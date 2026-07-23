@@ -43,7 +43,7 @@ serde = { version = "^1.0", features = ["derive"] }
 serde_derive = "^1.0"
 serde_json = { version = "1.0.145", features = ["float_roundtrip"] }
 serde_path_to_error = "0.1"
-serde_yaml = "0.9.34"
+serde_yaml_ng = "0.10"
 statrs = "0.17.1"
 
 # Optional dependencies (alphabetical order)
@@ -61,6 +61,7 @@ constcat = "0.6.1"
 paste = "1.0.15"
 subenum = "1.1.3"
 scoped_threadpool = "0.1.9"
+yaml-include = "0.8.1"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

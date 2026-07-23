@@ -204,12 +204,13 @@ impl SimulatorConfig {
     /// This method also resolves `base_path` from the parent directory of the
     /// input path and expands time-analysis output paths accordingly.
     pub fn load_from_path(path: &Path) -> SimbaResult<Self> {
-        let mut config: serde_yaml::Value = match confy::load_path(path) {
-            Ok(config) => config,
+        // let mut value = .expect("Failed to load config").parse();
+        let mut config: serde_yaml_ng::Value = match yaml_include::Transformer::new(path.into(), true) {
+            Ok(loader) => loader.parse(),
             Err(error) => {
                 let what = format!(
-                    "Error from Confy while loading the config file : {}",
-                    utils::confy::detailed_error(&error)
+                    "Error while loading the config file : {}",
+                    error
                 );
                 println!("ERROR: {what}");
                 return Err(SimbaError::new(SimbaErrorTypes::ConfigError, what));
@@ -220,7 +221,7 @@ impl SimulatorConfig {
             println!("ERROR: {what}");
             SimbaError::new(SimbaErrorTypes::ConfigError, what)
         })?;
-        let mut config: SimulatorConfig = match serde_yaml::from_value(config) {
+        let mut config: SimulatorConfig = match serde_yaml_ng::from_value(config) {
             Ok(c) => c,
             Err(e) => {
                 let what = format!(
