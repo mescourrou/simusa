@@ -4,26 +4,16 @@ use std::{
 };
 
 use crate::{
-    constants::TIME_ROUND,
-    context::Context,
-    logger::LogLevel,
-    navigators::{
-        NavigatorConfig, go_to::GoToConfig, trajectory_follower::TrajectoryFollowerConfig,
-    },
-    networking::network::Network,
-    node::node_factory::{RecordType, RobotConfig},
-    plugin_api::PluginAPI,
-    sensors::{
+    constants::TIME_ROUND, context::Context, logger::LogLevel, navigators::{
+        NavigatorConfig, go_to::GoToConfig, trajectory::TrajectoryConfig, trajectory_follower::TrajectoryFollowerConfig,
+    }, networking::network::Network, node::node_factory::{RecordType, RobotConfig}, plugin_api::PluginAPI, sensors::{
         SensorConfig,
         robot_sensor::RobotSensorConfig,
         sensor_manager::{ManagedSensorConfig, SensorManagerConfig},
-    },
-    simulator::{ResultConfig, Simulator, SimulatorConfig},
-    state_estimators::{
+    }, simulator::{ResultConfig, Simulator, SimulatorConfig}, state_estimators::{
         BenchStateEstimatorConfig, StateEstimator, StateEstimatorConfig,
         external_estimator::ExternalEstimatorConfig, perfect_estimator::PerfectEstimatorConfig,
-    },
-    utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
+    }, utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
 };
 
 struct PluginAPITest<SE: StateEstimator + 'static> {
@@ -353,8 +343,10 @@ fn trigger_sensor() {
     config.robots.push(RobotConfig {
         name: "robot1".to_string(),
         navigator: NavigatorConfig::TrajectoryFollower(TrajectoryFollowerConfig {
-            trajectory_path: env!("CARGO_MANIFEST_DIR").to_string()
-                + "/test_config/paths/path1.yaml",
+            trajectory: TrajectoryConfig {
+                point_list: vec![vec![0., 0.], vec![1., 1.]],
+                do_loop: false,
+            },
             ..Default::default()
         }),
         state_estimator_bench: vec![BenchStateEstimatorConfig {

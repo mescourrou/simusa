@@ -19,13 +19,7 @@ use nalgebra::{Vector2, Vector3};
 use simba_macros::config_derives;
 
 use crate::{
-    context::Context,
-    environment::{map::Map, oriented_landmark::OrientedLandmark},
-    errors::SimbaResult,
-    internal,
-    logger::InternalLog,
-    node::NodeMetaData,
-    utils::{
+    context::Context, environment::{map::{Map, MapConfig}, oriented_landmark::OrientedLandmark}, errors::SimbaResult, internal, logger::InternalLog, node::NodeMetaData, utils::{
         SharedRoLock, SharedRwLock,
         determinist_random_variable::DeterministRandomVariableFactory,
         geometry::{
@@ -48,10 +42,10 @@ pub mod oriented_landmark;
 #[config_derives]
 #[derive(Default)]
 pub struct EnvironmentConfig {
-    /// Optional map file path.
-    ///
-    /// If `None` (default), an empty [`Map`] is used.
-    pub map_path: Option<String>,
+    /// Optional map of the environment.
+    /// 
+    /// To use an external file, use the !include tag.
+    pub map: MapConfig,
 }
 
 #[cfg(feature = "gui")]
@@ -66,26 +60,15 @@ impl crate::gui::UIComponent for EnvironmentConfig {
         _unique_id: &str,
     ) {
         ui.horizontal(|ui| {
-            ui.label("Map path: ");
-            if let Some(map_path) = &mut self.map_path {
-                path_finder(ui, map_path, &global_config.base_path);
-                if ui.button("-").clicked() {
-                    self.map_path = None;
-                }
-            } else if ui.button("+").clicked() {
-                self.map_path = Some(String::new());
-            }
+            ui.label("Map: ");
+            self.map.show_mut(ui, _ctx, _buffer_stack, global_config, _current_node_name, _unique_id);
         });
     }
 
     fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
         ui.horizontal(|ui| {
-            ui.label("Map path: ");
-            if let Some(map_path) = &self.map_path {
-                ui.label(map_path);
-            } else {
-                ui.label("None");
-            }
+            ui.label("Map: ");
+            self.map.show(ui, _ctx, _unique_id);
         });
     }
 }
@@ -112,14 +95,9 @@ impl Environment {
     /// Loads the configured map path when provided; otherwise initializes an empty [`Map`].
     pub fn from_config(
         config: &EnvironmentConfig,
-        global_config: &SimulatorConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
     ) -> SimbaResult<Self> {
-        let map = if let Some(map_path) = &config.map_path {
-            Map::load_from_path(&global_config.base_path.join(map_path), va_factory)?
-        } else {
-            Map::new()
-        };
+        let map = Map::from_config(&config.map, va_factory)?;
         Ok(Self {
             map,
             meta_data_list: Arc::new(RwLock::new(HashMap::new())),

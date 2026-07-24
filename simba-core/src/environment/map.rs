@@ -1,12 +1,14 @@
 //! Map representation containing multiple landmarks.
 
+#[cfg(feature = "gui")]
+use std::collections::BTreeMap;
 use std::{path::Path, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 use simba_macros::{config_derives, enum_variables};
 
 #[cfg(feature = "gui")]
-use crate::gui::UIComponent;
+use crate::{gui::{UIComponent, utils::enum_combobox}, simulator::SimulatorConfig, utils::enum_tools::ToVec};
 use crate::{
     config::NumberConfig,
     environment::oriented_landmark::{
@@ -53,6 +55,81 @@ pub struct MapConfig {
     pub landmarks: Vec<OrientedLandmarkConfig>,
     /// Random generation parameters.
     pub random: Vec<RandomMap>,
+}
+
+#[cfg(feature = "gui")]
+impl UIComponent for MapConfig {
+    fn show_mut(
+        &mut self,
+        ui: &mut egui::Ui,
+        ctx: &egui::Context,
+        buffer_stack: &mut BTreeMap<String, String>,
+        global_config: &SimulatorConfig,
+        current_node_name: Option<&String>,
+        unique_id: &str,
+    ) {
+        ui.vertical(|ui| {
+            ui.label("Landmarks:");
+            for (i, landmark) in self.landmarks.iter_mut().enumerate() {
+                egui::CollapsingHeader::new(format!("Landmark {}", i)).show(ui, |ui| {
+                    landmark.show_mut(
+                        ui,
+                        ctx,
+                        buffer_stack,
+                        global_config,
+                        current_node_name,
+                        format!("{}-landmark-{}", unique_id, i).as_str(),
+                    );
+                });
+            }
+            if ui.button("+ Add Landmark").clicked() {
+                self.landmarks.push(OrientedLandmarkConfig::default());
+            }
+            ui.separator();
+            ui.label("Random generation:");
+            for (i, random_map) in self.random.iter_mut().enumerate() {
+                egui::CollapsingHeader::new(format!("Random Map {}", i)).show(ui, |ui| {
+                    random_map.show_mut(
+                        ui,
+                        ctx,
+                        buffer_stack,
+                        global_config,
+                        current_node_name,
+                        format!("{}-random-map-{}", unique_id, i).as_str(),
+                    );
+                });
+            }
+            if ui.button("+ Add Random Map").clicked() {
+                self.random.push(RandomMap::default());
+            }
+        });
+    }
+
+    fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
+        ui.vertical(|ui| {
+            ui.label("Landmarks:");
+            for (i, landmark) in self.landmarks.iter().enumerate() {
+                egui::CollapsingHeader::new(format!("Landmark {}", i)).show(ui, |ui| {
+                    landmark.show(
+                        ui,
+                        ctx,
+                        format!("{}-landmark-{}", unique_id, i).as_str(),
+                    );
+                });
+            }
+            ui.separator();
+            ui.label("Random generation:");
+            for (i, random_map) in self.random.iter().enumerate() {
+                egui::CollapsingHeader::new(format!("Random Map {}", i)).show(ui, |ui| {
+                    random_map.show(
+                        ui,
+                        ctx,
+                        format!("{}-random-map-{}", unique_id, i).as_str(),
+                    );
+                });
+            }
+        });
+    }
 }
 
 enum_variables!(
@@ -113,6 +190,77 @@ impl Check for RandomMap {
         } else {
             Err(errors)
         }
+    }
+}
+
+#[cfg(feature = "gui")]
+impl UIComponent for RandomMap {
+    fn show_mut(
+        &mut self,
+        ui: &mut egui::Ui,
+        ctx: &egui::Context,
+        buffer_stack: &mut BTreeMap<String, String>,
+        global_config: &SimulatorConfig,
+        current_node_name: Option<&String>,
+        unique_id: &str,
+    ) {
+        ui.vertical(|ui|{
+            ui.horizontal(|ui| {
+                ui.label("Number of landmarks:");
+                self.number.show_mut(ui, ctx, buffer_stack, global_config, current_node_name, unique_id);
+            });
+            ui.label("Distributions:");
+            RandomVariableTypeConfig::show_vector_mut(
+                &mut self.distributions,
+                ui,
+                ctx,
+                buffer_stack,
+                global_config,
+                current_node_name,
+                unique_id,
+            );
+            let possible_variables: Vec<MapVariables> = MapVariables::to_vec();
+            ui.horizontal(|ui| {
+                ui.label("Variable order:");
+                for (i, var) in self.variable_order.iter_mut().enumerate() {
+                    let unique_var_id = format!("variable-{i}-{unique_id}");
+                    enum_combobox(ui, var, unique_var_id);
+                }
+                if !self.variable_order.is_empty() && ui.button("-").clicked() {
+                    self.variable_order.pop();
+                }
+                if ui.button("+").clicked() {
+                    self.variable_order.push(
+                        possible_variables
+                            .get(self.variable_order.len().min(possible_variables.len()))
+                            .unwrap()
+                            .clone(),
+                    );
+                }
+            });
+        });
+    }
+
+    fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
+        ui.vertical(|ui|{
+            ui.horizontal(|ui| {
+                ui.label("Number of landmarks:");
+                self.number.show(ui, ctx, unique_id);
+            });
+            ui.label("Distributions:");
+            RandomVariableTypeConfig::show_vector(
+                &self.distributions,
+                ui,
+                ctx,
+                unique_id,
+            );
+            ui.horizontal(|ui| {
+                ui.label("Variable order:");
+                for (i, var) in self.variable_order.iter().enumerate() {
+                    ui.label(format!("{}: {}", i, var));
+                }
+            });
+        });
     }
 }
 
@@ -177,30 +325,17 @@ impl Map {
     }
 
     /// Load the map from the given `path`.
-    pub fn load_from_path(
-        path: &Path,
+    pub fn from_config(
+        config: &MapConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
     ) -> SimbaResult<Map> {
-        let config: MapConfig = match confy::load_path(path) {
-            Ok(config) => config,
-            Err(error) => {
-                return Err(SimbaError::new(
-                    SimbaErrorTypes::ConfigError,
-                    format!(
-                        "Error from Confy while loading the map file {} : {}",
-                        path.display(),
-                        error
-                    ),
-                ));
-            }
-        };
         let mut landmarks = config
             .landmarks
             .iter()
             .map(OrientedLandmark::from_config)
             .collect::<Vec<_>>();
         let mut max_id = landmarks.iter().map(|l| l.id).max().unwrap_or(0) as usize + 1;
-        for random_config in config.random {
+        for random_config in &config.random {
             let new_landmarks = random_config.generate_landmarks(va_factory, max_id);
             max_id += new_landmarks.len();
             landmarks.extend(new_landmarks);

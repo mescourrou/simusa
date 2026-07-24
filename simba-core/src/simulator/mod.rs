@@ -379,7 +379,6 @@ impl Simulator {
 
         self.environment = Arc::new(Environment::from_config(
             &config.environment,
-            &config,
             &self.determinist_va_factory,
         )?);
 

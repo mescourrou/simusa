@@ -1,7 +1,7 @@
 name: drone1
 navigator: 
   type: TrajectoryFollower
-  trajectory_path: paths/path1.yaml
+  trajectory: !include paths/path1.yaml
   forward_distance: 0.2
   target_speed: 1.
   stop_distance: 0.2

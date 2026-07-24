@@ -11,12 +11,12 @@ results: {} #default results
 max_time: 60.
 random_seed: 85646513.6849618
 environment:
-  map_path: "maps/landmarks_square.yaml"
+  map: !include "maps/landmarks_square.yaml"
 robots:
   - name: "robot1"
     navigator: 
       type: TrajectoryFollower
-      trajectory_path: "paths/path1.yaml"
+      trajectory: !include "paths/path1.yaml"
       target_speed: 0.5
       forward_distance: 0.2
     controller:
@@ -85,7 +85,7 @@ robots:
   - name: "robot2"
     navigator:
       type: TrajectoryFollower
-      trajectory_path: "paths/path1.yaml"
+      trajectory: !include "paths/path1.yaml"
       target_speed: 0.3
       forward_distance: 0.2
     physics: 
@@ -107,7 +107,7 @@ robots:
   - name: "robot3"
     navigator:
       type: TrajectoryFollower
-      trajectory_path: "paths/path1.yaml"
+      trajectory: !include "paths/path1.yaml"
       target_speed: 0.3
       forward_distance: 0.2
     physics: 

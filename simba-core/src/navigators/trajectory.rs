@@ -7,6 +7,7 @@ use config_checker::macros::Check;
 use libm::atan2;
 use na::{DMatrix, SVector};
 use nalgebra::Vector2;
+use simba_macros::config_derives;
 
 #[cfg(feature = "gui")]
 use crate::gui::UIComponent;
@@ -22,9 +23,7 @@ use serde_derive::{Deserialize, Serialize};
 ///
 /// This configuration takes a list of points and a boolean for looping (return to first point after the last one).
 /// Points are 1- or 2-dimensional. Any extra dimension is ignored, and missing dimensions are filled with 0.
-#[derive(Serialize, Deserialize, Debug, Check)]
-#[serde(default)]
-#[serde(deny_unknown_fields)]
+#[config_derives]
 pub struct TrajectoryConfig {
     /// Ordered list of the points to follow.
     pub point_list: Vec<Vec<f32>>,
@@ -38,6 +37,55 @@ impl Default for TrajectoryConfig {
             point_list: Vec::new(),
             do_loop: true,
         }
+    }
+}
+
+#[cfg(feature = "gui")]
+impl UIComponent for TrajectoryConfig {
+    fn show_mut(
+        &mut self,
+        ui: &mut egui::Ui,
+        _ctx: &egui::Context,
+        _buffer_stack: &mut std::collections::BTreeMap<String, String>,
+        _global_config: &crate::simulator::SimulatorConfig,
+        _current_node_name: Option<&String>,
+        _unique_id: &str,
+    )
+    {
+        ui.vertical(|ui| {
+            ui.horizontal(|ui| {
+                ui.label("Loop trajectory:");
+                ui.checkbox(&mut self.do_loop, "");
+            });
+            ui.label("Points:");
+            let mut to_remove = Vec::new();
+            for (i, point) in self.point_list.iter_mut().enumerate() {
+                ui.horizontal(|ui| {
+                    ui.label(format!("Point {}:", i));
+                    ui.add(egui::DragValue::new(&mut point[0]).max_decimals(crate::constants::TIME_ROUND_DECIMALS));
+                    ui.add(egui::DragValue::new(&mut point[1]).max_decimals(crate::constants::TIME_ROUND_DECIMALS));
+                    if ui.button("-").clicked() {
+                        to_remove.push(i);
+                    }
+                });
+            }
+            for i in to_remove.into_iter().rev() {
+                self.point_list.remove(i);
+            }
+            if ui.button("+ Add point").clicked() {
+                self.point_list.push(vec![0., 0.]);
+            }
+        });
+    }
+
+    fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
+        ui.vertical(|ui| {
+            ui.label(format!("Loop trajectory: {}", self.do_loop));
+            ui.label("Points:");
+            for (i, point) in self.point_list.iter().enumerate() {
+                ui.label(format!("Point {}: ({}, {})", i, point[0], point[1]));
+            }
+        });
     }
 }
 

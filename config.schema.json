@@ -21,7 +21,10 @@
       "description": "Global environment settings (maps).",
       "$ref": "#/$defs/EnvironmentConfig",
       "default": {
-        "map_path": null
+        "map": {
+          "landmarks": [],
+          "random": []
+        }
       }
     },
     "log": {
@@ -764,13 +767,13 @@
       "description": "Configuration for building an [`Environment`].\n\nThe map contains the map geometry. It is loaded from a file when `map_path` is provided, or initialized as empty otherwise. The map file should be parsable by the [`Map`] struct, which currently supports a simple custom format (see its documentation for details).\n\nThe map path is relative to the simulator config path.",
       "type": "object",
       "properties": {
-        "map_path": {
-          "description": "Optional map file path.\n\nIf `None` (default), an empty [`Map`] is used.",
-          "type": [
-            "string",
-            "null"
-          ],
-          "default": null
+        "map": {
+          "description": "Optional map of the environment.\n\nTo use an external file, use the !include tag.",
+          "$ref": "#/$defs/MapConfig",
+          "default": {
+            "landmarks": [],
+            "random": []
+          }
         }
       },
       "additionalProperties": false
@@ -1792,6 +1795,59 @@
       },
       "additionalProperties": false
     },
+    "MapConfig": {
+      "description": "Map containing multiple [`OrientedLandmark`] and possibility for random generation.\n\n# File example\n```yaml\nlandmarks:\n  - id: 1\n    x: 3\n    y: 2\n    theta: 0.7854\n    width: 2.8284\n    height: 0\n  - id: 2\n    x: 5.5\n    y: 7\n    theta: 1.5708\n    width: 3\n    height: 1\nrandom:\n  - number:\n      type: Num\n      value: 5\n    distributions:\n      - type: Uniform  \n        min: [0, 0, -3.1416]\n        max: [10, 10, 3.1416]\n    variable_order: [x, y, theta]\n```",
+      "type": "object",
+      "properties": {
+        "landmarks": {
+          "description": "Landmarks contained in the map.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/OrientedLandmarkConfig"
+          }
+        },
+        "random": {
+          "description": "Random generation parameters.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/RandomMap"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "MapVariables": {
+      "description": "Variables of the [`RandomMap`].",
+      "oneOf": [
+        {
+          "description": "X position of the landmark\n\n\nSerialization values(s) for this variable: `x`",
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "description": "Y position of the landmark\n\n\nSerialization values(s) for this variable: `y`",
+          "type": "string",
+          "const": "y"
+        },
+        {
+          "description": "Orientation of the landmark\n\n\nSerialization values(s) for this variable: `theta`, `orientation`",
+          "type": "string",
+          "const": "theta"
+        },
+        {
+          "description": "Height of the landmark\n\n\nSerialization values(s) for this variable: `height`, `h`",
+          "type": "string",
+          "const": "height"
+        },
+        {
+          "description": "Width of the landmark\n\n\nSerialization values(s) for this variable: `width`, `w`",
+          "type": "string",
+          "const": "width"
+        }
+      ]
+    },
     "NavigatorConfig": {
       "description": "Enumerate the configuration of the different strategies.\n\nThe navigator computes control errors from a target behavior.",
       "oneOf": [
@@ -1823,10 +1879,13 @@
               "format": "float",
               "default": 0.5
             },
-            "trajectory_path": {
-              "description": "Path of the trajectory configuration file.\n\nThe file must deserialize as [`TrajectoryConfig`]. Relative paths are resolved from\nthe configuration path.\nDefault: empty string (`\"\"`), which makes [`TrajectoryFollower::from_config`] fall back to\n[`TrajectoryFollower::new`].",
-              "type": "string",
-              "default": ""
+            "trajectory": {
+              "description": "Path to follow.\n\nTo use an external file, use !include path/to/file.yaml. The path is relative to the path of the configuration file.",
+              "$ref": "#/$defs/TrajectoryConfig",
+              "default": {
+                "do_loop": true,
+                "point_list": []
+              }
             },
             "type": {
               "type": "string",
@@ -1985,6 +2044,57 @@
           "format": "uint",
           "default": 0,
           "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "OrientedLandmarkConfig": {
+      "description": "Landmark entry loaded from map data.",
+      "type": "object",
+      "properties": {
+        "height": {
+          "description": "Height of the landmark used for obstruction checks.\n\nUse `0.0` for fully transparent landmarks. Default is `1.0` for non-transparent landmarks.",
+          "type": "number",
+          "format": "float",
+          "default": 1.0
+        },
+        "id": {
+          "description": "Unique landmark identifier.",
+          "type": "integer",
+          "format": "int32",
+          "default": 0
+        },
+        "labels": {
+          "description": "Optional semantic labels associated with this landmark.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "theta": {
+          "description": "Landmark orientation in radians.",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
+        },
+        "width": {
+          "description": "Landmark width, in meters.\n\nCan be `0.0` for point-like landmarks.",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
+        },
+        "x": {
+          "description": "Landmark x position.",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
+        },
+        "y": {
+          "description": "Landmark y position.",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
         }
       },
       "additionalProperties": false
@@ -2888,6 +2998,37 @@
       "file": {
         "type": "string"
       }
+    },
+    "RandomMap": {
+      "description": "Configuration for generating random landmarks in the map.",
+      "type": "object",
+      "properties": {
+        "distributions": {
+          "description": "List of distributions to generate the landmarks. The order should be consistent\nwith `variable_order`.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/RandomVariableTypeConfig"
+          }
+        },
+        "number": {
+          "description": "Number of landmarks to generate randomly.",
+          "$ref": "#/$defs/NumberConfig",
+          "default": {
+            "type": "Num",
+            "value": 0.0
+          }
+        },
+        "variable_order": {
+          "description": "Ordered list of target variables receiving sampled perturbations.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/MapVariables"
+          }
+        }
+      },
+      "additionalProperties": false
     },
     "RandomVariableTypeConfig": {
       "description": "Configuration of random-variable type and parameters.",
@@ -5474,6 +5615,30 @@
           "default": {
             "type": "Num",
             "value": 0.0
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "TrajectoryConfig": {
+      "description": "Config of the [`Trajectory`].\n\nThis configuration takes a list of points and a boolean for looping (return to first point after the last one).\nPoints are 1- or 2-dimensional. Any extra dimension is ignored, and missing dimensions are filled with 0.",
+      "type": "object",
+      "properties": {
+        "do_loop": {
+          "description": "Closing the loop or not.",
+          "type": "boolean",
+          "default": true
+        },
+        "point_list": {
+          "description": "Ordered list of the points to follow.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "float"
+            }
           }
         }
       },

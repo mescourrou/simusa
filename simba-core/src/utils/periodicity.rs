@@ -84,26 +84,12 @@ impl UIComponent for PeriodicityConfig {
         ui.vertical(|ui| {
             ui.horizontal(|ui| {
                 ui.label("Period:");
-                match &self.period {
-                    NumberConfig::Num(num) => {
-                        ui.label(format!("{}", num));
-                    }
-                    NumberConfig::Rand(rand_config) => {
-                        rand_config.show(ui, ctx, unique_id);
-                    }
-                }
+                self.period.show(ui, ctx, unique_id);
             });
             ui.horizontal(|ui| {
                 ui.label("Offset:");
                 if let Some(offset) = &self.offset {
-                    match offset {
-                        NumberConfig::Num(num) => {
-                            ui.label(format!("{}", num));
-                        }
-                        NumberConfig::Rand(rand_config) => {
-                            rand_config.show(ui, ctx, unique_id);
-                        }
-                    }
+                    offset.show(ui, ctx, unique_id);
                 } else {
                     ui.label("Same as period");
                 }
@@ -131,57 +117,26 @@ impl UIComponent for PeriodicityConfig {
         ui.vertical(|ui| {
             ui.horizontal(|ui| {
                 ui.label("Period:");
-                match &mut self.period {
-                    NumberConfig::Num(num) => {
-                        ui.add(egui::DragValue::new(num).max_decimals(TIME_ROUND_DECIMALS));
-                    }
-                    NumberConfig::Rand(rand_config) => {
-                        rand_config.show_mut(
+                self.period.show_mut(
                             ui,
                             ctx,
                             buffer_stack,
                             global_config,
                             current_node_name,
                             unique_id,
-                        );
-                    }
-                }
-                if ui.button("Switch number type").clicked() {
-                    self.period = match &self.period {
-                        NumberConfig::Num(_) => {
-                            NumberConfig::Rand(RandomVariableTypeConfig::default())
-                        }
-                        NumberConfig::Rand(_) => NumberConfig::Num(1.),
-                    }
-                }
+                );
             });
             ui.horizontal(|ui| {
                 ui.label("Offset:");
                 if let Some(offset) = &mut self.offset {
-                    match offset {
-                        NumberConfig::Num(num) => {
-                            ui.add(egui::DragValue::new(num).max_decimals(TIME_ROUND_DECIMALS));
-                        }
-                        NumberConfig::Rand(rand_config) => {
-                            rand_config.show_mut(
-                                ui,
-                                ctx,
-                                buffer_stack,
-                                global_config,
-                                current_node_name,
-                                unique_id,
-                            );
-                        }
-                    }
-                    if ui.button("Switch number type").clicked() {
-                        self.offset = match &self.offset {
-                            Some(NumberConfig::Num(_)) => {
-                                Some(NumberConfig::Rand(RandomVariableTypeConfig::default()))
-                            }
-                            Some(NumberConfig::Rand(_)) => Some(NumberConfig::Num(1.)),
-                            None => None,
-                        }
-                    }
+                    offset.show_mut(
+                        ui,
+                        ctx,
+                        buffer_stack,
+                        global_config,
+                        current_node_name,
+                        unique_id,
+                    );
                 } else {
                     ui.label("Same as period");
                     if ui.button("Set custom offset").clicked() {

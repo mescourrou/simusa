@@ -16,12 +16,12 @@ time_analysis:
   analysis_unit: s
 random_seed: 745138341
 environment:
-  map_path: maps/landmarks_obstruction.yaml
+  map: !include maps/landmarks_obstruction.yaml
 robots:
 - name: robot1
   navigator: 
     type: TrajectoryFollower
-    trajectory_path: paths/path1.yaml
+    trajectory: !include paths/path1.yaml
     forward_distance: 0.2
     target_speed: 0.5
     stop_distance: 0.2
@@ -116,7 +116,7 @@ robots:
 - name: robot2
   navigator: 
     type: TrajectoryFollower
-    trajectory_path: paths/path1.yaml
+    trajectory: !include paths/path1.yaml
     forward_distance: 0.2
     target_speed: 0.3
     stop_distance: 0.2
@@ -168,7 +168,7 @@ robots:
 - name: drone1
   navigator: 
     type: TrajectoryFollower
-    trajectory_path: paths/path1.yaml
+    trajectory: !include paths/path1.yaml
     forward_distance: 0.2
     target_speed: 1.
     stop_distance: 0.2

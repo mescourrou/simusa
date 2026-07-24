@@ -11,6 +11,8 @@ log:
       value: "simulator.log"
 results:
   result_path: "results.json"
+  analyse_script: ../python_scripts/analyse_results.py
+  show_figures: false
 max_time: 60.0
 time_analysis:
   exporter:
@@ -19,7 +21,7 @@ time_analysis:
   analysis_unit: s
 random_seed: null
 environment:
-  map_path: maps/landmarks_square.yaml
+  map: !include maps/landmarks_square.yaml
 robots:
 - !include robot1.yaml
 - !include robot2.yaml

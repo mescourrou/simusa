@@ -42,13 +42,10 @@ use std::path::Path;
 /// coefficient of `stop_ramp_coefficient`.
 #[config_derives]
 pub struct TrajectoryFollowerConfig {
-    /// Path of the trajectory configuration file.
-    ///
-    /// The file must deserialize as [`TrajectoryConfig`]. Relative paths are resolved from
-    /// the configuration path.
-    /// Default: empty string (`""`), which makes [`TrajectoryFollower::from_config`] fall back to
-    /// [`TrajectoryFollower::new`].
-    pub trajectory_path: String,
+    /// Path to follow.
+    /// 
+    /// To use an external file, use !include path/to/file.yaml. The path is relative to the path of the configuration file.
+    pub trajectory: TrajectoryConfig,
     /// Forward projection distance used during map matching, in meters.
     ///
     /// Default: `1.0`.
@@ -90,7 +87,7 @@ impl Check for TrajectoryFollowerConfig {
 impl Default for TrajectoryFollowerConfig {
     fn default() -> Self {
         Self {
-            trajectory_path: String::from(""),
+            trajectory: TrajectoryConfig::default(),
             forward_distance: 1.0,
             target_speed: 0.5,
             stop_distance: 0.2,
@@ -114,8 +111,11 @@ impl UIComponent for TrajectoryFollowerConfig {
             .id_salt(format!("trajectory-follower-{}", unique_id))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label("Trajectory path:");
-                    path_finder(ui, &mut self.trajectory_path, &global_config.base_path);
+                    egui::CollapsingHeader::new("Trajectory")
+                        .id_salt(format!("trajectory-{}", unique_id))
+                        .show(ui, |ui| {
+                            self.trajectory.show_mut(ui, _ctx, _buffer_stack, global_config, _current_node_name, unique_id);
+                        });
                 });
 
                 ui.horizontal(|ui| {
@@ -157,7 +157,11 @@ impl UIComponent for TrajectoryFollowerConfig {
             .id_salt(format!("trajectory-follower-{}", unique_id))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(format!("Trajectory path: {}", self.trajectory_path));
+                    egui::CollapsingHeader::new("Trajectory")
+                        .id_salt(format!("trajectory-{}", unique_id))
+                        .show(ui, |ui| {
+                            self.trajectory.show(ui, _ctx, unique_id);
+                        });
                 });
 
                 ui.horizontal(|ui| {
@@ -274,16 +278,9 @@ impl TrajectoryFollower {
         global_config: &SimulatorConfig,
         _initial_time: f32,
     ) -> Self {
-        let mut path = Path::new(&config.trajectory_path);
-        if config.trajectory_path.is_empty() {
-            return Self::new();
-        }
-        let joined_path = global_config.base_path.join(&config.trajectory_path);
-        if path.is_relative() {
-            path = joined_path.as_path();
-        }
+        let trajectory =  Trajectory::from_config(&config.trajectory);
         TrajectoryFollower {
-            trajectory: Self::load_trajectory_from_path(path),
+            trajectory,
             forward_distance: config.forward_distance,
             target_speed: config.target_speed,
             error: ControllerError::default(),
@@ -291,23 +288,6 @@ impl TrajectoryFollower {
             stop_distance: config.stop_distance,
             stop_ramp_coefficient: config.stop_ramp_coefficient,
         }
-    }
-
-    /// Load the trajectory from the given `path`. This file should be compatible
-    /// with [`TrajectoryConfig`].
-    fn load_trajectory_from_path(path: &Path) -> Trajectory {
-        let trajectory: TrajectoryConfig = match confy::load_path(path) {
-            Ok(config) => config,
-            Err(error) => {
-                println!(
-                    "Error from Confy while loading the trajectory file {} : {}",
-                    path.display(),
-                    error
-                );
-                return Trajectory::new();
-            }
-        };
-        Trajectory::from_config(&trajectory)
     }
 }
 
