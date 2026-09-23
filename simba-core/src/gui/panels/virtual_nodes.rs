@@ -2,10 +2,10 @@ use std::collections::BTreeMap;
 
 use simba_com::time_ordered_data::TimeOrderedData;
 
-use crate::{gui::UIComponent, node::node_factory::RecordType};
+use crate::{gui::UIComponent, node::node_factory::{ComputationUnitRecord, RecordType}};
 
 pub struct VirtualNodesPanel {
-    records: BTreeMap<String, TimeOrderedData<RecordType>>,
+    records: BTreeMap<String, TimeOrderedData<ComputationUnitRecord>>,
 }
 
 impl VirtualNodesPanel {
@@ -15,7 +15,7 @@ impl VirtualNodesPanel {
         }
     }
 
-    pub fn add_record(&mut self, node_name: String, time: f32, record: RecordType) {
+    pub fn add_record(&mut self, node_name: String, time: f32, record: ComputationUnitRecord) {
         if let Some(records) = self.records.get_mut(&node_name) {
             records.insert(time, record, true);
         } else {

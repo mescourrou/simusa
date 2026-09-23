@@ -133,9 +133,8 @@ struct PrivateParams {
     plugin_api: Option<Arc<dyn PluginAPI>>,
     config: Option<SimulatorConfig>,
     current_draw_time: f32,
-    robots: BTreeMap<String, drawables::robot::Robot>,
-    map: drawables::map::Map,
     drawables: Vec<Box<dyn drawables::Drawable>>,
+    drawn_robots: Vec<String>,
     playing: Option<(f32, std::time::Instant)>,
     simulation_run: bool,
     configurator: Option<Configurator>,
@@ -159,9 +158,8 @@ impl Default for PrivateParams {
             plugin_api: None,
             config: None,
             current_draw_time: 0.,
-            robots: BTreeMap::new(),
-            map: drawables::map::Map::default(),
             drawables: Vec::new(),
+            drawn_robots: Vec::new(),
             playing: None,
             simulation_run: false,
             configurator: None,
@@ -412,16 +410,19 @@ impl SimbaApp {
             .lock()
             .unwrap()
             .get_environment();
-        self.p.map = drawables::map::Map::init(
+        self.p.drawables.clear();
+        self.p.drawables.push(Box::new(drawables::map::Map::init(
             environment.map().record(self.p.context.as_ref().unwrap()),
             config,
             self.p.context.as_ref().unwrap(),
-        );
+        )));
         for robot in &config.robots {
-            self.p.robots.insert(
-                robot.name.clone(),
-                drawables::robot::Robot::init(robot, config),
-            );
+            if robot.autospawn {
+                self.p.drawables.push(Box::new(
+                    drawables::robot::Robot::init(robot, config, robot.name.clone()),
+                ));
+                self.p.drawn_robots.push(robot.name.clone());
+            }
         }
         if let Some(plugin_api) = &self.p.plugin_api
             && let Some(drawable) = plugin_api.get_drawable(config)
@@ -432,20 +433,6 @@ impl SimbaApp {
 
     fn draw(&mut self, ui: &mut egui::Ui, viewport: Rect) -> Result<Vec<Shape>, Vec2> {
         let mut shapes = Vec::new();
-        shapes.extend(
-            self.p
-                .map
-                .draw(ui, &viewport, &self.p.painter_info, self.drawing_scale)?,
-        );
-        for robot in self.p.robots.values() {
-            shapes.extend(robot.draw(
-                ui,
-                &viewport,
-                &self.p.painter_info,
-                self.drawing_scale,
-                self.p.current_draw_time,
-            )?);
-        }
         for drawable in &self.p.drawables {
             shapes.extend(drawable.draw(
                 ui,
@@ -465,17 +452,6 @@ impl SimbaApp {
         _viewport: Rect,
         response: &Response,
     ) {
-        for robot in self.p.robots.values_mut() {
-            robot.react(
-                ui,
-                ctx,
-                response,
-                &self.p.painter_info,
-                self.drawing_scale,
-                self.p.current_draw_time,
-            );
-        }
-
         for drawable in self.p.drawables.iter_mut() {
             drawable.react(
                 ui,
@@ -488,41 +464,47 @@ impl SimbaApp {
         }
     }
 
-    fn add_result(&mut self, time: f32, node: RecordType) {
+    fn add_result(&mut self, time: f32, record: RecordType) {
         let time = round_precision(time, TIME_ROUND).unwrap();
-        match &node {
+        match &record {
             RecordType::ComputationUnit(rec) => {
                 self.p
                     .virtual_nodes_panel
-                    .add_record(rec.name.clone(), time, node.clone());
-            }
-            RecordType::Robot(n) => {
-                if let Some(r) = self.p.robots.get_mut(&n.name) {
-                    r.add_record(time, *n.clone());
-                } else if let Some(config) = &self.p.config
-                    && let Some(new_config) =
-                        config.robots.iter().find(|rc| rc.name == n.model_name)
-                {
-                    self.p.robots.insert(
-                        n.name.clone(),
-                        drawables::robot::Robot::init(new_config, config),
-                    );
-                } else {
-                    error!(
-                        self.p.context.as_ref().unwrap(),
-                        "Received record for unknown robot {}", n.name
-                    );
+                    .add_record(rec.name.clone(), time, *rec.clone());
+                for drawable in self.p.drawables.iter_mut() {
+                    drawable.add_computation_unit_record(time, *rec.clone());
                 }
             }
-            RecordType::Map(map_record) => {
-                self.p.map.update_map(*map_record.clone());
+            RecordType::Robot(rec) => {
+                if !self.p.drawn_robots.contains(&rec.name) && let Some(config) = &self.p.config {
+                    if let Some(new_config) =
+                            config.robots.iter().find(|rc| rc.name == rec.model_name)
+                    {
+                        self.p.drawables.push(Box::new(
+                            drawables::robot::Robot::init(new_config, config, rec.name.clone()),
+                        ));
+                        self.p.drawn_robots.push(rec.name.clone());
+                    } else {
+                        error!(
+                            self.p.context.as_ref().unwrap(),
+                            "Received record for unknown robot {}", rec.name
+                        );
+                    }
+                }
+                for drawable in self.p.drawables.iter_mut() {
+                    drawable.add_robot_record(time, *rec.clone());
+                }
             }
-            RecordType::Scenario(_event_record) => {
-                todo!("Handle scenario events in the GUI");
+            RecordType::Map(rec) => {
+                for drawable in self.p.drawables.iter_mut() {
+                    drawable.add_map_record(time, *rec.clone());
+                }
             }
-        }
-        for drawable in self.p.drawables.iter_mut() {
-            drawable.add_record(time, node.clone());
+            RecordType::Scenario(rec) => {
+                for drawable in self.p.drawables.iter_mut() {
+                    drawable.add_scenario_record(time, *rec.clone());
+                }
+            }
         }
         if time > self.p.current_max_time {
             self.p.current_max_time = time;
@@ -648,6 +630,7 @@ impl eframe::App for SimbaApp {
                                 self.p.error_buffer.lock().unwrap().push((now, e));
                             }
                             Ok(c) => {
+                                self.duration = c.max_time;
                                 self.p.config = Some(c);
                                 if let Some(cfg) = &self.p.config.as_ref().unwrap().results && let Some(path) = &cfg.result_path {
                                     self.result_path = self.p.config.as_ref().unwrap().base_path.join(Path::new(&path)).to_str().unwrap().to_string();

@@ -1,6 +1,6 @@
 use egui::{Rect, Response, Shape, Vec2};
 
-use crate::{gui::app::PainterInfo, node::node_factory::RecordType};
+use crate::{environment::map::MapRecord, gui::app::PainterInfo, node::node_factory::{ComputationUnitConfig, ComputationUnitRecord, RecordType, RobotConfig, RobotRecord}, scenario::config::EventRecord, simulator::SimulatorConfig};
 
 pub mod map;
 pub mod observations;
@@ -9,7 +9,7 @@ pub mod robot;
 
 /// Trait for a drawable element in the GUI. It is used to draw the elements of the simulation in the GUI, such as the robot, the landmarks, the trajectory, etc., to react to the user interaction, and to draw additionnal windows.
 pub trait Drawable {
-    /// Function called when a new record is received. The time of the record can be different from the time of the last drawing.
+    /// Function called when a new robot record is received. The time of the record can be different from the time of the last drawing.
     ///
     /// You can use [`TimeOrderedData`](simba_com::time_ordered_data::TimeOrderedData) to manage the records.
     ///
@@ -17,7 +17,22 @@ pub trait Drawable {
     /// * `time` - The time of the record. It can be different from the time of the last drawing, and it can be in the past or in the future.
     /// * `record` - The record to add. It contains the information to draw the drawable for the given time.
     ///
-    fn add_record(&mut self, time: f32, record: RecordType);
+    fn add_robot_record(&mut self, time: f32, record: RobotRecord) {}
+
+    /// Function called when a new computation unit record is received. The time of the record can be different from the time of the last drawing.
+    /// 
+    /// See [`add_robot_record`](Drawable::add_robot_record) for more information.
+    fn add_computation_unit_record(&mut self, time: f32, record: ComputationUnitRecord) {}
+
+    /// Function called when a new map record is received. The time of the record can be different from the time of the last drawing.
+    ///
+    /// See [`add_robot_record`](Drawable::add_robot_record) for more information.
+    fn add_map_record(&mut self, time: f32, record: MapRecord) {}
+
+    /// Function called when a new scenario event record is received. The time of the record can be different from the time of the last drawing.
+    /// 
+    /// See [`add_robot_record`](Drawable::add_robot_record) for more information.
+    fn add_scenario_record(&mut self, time: f32, record: EventRecord) {}
 
     /// Draws the drawable for the given time.
     ///

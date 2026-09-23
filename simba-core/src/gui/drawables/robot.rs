@@ -3,11 +3,7 @@ use nalgebra::Vector3;
 use simba_com::time_ordered_data::TimeOrderedData;
 
 use crate::{
-    constants::TIME_ROUND,
-    gui::{UIComponent, app::PainterInfo, drawables},
-    node::node_factory::{RobotConfig, RobotRecord},
-    sensors::{SensorConfig, SensorObservationRecord},
-    simulator::SimulatorConfig,
+    constants::TIME_ROUND, gui::{Drawable, UIComponent, app::PainterInfo, drawables}, node::node_factory::{RecordType, RobotConfig, RobotRecord}, sensors::{SensorConfig, SensorObservationRecord}, simulator::SimulatorConfig,
 };
 
 use super::observations::{OrientedLandmarkObservation, OrientedRobotObservation};
@@ -21,10 +17,11 @@ pub struct Robot {
     gnss_obs: Option<drawables::observations::GNSSObservation>,
     scan_obs: Option<drawables::observations::ScanObservation>,
     context_info_enabled: bool,
+    robot_name: String,
 }
 
 impl Robot {
-    pub fn init(config: &RobotConfig, sim_config: &SimulatorConfig) -> Self {
+    pub fn init(config: &RobotConfig, sim_config: &SimulatorConfig, robot_name: String) -> Self {
         let mut landmark_obs = None;
         let mut robot_obs = None;
         let mut gnss_obs = None;
@@ -62,13 +59,20 @@ impl Robot {
             gnss_obs,
             scan_obs,
             context_info_enabled: false,
+            robot_name,
         }
     }
+}
 
-    pub fn add_record(&mut self, time: f32, record: RobotRecord) {
+impl Drawable for Robot {
+    fn add_robot_record(&mut self, time: f32, record: RobotRecord) {
+        if record.name != self.robot_name {
+            return;
+        }
         self.records.insert(time, record, true);
     }
-    pub fn draw(
+
+    fn draw(
         &self,
         ui: &mut egui::Ui,
         viewport: &Rect,
@@ -157,7 +161,7 @@ impl Robot {
         Ok(shapes)
     }
 
-    pub fn react(
+    fn react(
         &mut self,
         _ui: &mut egui::Ui,
         ctx: &egui::Context,

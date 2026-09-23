@@ -1,8 +1,7 @@
 use egui::{Color32, Rect, Shape, Stroke, Vec2};
 
 use crate::{
-    context::Context, environment::map::MapRecord, gui::app::PainterInfo,
-    simulator::SimulatorConfig,
+    context::Context, environment::map::MapRecord, gui::{Drawable, app::PainterInfo}, node::node_factory::RecordType, simulator::SimulatorConfig,
 };
 
 pub struct Map {
@@ -36,18 +35,21 @@ impl Map {
             current_map,
         }
     }
+}
 
-    pub fn update_map(&mut self, new_map: MapRecord) {
-        self.current_map = new_map;
+impl Drawable for Map {
+    fn add_map_record(&mut self, time: f32, record: MapRecord) {
+        self.current_map = record;
     }
 
     /// Build the set of map shapes for rendering in the current viewport.
-    pub fn draw(
+    fn draw(
         &self,
         _ui: &mut egui::Ui,
         _viewport: &Rect,
         painter_info: &PainterInfo,
         scale: f32,
+        _time: f32,
     ) -> Result<Vec<Shape>, Vec2> {
         let mut shapes = Vec::new();
         let center = painter_info.zero(scale);
