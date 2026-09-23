@@ -350,12 +350,15 @@ impl Simulator {
 
     /// Reset the simulator state from the currently loaded configuration.
     pub fn reset(&mut self, plugin_api: Option<Arc<dyn PluginAPI>>) -> SimbaResult<()> {
-        info!(self.context, "Reset node");
+        self.context.update_time(0.);
+        info!(self.context, "Reset simulator");
+        self.last_sim_time = -1.;
         self.network_manager.reset();
         self.environment.clear_meta_data();
         self.nodes = Vec::new();
+        self.node_apis.clear();
+        self.physics_list.write().unwrap().clear();
         self.time_cv = Arc::new(TimeCv::new());
-        self.last_sim_time = -1.;
         let config = self.config.clone();
         self.common_time = Arc::new(RwLock::new(f32::INFINITY));
         self.max_threads = config.optimization.threads;
@@ -384,19 +387,21 @@ impl Simulator {
 
         // Create robots
         for robot_config in &config.robots {
-            self.add_robot(
-                robot_config,
-                &config,
-                self.force_send_results,
-                0.,
-                &self.context.clone(),
-            )?;
-            let node = self.nodes.last().unwrap();
-            if let Some(physics) = node.physics() {
-                self.physics_list
-                    .write()
-                    .unwrap()
-                    .insert(node.name().clone(), physics);
+            if robot_config.autospawn {
+                self.add_robot(
+                    robot_config,
+                    &config,
+                    self.force_send_results,
+                    0.,
+                    &self.context.clone(),
+                )?;
+                let node = self.nodes.last().unwrap();
+                if let Some(physics) = node.physics() {
+                    self.physics_list
+                        .write()
+                        .unwrap()
+                        .insert(node.name().clone(), physics);
+                }
             }
         }
         // Create computation units
@@ -564,7 +569,7 @@ impl Simulator {
         initial_time: f32,
         context: &Context,
     ) -> SimbaResult<()> {
-        let context = context.new_callstack_level(&format!("add_robot({})", robot_config.name));
+        let context: Context = context.new_callstack_level(&format!("add_robot({})", robot_config.name));
         let new_node = NodeFactory::make_robot(
             robot_config,
             &mut MakeNodeParams {

@@ -10,20 +10,14 @@ use std::sync::{Arc, Mutex};
 use crate::{gui::UIComponent, simulator::SimulatorConfig};
 
 use crate::{
-    context::Context,
-    internal,
-    logger::InternalLog,
-    physics::{
+    context::Context, error, internal, logger::InternalLog, physics::{
         fault_models::fault_model::{
             PhysicsFaultModel, PhysicsFaultModelConfig, make_physics_fault_model_from_config,
         },
         robot_models::{
             Command, RobotModel, RobotModelConfig, make_model_from_config, unicycle::UnicycleConfig,
         },
-    },
-    recordable::Recordable,
-    state_estimators::{State, StateConfig, StateRecord},
-    utils::{SharedMutex, determinist_random_variable::DeterministRandomVariableFactory},
+    }, recordable::Recordable, state_estimators::{State, StateConfig, StateRecord}, utils::{SharedMutex, determinist_random_variable::DeterministRandomVariableFactory},
 };
 use config_checker::*;
 use serde_derive::{Deserialize, Serialize};
@@ -255,13 +249,20 @@ impl Physics for InternalPhysics {
     }
 
     /// Return the current state. Do not compute the state again.
-    fn state(&self, time: f32, _context: &Context) -> State {
-        assert!(
-            time == self.last_time_update,
-            "State should be requested at the same time as the last update: {} != {}",
-            time,
-            self.last_time_update
-        );
+    fn state(&self, time: f32, context: &Context) -> State {
+        if time != self.last_time_update {
+            error!(
+                context,
+                "State should be requested at the same time as the last update: {} != {}",
+                time,
+                self.last_time_update
+            );
+            panic!(
+                "State should be requested at the same time as the last update: {} != {}",
+                time,
+                self.last_time_update
+            );
+        }
         self.state.clone()
     }
 }
