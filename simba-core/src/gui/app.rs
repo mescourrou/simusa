@@ -9,23 +9,9 @@ use egui::{Align2, Color32, Id, Pos2, Rect, Response, Sense, Shape, Vec2};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AUTHORS, VERSION,
-    api::async_api::{AsyncApi, AsyncApiLoadConfigRequest, AsyncApiRunRequest, AsyncApiRunner},
-    constants::{TIME_ROUND, TIME_ROUND_DECIMALS},
-    context::Context,
-    error,
-    errors::{SimbaError, SimbaErrorTypes},
-    gui::{
-        UIComponent,
-        drawables::popup::Popup,
-        panels::{broker::BrokerPanel, logs::LogsPanel, virtual_nodes::VirtualNodesPanel},
-    },
-    info,
-    node::node_factory::RecordType,
-    plugin_api::PluginAPI,
-    recordable::Recordable,
-    simulator::{Record, SimbaBroker, Simulator, SimulatorConfig},
-    utils::{SharedMutex, SharedRoLock, maths::round_precision, numbers::OrderedF32},
+    AUTHORS, VERSION, api::async_api::{AsyncApi, AsyncApiLoadConfigRequest, AsyncApiRunRequest, AsyncApiRunner}, constants::{TIME_ROUND, TIME_ROUND_DECIMALS}, context::Context, error, errors::{SimbaError, SimbaErrorTypes}, gui::{
+        Drawable, UIComponent, drawables::{DrawableManager, popup::Popup}, panels::{broker::BrokerPanel, drawable_selector::DrawableSelectorPanel, logs::LogsPanel, virtual_nodes::VirtualNodesPanel},
+    }, info, node::node_factory::RecordType, plugin_api::PluginAPI, recordable::Recordable, simulator::{Record, SimbaBroker, Simulator, SimulatorConfig}, utils::{SharedMutex, SharedRoLock, maths::round_precision, numbers::OrderedF32},
 };
 
 use super::{
@@ -133,8 +119,6 @@ struct PrivateParams {
     plugin_api: Option<Arc<dyn PluginAPI>>,
     config: Option<SimulatorConfig>,
     current_draw_time: f32,
-    drawables: Vec<Box<dyn drawables::Drawable>>,
-    drawn_robots: Vec<String>,
     playing: Option<(f32, std::time::Instant)>,
     simulation_run: bool,
     configurator: Option<Configurator>,
@@ -145,6 +129,7 @@ struct PrivateParams {
     virtual_nodes_panel: VirtualNodesPanel,
     broker_panel: Option<BrokerPanel>,
     log_panel: Option<LogsPanel>,
+    drawable_selector_panel: DrawableSelectorPanel,
     current_max_time: f32,
     drawable_instants: BTreeSet<OrderedF32>,
     context: Option<Context>,
@@ -158,8 +143,7 @@ impl Default for PrivateParams {
             plugin_api: None,
             config: None,
             current_draw_time: 0.,
-            drawables: Vec::new(),
-            drawn_robots: Vec::new(),
+            drawable_selector_panel: DrawableSelectorPanel::new(),
             playing: None,
             simulation_run: false,
             configurator: None,
@@ -183,6 +167,7 @@ struct EnabledViews {
     virtual_nodes: bool,
     broker: bool,
     logs: bool,
+    drawable_selector: bool,
 }
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
@@ -198,6 +183,7 @@ pub struct SimbaApp {
     drawing_scale: f32,
     follow_sim_time: bool,
     enabled_views: EnabledViews,
+    drawable_manager: DrawableManager,
 }
 
 impl Default for SimbaApp {
@@ -214,6 +200,7 @@ impl Default for SimbaApp {
             drawing_scale: 100.,
             follow_sim_time: true,
             enabled_views: EnabledViews::default(),
+            drawable_manager: DrawableManager::new(),
         }
     }
 }
@@ -394,118 +381,42 @@ impl SimbaApp {
         self.p.server.as_ref().unwrap().lock().unwrap().stop();
     }
 
-    fn init_drawables(&mut self) {
-        if self.p.config.is_none() {
-            return;
-        }
-        let config = self.p.config.as_ref().unwrap();
-        let environment = self
-            .p
-            .server
-            .as_ref()
-            .unwrap()
-            .lock()
-            .unwrap()
-            .get_simulator()
-            .lock()
-            .unwrap()
-            .get_environment();
-        self.p.drawables.clear();
-        self.p.drawables.push(Box::new(drawables::map::Map::init(
-            environment.map().record(self.p.context.as_ref().unwrap()),
-            config,
-            self.p.context.as_ref().unwrap(),
-        )));
-        for robot in &config.robots {
-            if robot.autospawn {
-                self.p.drawables.push(Box::new(
-                    drawables::robot::Robot::init(robot, config, robot.name.clone()),
-                ));
-                self.p.drawn_robots.push(robot.name.clone());
-            }
-        }
-        if let Some(plugin_api) = &self.p.plugin_api
-            && let Some(drawable) = plugin_api.get_drawable(config)
-        {
-            self.p.drawables.push(drawable);
-        }
-    }
-
     fn draw(&mut self, ui: &mut egui::Ui, viewport: Rect) -> Result<Vec<Shape>, Vec2> {
-        let mut shapes = Vec::new();
-        for drawable in &self.p.drawables {
-            shapes.extend(drawable.draw(
-                ui,
-                &viewport,
-                &self.p.painter_info,
-                self.drawing_scale,
-                self.p.current_draw_time,
-            )?);
-        }
-        Ok(shapes)
+        self.drawable_manager.draw(
+            ui,
+            viewport,
+            &self.p.painter_info,
+            self.drawing_scale,
+            self.p.current_draw_time,
+        )
     }
 
     fn react(
         &mut self,
         ui: &mut egui::Ui,
         ctx: &egui::Context,
-        _viewport: Rect,
+        viewport: Rect,
         response: &Response,
     ) {
-        for drawable in self.p.drawables.iter_mut() {
-            drawable.react(
-                ui,
-                ctx,
-                response,
-                &self.p.painter_info,
-                self.drawing_scale,
-                self.p.current_draw_time,
-            );
-        }
+        self.drawable_manager.react(
+            ui,
+            ctx,
+            viewport,
+            response,
+            &self.p.painter_info,
+            self.drawing_scale,
+            self.p.current_draw_time,
+        );
     }
 
     fn add_result(&mut self, time: f32, record: RecordType) {
         let time = round_precision(time, TIME_ROUND).unwrap();
-        match &record {
-            RecordType::ComputationUnit(rec) => {
-                self.p
-                    .virtual_nodes_panel
-                    .add_record(rec.name.clone(), time, *rec.clone());
-                for drawable in self.p.drawables.iter_mut() {
-                    drawable.add_computation_unit_record(time, *rec.clone());
-                }
-            }
-            RecordType::Robot(rec) => {
-                if !self.p.drawn_robots.contains(&rec.name) && let Some(config) = &self.p.config {
-                    if let Some(new_config) =
-                            config.robots.iter().find(|rc| rc.name == rec.model_name)
-                    {
-                        self.p.drawables.push(Box::new(
-                            drawables::robot::Robot::init(new_config, config, rec.name.clone()),
-                        ));
-                        self.p.drawn_robots.push(rec.name.clone());
-                    } else {
-                        error!(
-                            self.p.context.as_ref().unwrap(),
-                            "Received record for unknown robot {}", rec.name
-                        );
-                    }
-                }
-                for drawable in self.p.drawables.iter_mut() {
-                    drawable.add_robot_record(time, *rec.clone());
-                }
-            }
-            RecordType::Map(rec) => {
-                for drawable in self.p.drawables.iter_mut() {
-                    drawable.add_map_record(time, *rec.clone());
-                }
-            }
-            RecordType::Scenario(rec) => {
-                for drawable in self.p.drawables.iter_mut() {
-                    drawable.add_scenario_record(time, *rec.clone());
-                }
-            }
+        if let RecordType::ComputationUnit(rec) = &record {
+            self.p
+                .virtual_nodes_panel
+                .add_record(rec.name.clone(), time, *rec.clone());
         }
+        self.drawable_manager.add_record(time, &record, &self.p.config, &self.p.context.as_ref().unwrap());
         if time > self.p.current_max_time {
             self.p.current_max_time = time;
         }
@@ -574,6 +485,7 @@ impl eframe::App for SimbaApp {
                         ui.checkbox(&mut self.enabled_views.virtual_nodes, "Virtual Nodes");
                         ui.checkbox(&mut self.enabled_views.broker, "Communication Broker");
                         ui.checkbox(&mut self.enabled_views.logs, "Logs");
+                        ui.checkbox(&mut self.enabled_views.drawable_selector, "Element Selector");
                     });
                     ui.add_space(16.0);
                     ui.menu_button("Help", |ui| {
@@ -635,7 +547,8 @@ impl eframe::App for SimbaApp {
                                 if let Some(cfg) = &self.p.config.as_ref().unwrap().results && let Some(path) = &cfg.result_path {
                                     self.result_path = self.p.config.as_ref().unwrap().base_path.join(Path::new(&path)).to_str().unwrap().to_string();
                                 }
-                                self.init_drawables();
+                                
+                                self.drawable_manager.init_drawables(self.p.config.as_ref().unwrap(), &self.p.plugin_api, &self.p.server, self.p.context.as_ref().unwrap());
                             }
                         }
                     }
@@ -888,6 +801,10 @@ impl eframe::App for SimbaApp {
                         } else {
                             ui.label("Broker information not available.");
                         }
+                    }
+                    if self.enabled_views.drawable_selector {
+                        self.p.drawable_selector_panel
+                            .draw(ui, ctx, "drawable_selector_panel", &mut self.drawable_manager);
                     }
                 });
                 // Allow resizing the side panel by dragging
