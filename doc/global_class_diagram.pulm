@@ -1,216 +1,808 @@
 @startuml
+skinparam pageMargin 10
 skinparam linetype polyline
 skinparam linetype ortho
 skinparam groupImplementation 2
 
-class Simulator
-Simulator *-- "*" Node
+package simulator {
+    class Simulator {
+        {static} from_config(SimulatorConfig, plugin_api: Option<PluginAPI>) -> Simulator
+        load_config(SimulatorConfig, plugin_api: Option<PluginAPI>)
+        reset(plugin_api: Option<PluginAPI>)
+        set_max_time(f32)
+        run()
+        load_results(filename: Option<String>) -> f32
+        {static} deserialize_results_from_file(filename: Path) -> Results
+        compute_results()
+        ===
+        get_records(sorted: bool = false) -> [Record]
+        get_async_api() -> SimulatorAsyncApi
+        get_broker() -> Broker
+        get_context() -> Context
+        get_environment() -> Environment
+        get_nodes() -> [Node]
+    }
+    Simulator *-- "*" .node.Node
+    Simulator *-- .utils.DeterministRandomVariableFactory
+    Simulator -- "?" .PluginAPI
+    Simulator -- SimulatorAsyncApi
 
-enum NodeType {
-    Robot
-    Sensor
-    Object
-    ComputationUnit
+    class AsyncSimulator {
+        {static} from_config(SimulatorConfig, plugin_api: Option<PluginAPI>) -> AsyncSimulator
+        run(plugin_api: Option<PluginAPI>, max_time: Option<f32>, reset: bool)
+        get_records(sorted: bool = false) -> [Record]
+        compute_results()
+        stop()
+        get_simulator() -> Simulator
+    }
+    AsyncSimulator *-- .api.AsyncApiRunner
+    AsyncSimulator *-- .api.AsyncApi
+    AsyncSimulator *-- "?" .api.PluginAsyncAPI
+
+    class SimulatorAsyncApi {
+        current_time: f32
+        {field} records: mpsc::Receiver<Record>
+    }
+
 }
-note right of NodeType::Robot
-    Can move, can be detected, can sense, can communicate
-end note
-note right of NodeType::Sensor
-    Cannot move, cannot be detected, can sense, can communicate
-end note
-note right of NodeType::Object
-    Can be moved, can be detected, cannot sense, cannot communicate
-end note
-note right of NodeType::ComputationUnit
-    Cannot move, cannot be detected, cannot sense, can communicate
-end note
 
-class Node
-Node *-- NodeType
+package api {
+    class AsyncApiRunner {
+        new_with_simulator(Simulator) -> AsyncApiRunner
+        get_api() -> AsyncApi
+        get_simulator() -> Simulator
+        stop()
+        run(plugin_api: Option<PluginAPI>)
+    }
+    AsyncApiRunner -- AsyncApi
+    AsyncApiRunner *-- AsyncApiServer
+    AsyncApiRunner *-- Simulator
 
-class NodeFactory {
-    make_robot(RobotConfig)
-    make_sensor(SensorConfig)
-    make_object(ObjectConfig)
-    make_computation_unit(ComputationUnitConfig)
+    note top of api.AsyncApi
+    The Async api of the simulator
+    use mpsc channels to communicate
+    between clients and simulator
+    end note
+    class AsyncApi {
+        simulator_api() -> SimulatorAsyncApi
+        load_config(SimulatorConfig, force_send_results: bool) -> SimulatorConfig
+        load_results(filename: Option<String>) -> f32
+        run(max_time: Option<f32>, reset: bool)
+        get_records(sorted: bool) -> [Record]
+        compute_results()
+    }
+
+    class PluginAsyncAPI {
+        get_client() -> PluginAsyncAPIClient
+    }
+    PluginAPI <|-- PluginAsyncAPI
+    PluginAsyncAPI -- PluginAsyncAPIClient
+
+    class PluginAsyncAPIClient {
+        get_state_estimator(PluginAsyncAPIRequest) -> StateEstimator
+        get_navigator(PluginAsyncAPIRequest) -> Navigator
+        get_controller(PluginAsyncAPIRequest) -> Controller
+        get_physics(PluginAsyncAPIRequest) -> Physics
+    }
+    PluginAsyncAPIClient -- PluginAsyncAPIRequest
+
+    class PluginAsyncAPIRequest {
+        {field} config: serde_json::Value
+        global_config: SimulatorConfig
+        va_factory: DeterministRandomVariableFactory
+        network: Network
+        initial_time: f32
+    }
+
 }
-NodeFactory --> Node
+
+package node {
+    enum NodeType {
+        Robot
+        Sensor
+        Object
+        ComputationUnit
+    }
+    ' note right of NodeType::Robot
+    '     Can move, can be detected, can sense, can communicate
+    ' end note
+    ' note right of NodeType::Sensor
+    '     Cannot move, cannot be detected, can sense, can communicate
+    ' end note
+    ' note right of NodeType::Object
+    '     Can be moved, can be detected, cannot sense, cannot communicate
+    ' end note
+    ' note right of NodeType::ComputationUnit
+    '     Cannot move, cannot be detected, cannot sense, can communicate
+    ' end note
+    class Node {
+        next_time_step(min_time_excluded: f32) -> f32
+        name() -> String
+        state() -> NodeState
+        send_records() -> bool
+        other_node_names() -> [String]
+        node_type() -> NodeType
+        network() -> Network
+        physics() -> Physics
+        sensor_manager() -> SensorManager
+        state_estimator() -> StateEstimator
+        state_estimator_bench() -> [BenchStateEstimator]
+        navigator() -> Navigator
+        controller() -> Controller
+        environment() -> Environment
+        get_other_node_physics(node_name: String) -> Option<Physics>
+        get_all_node_physics() -> dict(String, Physics)
+        meta_data() -> NodeMetaData
+        meta_data_list() -> dict(String, NodeMetaData)
+        pre_kill()
+    }
+    Node *-- NodeType
+
+    class NodeFactory {
+        make_robot(RobotConfig) -> Node
+        make_sensor(SensorConfig) -> Node
+        make_object(ObjectConfig) -> Node
+        make_computation_unit(ComputationUnitConfig) -> Node
+    }
+    NodeFactory --> Node
+
+    class NodeMetaData {
+        name: String
+        node_type: NodeType
+        model_name: String
+        labels: [String]
+        state: NodeState
+        position: Option<(f32, f32)>
+    }
+    NodeMetaData *-- NodeType
+    NodeMetaData *-- NodeState
+
+    enum NodeState {
+        Created
+        Running
+        Zombie
+        Terminated
+    }
+}
 
 package physics {
-Node *-- "+" Physics
-interface Physics
-note left of Physics: Allow to be mobile\nand to be perceived
+    node.Node *-- "+" Physics
+    interface Physics {
+        post_init(Node)
+        apply_command(Command, time: f32)
+        update_state(time: f32)
+        state(time: f32) -> State
+        next_time_step() -> Option<f32>
+    }
+    note left of Physics: Allow to be mobile\nand to be perceived
 
-Physics <|.. PerfectPhysics
-Physics <|.. ExternalPhysics
-class PerfectPhysics
-class ExternalPhysics
+    class PerfectPhysics
+    Physics <|.. PerfectPhysics
+    class ExternalPhysics
+    Physics <|.. ExternalPhysics
+    ExternalPhysics *-- Physics
+    class PythonPhysics
+    Physics <|.. PythonPhysics
+
+    package fault_models {
+        interface PhysicsFaultModel {
+            post_init(Node)
+            add_faults(time: f32, state: mut State)
+        }
+        class AdditiveRobotCenteredPhysicsFault
+        PhysicsFaultModel <|.. AdditiveRobotCenteredPhysicsFault
+        class PythonPhysicsFaultModel
+        PhysicsFaultModel <|.. PythonPhysicsFaultModel
+    }
+
+    package robot_model {
+        interface RobotModel {
+            update_state(previous_state: mut State, command: Command, dt: f32)
+            default_command() -> Command
+        }
+        class HolonomicCommand {
+            longitudinal_velocity: f32
+            lateral_velocity: f32
+            angular_velocity: f32
+        }
+        class Holonomic
+        RobotModel <|.. Holonomic
+        HolonomicCommand -- Holonomic
+
+        class UnicycleCommand {
+            left_wheel_velocity: f32
+            right_wheel_velocity: f32
+        }
+        class Unicycle
+        RobotModel <|.. Unicycle
+        UnicycleCommand -- Unicycle
+
+        enum Command {
+            Unicycle(UnicycleCommand)
+            Holonomic(HolonomicCommand)
+        }
+        Command::Unicycle --> UnicycleCommand
+        Command::Holonomic --> HolonomicCommand
+    }
+    PerfectPhysics *-- RobotModel
+    PerfectPhysics *-- "*" PhysicsFaultModel
+
 }
 
 package state_estimators {
-Node *-- "+" StateEstimator
-interface StateEstimator
+    node.Node *-- "+" StateEstimator
+    interface StateEstimator {
+        post_init(Node)
+        prediction_step(Node, Option<Command>, time: f32)
+        correction_step(Node, [Observation], time: f32)
+        world_state() -> WorldState
+        next_time_step() -> f32
+        pre_loop_hook(Node, time: f32)
+    }
 
-StateEstimator <|.. PerfectEstimator
-StateEstimator <|.. ExternalEstimator
-class PerfectEstimator
-class ExternalEstimator
+    class WorldState {
+        +{field} ego: Option<State>
+        +{field} objects: dict(String, State)
+        +{field} landmarks: dict(i32, State)
+        +{field} occupancy_grid: Option<OccupancyGrid>
+    }
+
+    WorldState *-- "*" State
+
+    class State {
+        +{field} pose: (f32, f32, f32)
+        +{field} velocity: (f32, f32, f32)
+    }
+    StateEstimator -- WorldState
+    StateEstimator -- .physics.robot_model.Command
+    StateEstimator -- .sensors.Observation
+
+
+    class PerfectEstimator
+    StateEstimator <|.. PerfectEstimator
+    class ExternalEstimator
+    StateEstimator <|.. ExternalEstimator
+    ExternalEstimator *-- StateEstimator
+    class PythonEstimator
+    StateEstimator <|.. PythonEstimator
 }
 
+package environment {
+    class Environment {
+        map: Map
+        {field} meta_data_list: dict(String, NodeMetaData)
+        get_observable_landmarks(position, observer_height, max_distance) -> [OrientedLandmark]
+        is_target_observable(target_position, target_height, observer_position, observer_height, max_distance) -> bool
+    }
+    Environment *-- Map
+    Environment -- "*" NodeMetaData
+
+    class Map {
+        landmarks: [OrientedLandmark]
+    }
+    Map *-- "*" OrientedLandmark
+
+    class OrientedLandmark {
+        id: i32
+        labels: [String]
+        pose: (f32, f32, f32)
+        height: f32
+        width: f32
+    }
+    .simulator.Simulator *-- Environment
+}
+
+
 package navigators {
-Node *-- "+" Navigator
-interface Navigator
-Navigator <|.. TrajectoryFollower
-Navigator <|.. ExternalNavigator
-class TrajectoryFollower
-class ExternalNavigator
+    node.Node *-- "+" Navigator
+    interface Navigator {
+        post_init(Node)
+        compute_error(Node, WorldState) -> ControllerError
+        pre_loop_hook(Node, time: f32)
+        next_time_step() -> Option<f32>
+    }
+    Navigator -- .controllers.ControllerError
+    Navigator -- .state_estimators.WorldState
+
+    class TrajectoryFollower
+    Navigator <|.. TrajectoryFollower
+    class GoTo
+    Navigator <|.. GoTo
+    class ExternalNavigator
+    Navigator <|.. ExternalNavigator
+    ExternalNavigator *-- Navigator
+    class PythonNavigator
+    Navigator <|.. PythonNavigator
 }
 
 package controllers {
-Node *-- "+" Controller
-interface Controller
-Controller <|.. PID
-Controller <|.. ExternalController
-class PID
-class ExternalController
+    node.Node *-- "+" Controller
+    interface Controller {
+        post_init(Node)
+        make_command(Node, ControllerError, time: f32) -> Command
+        pre_loop_hook(Node, time: f32)
+        next_time_step() -> Option<f32>
+    }
+    Controller -- .physics.robot_model.Command
+    Controller -- ControllerError
+
+    class ControllerError {
+        lateral: f32
+        longitudinal: f32
+        theta: f32
+        velocity: f32
+    }
+
+    class PID
+    Controller <|.. PID
+    class ExternalController
+    Controller <|.. ExternalController
+    ExternalController *-- Controller
+    class PythonController
+    Controller <|.. PythonController
 }
 
 
 package utils {
-class DeterministRandomVariableFactory
+    class DeterministRandomVariableFactory
 
-DeterministRandomVariableFactory --> DeterministRandomVariable
-interface DeterministRandomVariable
+    DeterministRandomVariableFactory --> DeterministRandomVariable
+    interface DeterministRandomVariable
 
-package distributions {
-    
-DeterministRandomVariable <|.. Bernouilli
-class Bernouilli
+    package distributions {
 
-DeterministRandomVariable <|.. Exponential
-class Exponential
+        DeterministRandomVariable <|.. Bernouilli
+        class Bernouilli
 
-DeterministRandomVariable <|.. Normal
-class Normal
+        DeterministRandomVariable <|.. Exponential
+        class Exponential
 
-DeterministRandomVariable <|.. Poisson
-class Poisson
+        DeterministRandomVariable <|.. Normal
+        class Normal
 
-DeterministRandomVariable <|.. Uniform
-class Uniform
+        DeterministRandomVariable <|.. Poisson
+        class Poisson
 
-DeterministRandomVariable <|.. Fixed
-class Fixed
-}
+        DeterministRandomVariable <|.. Uniform
+        class Uniform
+
+        DeterministRandomVariable <|.. Fixed
+        class Fixed
+    }
+
+    class Frame {
+        new(x: f32, y: f32, theta: f32) -> Frame
+        transform() -> Isometry2
+        attach_to_state(state: State) -> AttachedFrame
+    }
+
+    Frame -- AttachedFrame
+
+    class AttachedFrame {
+        state() -> State
+        transform() -> Isometry2
+        transform_point_frame_to_global(point: (f32, f32)) -> (f32, f32)
+        transform_point_global_to_frame(point: (f32, f32)) -> (f32, f32)
+    }
 }
 
 package sensors {
-Node *-- "+" SensorManager
-class SensorManager
+    node.Node *-- "+" SensorManager
+    class SensorManager
 
-SensorManager *-- "*" Sensor
-interface Sensor
+    SensorManager *-- "*" Sensor
+    interface Sensor {
+        post_init(Node, initial_time: f32)
+        get_observations(Node, time: f32) -> [Observation]
+        next_time_step() -> Option<f32>
+    }
+    Sensor -- Observation
 
-Sensor <|.. GNSSSensor
-class GNSSSensor
+    Sensor <|.. GNSSSensor
+    class GNSSSensor
 
-Sensor <|.. SpeedSensor
-class SpeedSensor
+    class GNSSObservation {
+        +{field} pose: (f32, f32, f32)
+        +{field} velocity: (f32, f32)
+        +{field} applied_faults
+        +{field} frame
+    }
+    GNSSSensor -- GNSSObservation
+    GNSSObservation *-- .utils.Frame
 
-Sensor <|.. OrientedLandmarkSensor
-class OrientedLandmarkSensor
+    Sensor <|.. SpeedSensor
+    class SpeedSensor
 
-Sensor <|.. RobotSensor
-class RobotSensor
+    class SpeedObservation {
+        +{field} linear_velocity: f32
+        +{field} lateral_velocity: f32
+        +{field} angular_velocity: f32
+        +{field} applied_faults
+        +{field} frame
+    }
+    SpeedSensor -- SpeedObservation
+    SpeedObservation *-- .utils.Frame
 
-package fault_models {
+    Sensor <|.. DisplacementSensor
+    class DisplacementSensor
 
-GNSSSensor *-- "*" FaultModel
-SpeedSensor *-- "*" FaultModel
-OrientedLandmarkSensor *-- "*" FaultModel
-RobotSensor *-- "*" FaultModel
-interface FaultModel
+    class DisplacementObservation {
+        +{field} translation: (f32, f32)
+        +{field} rotation: f32
+        +{field} applied_faults
+        +{field} frame
+    }
+    DisplacementSensor -- DisplacementObservation
+    DisplacementObservation *-- .utils.Frame
 
-FaultModel <|.. AdditiveObservationCenteredPolar
-class AdditiveObservationCenteredPolar {
-    apparition
-    distributions
-}
-AdditiveObservationCenteredPolar::apparition *-- Bernouilli
-AdditiveObservationCenteredPolar::distributions *-- "*" DeterministRandomVariable
+    Sensor <|.. OrientedLandmarkSensor
+    class OrientedLandmarkSensor
 
-FaultModel <|.. AdditiveRobotCenteredPolar
-class AdditiveRobotCenteredPolar  {
-    apparition
-    distributions
-}
-AdditiveRobotCenteredPolar::apparition *-- Bernouilli
-AdditiveRobotCenteredPolar::distributions *-- "*" DeterministRandomVariable
+    class OrientedLandmarkObservation {
+        +{field} id: i32
+        +{field} labels: [String]
+        +{field} pose: (f32, f32, f32)
+        +{field} height: f32
+        +{field} width: f32
+        +{field} applied_faults
+        +{field} frame
+    }
+    OrientedLandmarkSensor -- OrientedLandmarkObservation
+    OrientedLandmarkObservation *-- .utils.Frame
 
-FaultModel <|.. AdditiveRobotCentered
-class AdditiveRobotCentered {
-    apparition
-    distributions
-}
-AdditiveRobotCentered::apparition *-- Bernouilli
-AdditiveRobotCentered::distributions *-- "*" DeterministRandomVariable
+    Sensor <|.. RobotSensor
+    class RobotSensor
 
-FaultModel <|.. Clutter
-class Clutter {
-    apparition
-    distributions
-}
-Clutter::apparition *-- DeterministRandomVariable
-Clutter::distributions *-- "*" DeterministRandomVariable
+    class OrientedRobotObservation {
+        +{field} name: String
+        +{field} labels: [String]
+        +{field} pose: (f32, f32, f32)
+        +{field} applied_faults
+        +{field} frame
+    }
+    OrientedRobotObservation -- RobotSensor
+    OrientedRobotObservation *-- .utils.Frame
 
-FaultModel <|.. Misassociation
-class Misassociation {
-    apparition
-    distribution
-}
-Misassociation::apparition *-- Bernouilli
-Misassociation::distribution *-- DeterministRandomVariable
+    Sensor <|.. ScanSensor
+    class ScanSensor
+    class ScanObservation {
+        +{field} distances: [f32]
+        +{field} angles: [f32]
+        +{field} radial_velocities: [f32]
+        +{field} applied_faults
+        +{field} frame
+    }
+    ScanSensor -- ScanObservation
+    ScanObservation *-- .utils.Frame
 
-FaultModel <|.. Misdetection
-class Misdetection {
-    apparition
-}
-Misdetection::apparition *-- Bernouilli
-}
+    Sensor <|.. ExternalSensor
+    ExternalSensor *-- Sensor
+    class ExternalSensor
+    class ExternalObservation {
+        +{field} observation: serde_json::Value
+    }
+
+    class Observation {
+        +sensor_name: String
+        +observer: String
+        +time: f32
+        +sensor_observation: SensorObservation
+    }
+    Observation *-- SensorObservation
+
+    enum SensorObservations {
+        GNSS(GNSSObservation)
+        Speed(SpeedObservation)
+        Displacement(DisplacementObservation)
+        OrientedLandmark(OrientedLandmarkObservation)
+        OrientedRobot(OrientedRobotObservation)
+        Scan(ScanObservation)
+        External(ExternalObservation)
+    }
+    SensorObservations::GNSS --> GNSSObservation
+    SensorObservations::Speed --> SpeedObservation
+    SensorObservations::Displacement --> DisplacementObservation
+    SensorObservations::OrientedLandmark --> OrientedLandmarkObservation
+    SensorObservations::OrientedRobot --> OrientedRobotObservation
+    SensorObservations::Scan --> ScanObservation
+    SensorObservations::External --> ExternalObservation
+
+    package fault_models {
+
+        GNSSSensor *-- "*" FaultModel
+        SpeedSensor *-- "*" FaultModel
+        DisplacementSensor *-- "*" FaultModel
+        OrientedLandmarkSensor *-- "*" FaultModel
+        RobotSensor *-- "*" FaultModel
+        ScanSensor *-- "*" FaultModel
+
+        interface FaultModel {
+            post_init(Node, initial_time: f32)
+            add_faults(time: f32, seed: f32, observations: mut [SensorObservations], environment: Environment)
+        }
+        FaultModel -- .sensors.SensorObservations
+        FaultModel -- .environment.Environment
+
+        FaultModel <|.. Additive
+        class Additive<SensorVariables> {
+            apparition: Bernouilli
+            distributions: "*" DeterministRandomVariable
+            proportional_to: SensorVariable
+            proportional_factor: f32
+        }
+        Additive::apparition *-- Bernouilli
+        Additive::distributions *-- "*" DeterministRandomVariable
+
+        FaultModel <|.. Clutter
+        class Clutter<SensorVariables> {
+            apparition: "*" DeterministRandomVariable
+            distributions: "*" DeterministRandomVariable
+            observation_id: String
+        }
+        Clutter::apparition *-- DeterministRandomVariable
+        Clutter::distributions *-- "*" DeterministRandomVariable
+
+        FaultModel <|.. Misassociation
+        class Misassociation {
+            apparition: Bernouilli
+            distribution: DeterministRandomVariable
+        }
+        Misassociation::apparition *-- Bernouilli
+        Misassociation::distribution *-- DeterministRandomVariable
+
+        FaultModel <|.. Misdetection
+        class Misdetection {
+            apparition: Bernouilli
+        }
+        Misdetection::apparition *-- Bernouilli
+
+        FaultModel <|.. ExternalFault
+        ExternalFault *-- FaultModel
+        class ExternalFault
+
+        FaultModel <|.. PythonFaultModel
+        class PythonFaultModel
+    }
+
+    package sensor_filters {
+        interface SensorFilter {
+            post_init(Node)
+            filter(time: f32, observations: mut SensorObservations) -> Option(SensorObservations)
+        }
+        SensorFilter -- .sensors.SensorObservations
+
+        class RangeFilter<SensorVariables> {
+            min_range: list(f32)
+            max_range: list(f32)
+            inside: bool
+        }
+
+        class ExternalFilter
+        SensorFilter <|.. ExternalFilter
+        ExternalFilter *-- SensorFilter
+        class PythonFilter
+    }
+
+    enum DisplacementSensorFilterType {
+        Range(RangeFilter)
+        Python(PythonFilter)
+        External(ExternalFilter)
+    }
+    DisplacementSensorFilterType::Range --> sensor_filters.RangeFilter
+    DisplacementSensorFilterType::Python --> sensor_filters.PythonFilter
+    DisplacementSensorFilterType::External --> sensor_filters.ExternalFilter
+    DisplacementSensor *-- DisplacementSensorFilterType
+
+    enum GNSSSensorFilterType {
+        Range(RangeFilter)
+        Python(PythonFilter)
+        External(ExternalFilter)
+    }
+    GNSSSensorFilterType::Range --> sensor_filters.RangeFilter
+    GNSSSensorFilterType::Python --> sensor_filters.PythonFilter
+    GNSSSensorFilterType::External --> sensor_filters.ExternalFilter
+    GNSSSensor *-- GNSSSensorFilterType
+
+    enum OrientedLandmarkSensorFilterType {
+        Range(RangeFilter)
+        Id(StringFilter)
+        Label(StringFilter)
+        Python(PythonFilter)
+        External(ExternalFilter)
+    }
+    OrientedLandmarkSensorFilterType::Range --> sensor_filters.RangeFilter
+    OrientedLandmarkSensorFilterType::Python --> sensor_filters.PythonFilter
+    OrientedLandmarkSensorFilterType::External --> sensor_filters.ExternalFilter
+    OrientedLandmarkSensorFilterType::Id --> sensor_filters.StringFilter
+    OrientedLandmarkSensorFilterType::Label --> sensor_filters.StringFilter
+    OrientedLandmarkSensor *-- OrientedLandmarkSensorFilterType
+
+    enum RobotSensorFilterType {
+        Range(RangeFilter)
+        Id(StringFilter)
+        Label(StringFilter)
+        Python(PythonFilter)
+        External(ExternalFilter)
+    }
+    RobotSensorFilterType::Range --> sensor_filters.RangeFilter
+    RobotSensorFilterType::Python --> sensor_filters.PythonFilter
+    RobotSensorFilterType::External --> sensor_filters.ExternalFilter
+    RobotSensorFilterType::Id --> sensor_filters.StringFilter
+    RobotSensorFilterType::Label --> sensor_filters.StringFilter
+    RobotSensor *-- RobotSensorFilterType
+
+    enum ScanSensorFilterType {
+        Range(RangeFilter)
+        Python(PythonFilter)
+        External(ExternalFilter)
+    }
+    ScanSensorFilterType::Range --> sensor_filters.RangeFilter
+    ScanSensorFilterType::Python --> sensor_filters.PythonFilter
+    ScanSensorFilterType::External --> sensor_filters.ExternalFilter
+    ScanSensor *-- ScanSensorFilterType
+
+    enum SpeedSensorFilterType {
+        Range(RangeFilter)
+        Python(PythonFilter)
+        External(ExternalFilter)
+    }
+    SpeedSensorFilterType::Range --> sensor_filters.RangeFilter
+    SpeedSensorFilterType::Python --> sensor_filters.PythonFilter
+    SpeedSensorFilterType::External --> sensor_filters.ExternalFilter
+    SpeedSensor *-- SpeedSensorFilterType
+
+    
 }
 
 
 package networking {
-Simulator *-- NetworkManager
-class NetworkManager
+    simulator.Simulator *-- NetworkManager
+    class NetworkManager {
+        broker
+        process_messages()
+    }
 
-Node *-- "+" Network
-class Network
+    node.Node *--  Network
+    class Network {
+        range: f32
+        reception_delay: f32
+        broker: Broker
+        make_channel(PathKey) -> PathKey
+        subscribe_to(keys: [PathKey], multiclient: Option<MultiClient>) -> MultiClient
+        send_to(key: PathKey, message: Envelope, time: f32)
+    }
 
-Network <--> NetworkManager : mpsc
 
-Node *-- ServiceManager
-class ServiceManager {
-    get_real_state: Service
-    get_real_state_client: map[ServiceClient]
+    NetworkManager *-- .simba_com.Broker
+    Network -- .simba_com.Broker
+    Network -- .simba_com.MultiClient
+    Network -- Envelope
+
+
+    class Envelope {
+        from: String
+        message: MessageTypes
+        timestamp: f32
+        message_flags: [MessageFlag]
+    }
+
+    enum MessageTypes {
+        {field} String(String)
+        {field} GoTo(GoToMessage)
+        {field} SensorTrigger(SensorTriggerMessage)
+        {field} Observation([Observation])
+        {field} Event(EventRecord)
+        {field} Custom([u8])
+    }
+
+    Envelope -- MessageTypes
+
+    enum MessageFlag {
+        God
+        Unsubscribe
+        Kill
+    }
+    Envelope -- "*" MessageFlag
+
 }
-ServiceManager *-- "1" Service
-ServiceManager *-- "*" ServiceClient
 
-interface ServiceInterface
-note top of ServiceInterface: Not used anymore
 
-ServiceInterface <|.. Service
-class Service<RequestMsg, ResponseMsg>
-class ServiceClient<RequestMsg, ResponseMsg>
-Service <--> ServiceClient: mpsc
+package simba_com as "simba-com" {
+    class Broker
+    class MultiClient
 }
 
-package physics {
-package physics_fault_models_<<future>> {
+package scenario {
+    class Scenario
+    Scenario *-- "*" Event
+    class Event {
+        triggering_nodes: [Regex]
+        trigger: EventTriggerConfig
+        event_type: EventTypeConfig
+    }
+    Event *-- EventTriggerConfig
+    Event *-- EventTypeConfig
 
+    enum EventTriggerConfig {
+        Time(TimeEventTriggerConfig)
+        Proximity(ProximityEventTriggerConfig)
+        Area(AreaEventTriggerConfig)
+    }
+    EventTriggerConfig::Time --> TimeEventTriggerConfig
+    EventTriggerConfig::Proximity --> ProximityEventTriggerConfig
+    EventTriggerConfig::Area --> AreaEventTriggerConfig
+
+    class TimeEventTriggerConfig {
+        time
+        occurences
+    }
+
+    enum AreaEventTriggerConfig {
+        Rect(RectAreaEventTriggerConfig)
+        Circle(CircleAreaEventTriggerConfig)
+    }
+    AreaEventTriggerConfig::Rect --> RectAreaEventTriggerConfig
+    AreaEventTriggerConfig::Circle --> CircleAreaEventTriggerConfig
+
+    class RectAreaEventTriggerConfig {
+        bottom_left: (f32, f32)
+        top_right: (f32, f32)
+        inside: bool
+    }
+
+    class CircleAreaEventTriggerConfig {
+        center: (f32, f32)
+        radius: f32
+        inside: bool
+    }
+
+    class ProximityEventTriggerConfig {
+        protected_target: Option<String>
+        distance: f32
+        inside: bool
+    }
+
+    enum EventTypeConfig {
+        Spawn(SpawnEventConfig)
+        Kill(String)
+    }
+    EventTypeConfig::Spawn --> SpawnEventConfig
+
+    class SpawnEventConfig {
+        model_name: String
+        node_name: String
+    }
+
+    .simulator.Simulator *-- Scenario
 }
+
+package gui {
+    interface Drawable {
+        add_record(time: f32, record: RecordType)
+        draw(ui, viewport, painter_info, scale: f32, time: f32) -> ([Shape], (f32, f32))
+        react(ui, ctx, response, painter_info, scale: f32, time: f32)
+    }
 }
+
+interface PluginAPI {
+    get_state_estimator(custom_config) -> StateEstimator
+    get_navigator(custom_config) -> Navigator
+    get_controller(custom_config) -> Controller
+    get_physics(custom_config) -> Physics
+    get_sensor(custom_config) -> Sensor
+    get_sensor_filter(custom_config) -> SensorFilter
+    get_sensor_fault(custom_config) -> FaultModel
+    get_drawable(custom_config) -> Drawable
+}
+StateEstimator -- PluginAPI
+Navigator -- PluginAPI
+Controller -- PluginAPI
+Physics -- PluginAPI
+Sensor -- PluginAPI
+SensorFilter -- PluginAPI
+FaultModel -- PluginAPI
+Drawable -- PluginAPI
+
 
 @enduml
 

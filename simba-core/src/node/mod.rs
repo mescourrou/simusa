@@ -135,7 +135,7 @@ impl Node {
     /// Initialize the node after its creation.
     ///
     /// It is used to initialize the sensor manager, which need to know the list of all nodes.
-    pub fn post_creation_init(
+    pub(crate) fn post_creation_init(
         &mut self,
         physics_list: SharedRoLock<BTreeMap<String, SharedRoLock<Box<dyn Physics>>>>,
         meta_data_list: SharedRoLock<HashMap<String, SharedRoLock<NodeMetaData>>>,
@@ -383,7 +383,7 @@ impl Node {
     /// ## Arguments
     /// * `time` - Current simulation time upper-bound for message processing.
     /// * `context` - Shared simulation context used for logging.
-    pub fn handle_messages(&mut self, time: f32, context: &Context) {
+    pub(crate) fn handle_messages(&mut self, time: f32, context: &Context) {
         while let Some((path, message)) = self.node_message_client.try_receive(time) {
             if path
                 == PathKey::from_str(networking::channels::internal::COMMAND)
@@ -903,7 +903,7 @@ impl Node {
     }
 
     /// Terminate this node and publish its final state update.
-    pub fn kill(&mut self, time: f32) {
+    pub(crate) fn kill(&mut self, time: f32) {
         self.node_meta_data.write().unwrap().state = NodeState::Terminated;
         self.node_server
             .as_ref()

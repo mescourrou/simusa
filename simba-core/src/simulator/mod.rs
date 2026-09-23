@@ -2001,6 +2001,14 @@ def show():
     pub fn get_environment(&self) -> Arc<Environment> {
         self.environment.clone()
     }
+
+    /// Get the list of nodes of the simulator.
+    /// 
+    /// WARNING: The list is empty while the simulator is running in multithreaded mode,
+    /// as the nodes are running in their own threads and are not accessible from the main thread.
+    pub fn get_nodes(&self) -> &Vec<Node> {
+        &self.nodes
+    }
 }
 
 impl Default for Simulator {
