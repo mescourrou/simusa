@@ -1,7 +1,8 @@
-use std::sync::{Arc, Mutex};
+use std::{cell::Cell, collections::{BTreeMap, HashMap}, default, sync::{Arc, Mutex}};
 
+use colored::Colorize;
 use eframe::egui_glow::painter;
-use egui::{Rect, Response, Shape, Vec2};
+use egui::{FontId, Rect, Response, RichText, Shape, Vec2};
 use serde::{Deserialize, Serialize};
 
 use crate::{api::async_api::AsyncApiRunner, context::Context, environment::map::MapRecord, error, gui::app::PainterInfo, node::node_factory::{ComputationUnitConfig, ComputationUnitRecord, RecordType, RobotConfig, RobotRecord}, plugin_api::PluginAPI, recordable::Recordable, scenario::config::EventRecord, simulator::SimulatorConfig};
@@ -47,6 +48,13 @@ pub trait Drawable {
     fn associated_node_name(&self) -> Option<String> {
         None
     }
+
+    /// Returns the name of the drawable, to display its settings on the GUI and its toggle button.
+    /// 
+    /// If the drawable is not associated with a node, it should return a name.
+    /// 
+    /// If the drawable is associated with a node, if it returns None, the drawable will be toggled with the node global button.
+    fn name(&self) -> Option<String>;
 
     /// Show parameters of the drawable to be customized in the GUI.
     #[allow(unused_variables)]
@@ -99,22 +107,41 @@ pub trait Drawable {
     }
 }
 
-
 #[derive(Deserialize, Serialize)]
 pub struct DrawableManager {
+    enabled: Vec<bool>,
     #[serde(skip)]
     drawn_robots: Vec<String>,
     #[serde(skip)]
     drawables: Vec<Box<dyn Drawable>>,
-    enabled_drawables: Vec<bool>,
+    #[serde(skip)]
+    categories: Cell<BTreeMap<String, Vec<usize>>>,
 }
 
 impl DrawableManager {
+    const GLOBAL_CATEGORY: &str = "__GLOBAL__";
     pub fn new() -> Self {
         Self {
             drawn_robots: Vec::new(),
             drawables: Vec::new(),
-            enabled_drawables: Vec::new(),
+            enabled: Vec::new(),
+            categories: Cell::new(BTreeMap::new()),
+        }
+    }
+
+    fn add_drawable(&mut self, drawable: Box<dyn Drawable>, context: &Context) {
+        if let Some(category) = drawable.associated_node_name() {
+            self.categories.get_mut().entry(category).or_insert_with(Vec::new).push(self.drawables.len());
+        } else {
+            if drawable.name().is_none() {
+                error!(context, "Drawables without name and without associated node are ignored.", );
+                return;
+            }
+            self.categories.get_mut().entry(Self::GLOBAL_CATEGORY.to_string()).and_modify(|v| v.push(self.drawables.len()));
+        }
+        self.drawables.push(drawable);
+        if self.enabled.len() < self.drawables.len() {
+            self.enabled.resize(self.drawables.len(), true);
         }
     }
 
@@ -128,24 +155,28 @@ impl DrawableManager {
             .lock()
             .unwrap()
             .get_environment();
+        // Prepare drawable management
         self.drawables.clear();
-        self.drawables.push(Box::new(map::Map::init(
+        self.categories.set(BTreeMap::new());
+        self.categories.get_mut().insert(Self::GLOBAL_CATEGORY.to_string(), Vec::new());
+        // Insert Map
+        self.add_drawable(Box::new(map::Map::init(
             environment.map().record(context),
             config,
             context,
-        )));
+        )), context);
+        
+        // Insert robots
         for robot in &config.robots {
             if robot.autospawn {
-                self.drawables.push(Box::new(
-                    robot::Robot::init(robot, config, robot.name.clone()),
-                ));
+                self.add_drawable(Box::new(robot::Robot::init(robot, config, robot.name.clone())), context);
                 self.drawn_robots.push(robot.name.clone());
             }
         }
-        if let Some(plugin_api) = plugin_api
-            && let Some(drawable) = plugin_api.get_drawable(config)
-        {
-            self.drawables.push(drawable);
+        if let Some(plugin_api) = plugin_api {
+            for drawable in plugin_api.get_drawables(config) {
+                self.add_drawable(drawable, context);
+            }
         }
     }
 
@@ -158,7 +189,10 @@ impl DrawableManager {
         current_draw_time: f32,
     ) -> Result<Vec<Shape>, Vec2> {
         let mut shapes = Vec::new();
-        for drawable in &self.drawables {
+        for (drawable, enabled) in self.drawables.iter().zip(&self.enabled) {
+            if !enabled {
+                continue;
+            }
             shapes.extend(drawable.draw(
                 ui,
                 &viewport,
@@ -180,7 +214,10 @@ impl DrawableManager {
         drawing_scale: f32,
         current_draw_time: f32,
     ) {
-        for drawable in self.drawables.iter_mut() {
+        for (drawable, enabled) in self.drawables.iter_mut().zip(&self.enabled) {
+            if !enabled {
+                continue;
+            }
             drawable.react(
                 ui,
                 ctx,
@@ -204,9 +241,7 @@ impl DrawableManager {
                     if let Some(new_config) =
                             config.robots.iter().find(|rc| rc.name == rec.model_name)
                     {
-                        self.drawables.push(Box::new(
-                            robot::Robot::init(new_config, config, rec.name.clone()),
-                        ));
+                        self.add_drawable(Box::new(robot::Robot::init(new_config, config, rec.name.clone())), context);
                         self.drawn_robots.push(rec.name.clone());
                     } else {
                         error!(
@@ -230,5 +265,44 @@ impl DrawableManager {
                 }
             }
         }
+    }
+
+    fn draw_one_drawable(&mut self, ui: &mut egui::Ui, index: usize, unique_id: &str) {
+        if let Some(name) = self.drawables[index].name() {
+            egui::CollapsingHeader::new(name)
+            .id_salt(format!("{}", unique_id))
+            .show(ui, |ui| {
+                ui.checkbox(&mut self.enabled[index], "Enabled");
+                self.drawables[index].show_params_mut(ui, unique_id);
+            });
+        } else {
+            self.drawables[index].show_params_mut(ui, unique_id);
+        }
+    }
+
+    pub fn draw_parameters(&mut self, ui: &mut egui::Ui, unique_id: &str) {
+        let categories = self.categories.take();
+        for (category, indices) in categories.iter() {
+            let unique_id = format!("drawable-params-{}-{}", unique_id, category);
+            if category != Self::GLOBAL_CATEGORY {
+                ui.separator();
+                egui::CollapsingHeader::new(category)
+                    .id_salt(format!("{}", unique_id))
+                    .show(ui, |ui| {
+                        for index in indices {
+                            let unique_id = format!("{}-{}", unique_id, index);
+                            self.draw_one_drawable(ui, *index, &unique_id);
+                        }
+                    });
+            } else {
+                ui.label(RichText::new("Global:").strong().heading());
+                for index in indices {
+                    let unique_id = format!("{}-{}", unique_id, index);
+                    self.draw_one_drawable(ui, *index, &unique_id);
+                }
+                ui.label(RichText::new("Nodes:").strong().heading());
+            }
+        }
+        self.categories.set(categories);
     }
 }

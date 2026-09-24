@@ -204,17 +204,19 @@ pub trait PluginAPI: Send + Sync {
         panic!("The given PluginAPI does not provide a sensor");
     }
 
-    /// Return the [`Drawable`](crate::gui::Drawable) to be used by the GUI.
+    /// Return a list of [`Drawable`](crate::gui::Drawable) to be used by the GUI.
     ///
     /// The GUI will call this function at startup to load an instance of the [`Drawable`](crate::gui::Drawable) to be used for the visualization.
-    /// The GUI will then call the [`Drawable::add_record`](crate::gui::Drawable::add_record) function at each step of the simulation to update the drawable with the new record.
+    /// The GUI will then call the [`Drawable::add_robot_record`](crate::gui::Drawable::add_robot_record), [`Drawable::add_computation_unit_record`](crate::gui::Drawable::add_computation_unit_record),
+    /// [`Drawable::add_map_record`](crate::gui::Drawable::add_map_record), and [`Drawable::add_scenario_record`](crate::gui::Drawable::add_scenario_record) functions (depending on the type of the record)
+    /// at each step of the simulation to update the drawable with the new record.
     /// The GUI will then call [`Drawable::draw`](crate::gui::Drawable::draw) and [`Drawable::react`](crate::gui::Drawable::react) function at each frame to draw the drawable and react to click.
     #[cfg(feature = "gui")]
-    fn get_drawable(
+    fn get_drawables(
         &self,
         global_config: &SimulatorConfig,
-    ) -> Option<Box<dyn crate::gui::Drawable>> {
-        None
+    ) -> Vec<Box<dyn crate::gui::Drawable>> {
+        Vec::new()
     }
 
     /// Return the [`SensorFilter`] to be used by the

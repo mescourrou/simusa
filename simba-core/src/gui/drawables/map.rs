@@ -108,4 +108,18 @@ impl Drawable for Map {
         }
         Ok(shapes)
     }
+
+    fn name(&self) -> Option<String> {
+        Some("Map".to_string())
+    }
+
+    fn show_params_mut(&mut self, ui: &mut egui::Ui, _unique_id: &str) {
+        ui.vertical(|ui| {
+            ui.horizontal(|ui| {
+                ui.label("Color:");
+                ui.color_edit_button_srgba(&mut self.color);
+            });
+            ui.add(egui::Slider::new(&mut self.arrow_len, 0.0..=1.0).text("Arrow Length"));
+        });
+    }
 }

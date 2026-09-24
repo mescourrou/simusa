@@ -14,7 +14,7 @@ impl DrawableSelectorPanel {
         egui::CollapsingHeader::new("Element Selector")
             .id_salt(format!("element-selector-{}", unique_id))
             .show(ui, |ui| {
-                // drawable_manager.draw_selector_panel(ui, ctx);
+                drawable_manager.draw_parameters(ui, unique_id);
             });
     }
 }

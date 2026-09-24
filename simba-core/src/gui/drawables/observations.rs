@@ -91,6 +91,14 @@ impl OrientedRobotObservation {
         ));
         Ok(shapes)
     }
+
+    pub fn show_params_mut(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label("Color:");
+            ui.color_edit_button_srgba(&mut self.color);
+        });
+        ui.add(egui::Slider::new(&mut self.arrow_len, 0.0..=1.0).text("Arrow Length"));
+    }
 }
 
 pub struct OrientedLandmarkObservation {
@@ -189,6 +197,14 @@ impl OrientedLandmarkObservation {
         }
         Ok(shapes)
     }
+
+    pub fn show_params_mut(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label("Color:");
+            ui.color_edit_button_srgba(&mut self.color);
+        });
+        ui.add(egui::Slider::new(&mut self.arrow_len, 0.0..=1.0).text("Arrow Length"));
+    }
 }
 
 pub struct GNSSObservation {
@@ -266,6 +282,13 @@ impl GNSSObservation {
         ));
         Ok(shapes)
     }
+
+    pub fn show_params_mut(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label("Color:");
+            ui.color_edit_button_srgba(&mut self.color);
+        });
+    }
 }
 
 pub struct ScanObservation {
@@ -309,5 +332,12 @@ impl ScanObservation {
             shapes.push(Shape::circle_filled(obs_position, 0.05 * scale, self.color));
         }
         Ok(shapes)
+    }
+
+    pub fn show_params_mut(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label("Color:");
+            ui.color_edit_button_srgba(&mut self.color);
+        });
     }
 }
