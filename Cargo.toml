@@ -1,20 +1,20 @@
 # Workspace
 [workspace]
 members = [
-    "simba-cmd",
-    "simba-com",
-    "simba-core",
-    "simba-macros",
-    "simba-tools",
+    "simusa-cmd",
+    "simusa-com",
+    "simusa-core",
+    "simusa-macros",
+    "simusa-tools",
     "examples/stacked_plugins",
     "examples/plugin",
 ]
 default-members = [
-    "simba-cmd",
-    "simba-com",
-    "simba-core",
-    "simba-macros",
-    "simba-tools"
+    "simusa-cmd",
+    "simusa-com",
+    "simusa-core",
+    "simusa-macros",
+    "simusa-tools"
     ]
 
 resolver = "2"
@@ -23,7 +23,7 @@ resolver = "2"
 version = "1.8.1"
 edition = "2024"
 authors = ["Maxime Escourrou <maxime.escourrou@laas.fr>"]
-license = "GPLv3"
+license = "MIT"
 
 [profile.release]
 opt-level = 2 # fast and small wasm

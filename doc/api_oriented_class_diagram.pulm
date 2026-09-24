@@ -3,7 +3,7 @@ skinparam linetype polyline
 skinparam linetype ortho
 skinparam groupImplementation 2
 
-package simba {
+package simusa {
     class Simulator {
         {static} from_config(SimulatorConfig, plugin_api: Option<PluginAPI>) -> Simulator
         load_config(SimulatorConfig, plugin_api: Option<PluginAPI>)

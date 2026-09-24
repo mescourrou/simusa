@@ -1,0 +1,123 @@
+/*!
+Module providing the interface to use external [`SensorFilter`].
+
+To make your own external sensor filter strategy, the simulator should
+be used as a library (see [dedicated page](crate::plugin_api)).
+
+Your own external sensor filter strategy is made using the
+[`PluginAPI::get_sensor_filter`] function.
+*/
+
+use std::sync::Arc;
+
+use simusa_macros::config_derives;
+
+use crate::context::Context;
+use crate::errors::{SimusaError, SimusaErrorTypes, SimusaResult};
+#[cfg(feature = "gui")]
+use crate::gui::{UIComponent, utils::json_config};
+use crate::internal;
+use crate::sensors::sensor_filters::SensorFilter;
+use crate::simulator::SimulatorConfig;
+use crate::utils::macros::external_config;
+use crate::{
+    plugin_api::PluginAPI, utils::determinist_random_variable::DeterministRandomVariableFactory,
+};
+
+use crate::sensors::SensorObservation;
+
+external_config!(
+/// Config for the external sensor filter (generic).
+///
+/// The config for [`ExternalFilter`] uses a [`serde_json::Value`] to
+/// integrate your own configuration inside the full simulator config.
+///
+/// In the yaml file, the config could be:
+/// ```YAML
+/// filters:
+///     - type: External
+///       parameter_of_my_own_estimator: true
+/// ```
+    ExternalFilterConfig,
+    "External Filter",
+    "external-filter"
+);
+
+/// External sensor strategy, which does the bridge with your own strategy.
+pub struct ExternalFilter {
+    /// External sensor.
+    filter: Box<dyn SensorFilter>,
+}
+
+impl ExternalFilter {
+    /// Creates a new [`ExternalFilter`] from the given config.
+    ///
+    /// <div class="warning">The `plugin_api` is required here !</div>
+    ///
+    ///  ## Arguments
+    /// * `config` -- Scenario config of the External filter.
+    /// * `plugin_api` -- Required [`PluginAPI`] implementation.
+    /// * `global_config` -- Simulator config.
+    /// * `_va_factory` -- Factory for Determinists random variables.
+    pub fn from_config(
+        config: &ExternalFilterConfig,
+        plugin_api: &Option<Arc<dyn PluginAPI>>,
+        global_config: &SimulatorConfig,
+        va_factory: &Arc<DeterministRandomVariableFactory>,
+        initial_time: f32,
+        context: &Context,
+    ) -> SimusaResult<Self> {
+        internal!(
+            context,
+            crate::logger::InternalLog::API,
+            "Config given: {:?}",
+            config
+        );
+        Ok(Self {
+            filter: plugin_api
+                .as_ref()
+                .ok_or_else(|| {
+                    SimusaError::new(
+                        SimusaErrorTypes::ExternalAPIError,
+                        "Plugin API not set!".to_string(),
+                    )
+                })?
+                .get_sensor_filter(
+                    &config.config,
+                    global_config,
+                    va_factory,
+                    initial_time,
+                    context,
+                ),
+        })
+    }
+}
+
+impl std::fmt::Debug for ExternalFilter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ExternalFilter {{}}")
+    }
+}
+
+impl SensorFilter for ExternalFilter {
+    fn post_init(
+        &mut self,
+        node: &mut crate::node::Node,
+        initial_time: f32,
+        context: &Context,
+    ) -> SimusaResult<()> {
+        self.filter.post_init(node, initial_time, context)
+    }
+
+    fn filter(
+        &self,
+        time: f32,
+        observation: SensorObservation,
+        observer_state: &crate::state_estimators::State,
+        observee_state: Option<&crate::state_estimators::State>,
+        context: &Context,
+    ) -> Option<SensorObservation> {
+        self.filter
+            .filter(time, observation, observer_state, observee_state, context)
+    }
+}

@@ -5,19 +5,19 @@ The state estimator produce a World representation used by the Navigator, using 
 The minimal code is composed of a struct which implements the `StateEstimator` trait and the `Recordable<StateEstimatorRecord>` trait.
 The `StateEstimator` trait has multiple functions which need to be implemented:
 ```Rust
-fn prediction_step(&mut self, node: &mut simba::node::Node, command: Option<Command>, time: f32, context: &Context);
+fn prediction_step(&mut self, node: &mut simusa::node::Node, command: Option<Command>, time: f32, context: &Context);
 
-fn correction_step(&mut self, node: &mut simba::node::Node, observations: &[Observation], time: f32, context: &Context);
+fn correction_step(&mut self, node: &mut simusa::node::Node, observations: &[Observation], time: f32, context: &Context);
 
 fn world_state(&self, context: &Context) -> WorldState;
 
 fn next_time_step(&self, context: &Context) -> f32;
 
-fn pre_loop_hook(&mut self, node: &mut simba::node::Node, time: f32, context: &Context);
+fn pre_loop_hook(&mut self, node: &mut simusa::node::Node, time: f32, context: &Context);
 ```
 The `next_time_step` is very important as it will trigger the call of `prediction_step`. It should not return a constant as time should be increasing.
 
-**Tips**: You can use `simba::utils::maths::round_precision(time, simba::constants::TIME_ROUND)` to round the returned time to the simulator precision, avoiding time drift when using additions on floats.
+**Tips**: You can use `simusa::utils::maths::round_precision(time, simusa::constants::TIME_ROUND)` to round the returned time to the simulator precision, avoiding time drift when using additions on floats.
 
 The `Recordable<StateEstimatorRecord>` has to be implemented, but it can be as minimal as below if no record is needed:
 ```Rust
@@ -53,36 +53,36 @@ impl MyWonderfulStateEstimator {
 impl StateEstimator for MyWonderfulStateEstimator {
     fn prediction_step(
         &mut self,
-        _robot: &mut simba::node::Node,
+        _robot: &mut simusa::node::Node,
         _command: Option<Command>,
         time: f32,
-        _context: &simba::context::Context,
+        _context: &simusa::context::Context,
     ) {
         self.last_prediction = time;
     }
 
     fn correction_step(
         &mut self,
-        _robot: &mut simba::node::Node,
+        _robot: &mut simusa::node::Node,
         _observations: &[Observation],
         _time: f32,
-        _context: &simba::context::Context,
+        _context: &simusa::context::Context,
     ) {
     }
 
-    fn next_time_step(&self, _context: &simba::context::Context) -> f32 {
+    fn next_time_step(&self, _context: &simusa::context::Context) -> f32 {
         self.last_prediction + 0.5
     }
 
-    fn world_state(&self, _context: &simba::context::Context) -> WorldState {
+    fn world_state(&self, _context: &simusa::context::Context) -> WorldState {
         WorldState::new()
     }
 
     fn pre_loop_hook(
         &mut self,
-        _node: &mut simba::node::Node,
+        _node: &mut simusa::node::Node,
         _time: f32,
-        _context: &simba::context::Context,
+        _context: &simusa::context::Context,
     ) {
     }
 }

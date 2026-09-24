@@ -24,7 +24,7 @@ robots:
 
 ## Robot Models
 
-SiMBA supports two kinematic models for robots:
+SiMuSA supports two kinematic models for robots:
 
 ### Unicycle (Differential Drive)
 

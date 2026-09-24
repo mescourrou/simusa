@@ -84,7 +84,7 @@ controller:
 ```
 
 **How it works**:
-1. SiMBA loads `my_controller.py` and instantiates `MyController`
+1. SiMuSA loads `my_controller.py` and instantiates `MyController`
 2. Your class receives the config dict with all parameters
 3. Each simulation step, your methods are called to compute control
 4. You return motor commands

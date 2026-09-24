@@ -1,14 +1,14 @@
-# SiMBA: Multi-Robot Backend Simulator 
+# SiMuSA: Simulator for Multi-robot Sensing Abstraction
 
 ## User Documentation
 
-SiMBA is a simulator designed to abstract sensor measurements to facilitate the implementation of backend fusion algorithms or visual servoing. The simulator supports multiple robots, and the time rate is dynamic, waiting for the algorithms to finish before jumping to the next time step. It is written in Rust, and Python bindings are available, with a loss of performance. Its modular architecture allows for extension of different components while using the default version of the others.
+SiMuSA is a simulator designed to abstract sensor measurements to facilitate the implementation of backend fusion algorithms or servoing. The simulator supports multiple robots, and the time rate is dynamic, waiting for the algorithms to finish before jumping to the next time step. It is written in Rust, and Python bindings are available, with a loss of performance. Its modular architecture allows for extension of different components while using the default version of the others.
 
 ---
 
 ## Quick Navigation
 
-### New to SiMBA? Start here:
+### New to SiMuSA? Start here:
 
 1. **[Getting Started Guide](config_getting_started.md)** ← Start here!
    - Minimal working example
@@ -29,8 +29,8 @@ SiMBA is a simulator designed to abstract sensor measurements to facilitate the 
 
 - **[Auto-generated API Reference](config_documentation.md)** - Complete field listing (for reference)
 - **[Python Integration](python/using_python.md)** - Custom Python components
-- **[Plugin Development](plugin/index.md)** - Extending SiMBA
-- **[Rust API Documentation](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simba/)** - Technical implementation details
+- **[Plugin Development](plugin/index.md)** - Extending SiMuSA
+- **[Rust API Documentation](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/)** - Technical implementation details
 
 ---
 
@@ -130,7 +130,7 @@ This provides real-time validation and suggestions! The `config.schema.json` fil
 1. **Check the troubleshooting guide**: [Tips & Tricks - Troubleshooting](config_tips.md#troubleshooting)
 2. **Look at examples**: Browse `config_example/` directory
 3. **Search the reference**: [Configuration Reference](config_reference.md)
-4. **Check the Rust docs**: [Full API docs](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simba/)
+4. **Check the Rust docs**: [Full API docs](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/)
 
 ---
 

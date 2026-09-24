@@ -15,7 +15,7 @@ Defines how the robot moves and interacts with the world.
 
 ## Physics Type: `Internal`
 
-Use SiMBA's built-in kinematic/dynamic physics engine. This is the standard choice for most simulations.
+Use SiMuSA's built-in kinematic/dynamic physics engine. This is the standard choice for most simulations.
 
 ```yaml
 physics:
@@ -135,7 +135,7 @@ physics:
 ```
 
 **How it works**:
-1. SiMBA loads `my_physics.py` and instantiates `MyPhysics`
+1. SiMuSA loads `my_physics.py` and instantiates `MyPhysics`
 2. Your class receives initial state and config
 3. When motor commands are sent, your `apply_command(command, time)` method is called
 4. Each time step, `update_state(time)` is called

@@ -99,7 +99,7 @@ navigator:
 ```
 
 **How it works**:
-1. SiMBA loads `my_navigator.py` and instantiates the `MyNavigator` class
+1. SiMuSA loads `my_navigator.py` and instantiates the `MyNavigator` class
 2. Your class receives the `config` dict with all parameters (including `custom_param1`)
 3. Each simulation step, your navigator's `get_navigation_command()` method is called
 4. You return target position/velocity for the controller to track

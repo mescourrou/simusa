@@ -6,7 +6,7 @@
     - **You are here:** Tips & Tricks 👈
     - Quick field lookup? → [Auto-generated Docs](config_documentation.md)
 
-This guide provides best practices, common patterns, and troubleshooting advice for SiMBA configuration.
+This guide provides best practices, common patterns, and troubleshooting advice for SiMuSA configuration.
 
 ## Table of Contents
 - [Common Patterns](#common-patterns)
@@ -265,10 +265,10 @@ computation_units:
 Specify the correct version matching your simulator to get a warning when using different major versions:
 
 ```yaml
-version: 1.8.0  # Match your installed SiMBA version
+version: 1.8.0  # Match your installed SiMuSA version
 ```
 
-Check with: `simba-cmd --version`
+Check with: `simusa-cmd --version`
 
 ### 2. File Path Organization
 
@@ -401,7 +401,7 @@ log:
 
 **Important**: 
 - `Debug` level: For your own Rust custom code logging (via `log::debug!()`)
-- `Internal` level: For SiMBA's internal simulator logs (network messages, component lifecycle, etc.)
+- `Internal` level: For SiMuSA's internal simulator logs (network messages, component lifecycle, etc.)
 
 The simulator does NOT emit Debug-level logs unless you explicitly use `Internal` logging option.
 
@@ -736,4 +736,4 @@ See `analyse_results.py` in the `python_scripts/` folder for an example implemen
 - **[Getting Started Guide](config_getting_started.md)**: Quick introduction to configuration
 - **[Complete Reference](config_reference.md)**: Detailed documentation of all options
 - **[Auto-generated Documentation](config_documentation.md)**: Field-level details
-- **[Rust API Docs](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simba/)**: Technical implementation details
+- **[Rust API Docs](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/)**: Technical implementation details

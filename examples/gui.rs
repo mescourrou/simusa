@@ -1,4 +1,4 @@
-use simba::gui;
+use simusa::gui;
 
 fn main() {
     gui::run_gui(None, None, false);

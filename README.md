@@ -1,35 +1,14 @@
-# SiMBA: Simulator for Multi-robot Backend Algorithms
+# SiMuSA: Simulator for Multi-robot Sensing Abstraction
 
-SiMBA is a simulator designed to abstract sensor measurements to facilitate the implementation of backend fusion algorithms or visual servoing. The simulator supports multiple robots, and the time rate is dynamic, waiting for the algorithms to finish before jumping to the next time step. It is written in Rust, and Python bindings are available, with a loss of performance. Its modular architecture allows for extension of different components while using the default version of the others.
+SiMuSA is a simulator designed to abstract sensor measurements to facilitate the implementation of backend fusion algorithms or servoing. The simulator supports multiple robots, and the time rate is dynamic, waiting for the algorithms to finish before jumping to the next time step. It is written in Rust, and Python bindings are available, with a loss of performance. Its modular architecture allows for extension of different components while using the default version of the others.
 
-## Features
-Here is a list of available and considered features. The order is not a priority order.
-- [X] First simple control-state estimation-physics loop
-- [X] Message exchange between robots
-- [X] Automatic result treatment at the end of runs
-- [X] Basic sensors: displacement, speed, GNSS, relative landmark, inter-robot, scan
-- [X] State estimator test bench
-- [X] Determinist random variables for noise simulation
-- [X] Python bindings: state estimators, controllers, navigators and physics
-- [X] Time performance analysis
-- [X] Complex noise addition and faults
-- [X] Graphical User Interface (real time + replay)
-- [X] PluginAPI to provide custom implementations of components (controllers, state estimators, physics, etc.)
-- [X] Triggerable sensors
-- [X] Centralized algorithm possibility
-- [ ] Export data to file
-- [ ] Possibility to read data from file instead of simulation: test state estimation algorithms on real data
-- [ ] ROS2 interface (rosbag reading)
-- [ ] Gazebo interface (maybe)
-- [ ] C++ bindings
-- [ ] New faults: delay, activation windows
 
 ## Crates
-- `simba-core`: Main library.
-- `simba-cmd`: Command line tool to launch the simulator on a given configuration file.
-- `simba-tools`: Command line tool for developers.
-- `simba-macros`: Procedural macros used in `simba-core`.
-- `simba-com`: Library for message exchange between nodes and synchronization.
+- `simusa-core`: Main library.
+- `simusa-cmd`: Command line tool to launch the simulator on a given configuration file.
+- `simusa-tools`: Command line tool for developers.
+- `simusa-macros`: Procedural macros used in `simusa-core`.
+- `simusa-com`: Library for message exchange between nodes and synchronization.
 
 ## Cargo Features:
 - "gui": enable GUI running. Use `gui::run_gui` to start a GUI.
@@ -40,7 +19,7 @@ You can compile the documentation using Cargo:
 cargo doc --no-deps
 ```
 
-The last Rust documentation is available [here](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simba).
+The last Rust documentation is available [here](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa).
 
 The last user documentation is available [here](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/user).
 
@@ -74,4 +53,4 @@ source .env/bin/activate
 2) Then, install maturin:
 `pip install maturin`
 3) To build the bindings, use `maturin develop`. It needs to be run in the virtualenv
-4) To test that the package was built successfully, you can import it in python: `python -m simba`
+4) To test that the package was built successfully, you can import it in python: `python -m simusa`

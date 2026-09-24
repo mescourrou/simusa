@@ -673,9 +673,9 @@ package networking {
     }
 
 
-    NetworkManager *-- .simba_com.Broker
-    Network -- .simba_com.Broker
-    Network -- .simba_com.MultiClient
+    NetworkManager *-- .simusa_com.Broker
+    Network -- .simusa_com.Broker
+    Network -- .simusa_com.MultiClient
     Network -- Envelope
 
 
@@ -707,7 +707,7 @@ package networking {
 }
 
 
-package simba_com as "simba-com" {
+package simusa_com as "simusa-com" {
     class Broker
     class MultiClient
 }
