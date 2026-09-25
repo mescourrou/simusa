@@ -47,8 +47,26 @@ if [ -z "$CHANGELOG_VERSION_LINE" ]; then
     exit 1
 fi
 
+# Check that when subcrate import other workspace crates, they use the same version as the workspace version
+DIRS=$(find . -name Cargo.toml -not -path "./target/*" | xargs dirname | grep "^./simusa-" | sed 's/^\.\///')
+DEPS="simusa $DIRS"
+for dir in $DIRS; do
+    for dep in $DEPS; do
+        if [ "$dir" != "$dep" ]; then
+            # Check if dir/Cargo.toml contains a dependency on dep with the correct version
+            DEP_VERSION=$(cat "$dir/Cargo.toml" | grep "^$dep" | head -n 1 | sed 's/.*version = "//' | sed 's/".*//')
+            if [ -n "$DEP_VERSION" ] && [ "$DEP_VERSION" != "$CURRENT_RELEASE" ]; then
+                echo "Error: $dir depends on $dep with version $DEP_VERSION, but current release is $CURRENT_RELEASE"
+                echo "File $dir/Cargo.toml"
+                exit 1
+            fi
+        fi
+    done
+done
+
 cargo fmt --all
 cargo clippy --all-targets -- -D warnings
+cargo clippy -p simusa --features monothreaded -- -D warnings
 cargo build --release
 ./generate_config_doc.py
 RUSTFLAGS="-D warnings" cargo doc --no-deps --release

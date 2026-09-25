@@ -109,7 +109,7 @@
     "version": {
       "description": "Version of the simulator used by the configuration. Produces a warning the the major version (second number)\nis different from the current one.",
       "type": "string",
-      "default": "1.9.0"
+      "default": "1.9.1"
     }
   },
   "additionalProperties": false,

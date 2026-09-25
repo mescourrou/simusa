@@ -4,12 +4,15 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
+description = "Procedural macros for simusa"
+readme.workspace = true
+repository.workspace = true
 
 [lib]
 proc-macro = true
 
 
 [dependencies]
-syn = "^2.0.90"
-quote = "^1.0.37"
-proc-macro2 = "^1.0.92"
+syn = "2.0.93"
+quote = "1.0.38"
+proc-macro2 = "1.0.103"

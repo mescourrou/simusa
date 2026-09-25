@@ -18,11 +18,7 @@ struct Cli {
 
 fn doit(args: Cli) -> SimusaResult<()> {
     if args.no_gui {
-        let config_path = args
-            .config_path
-            .as_ref()
-            .map(|p| Path::new(unsafe { std::mem::transmute::<&String, &'static String>(p) }));
-        if config_path.is_none() {
+        if args.config_path.is_none() {
             println!("If no gui is used, provide a config path!");
             return Ok(());
         }
@@ -30,7 +26,7 @@ fn doit(args: Cli) -> SimusaResult<()> {
         Simulator::init_environment();
         println!("Load configuration...");
         let mut simulator = Simulator::from_config_path(
-            config_path.unwrap(),
+            Path::new(&args.config_path.unwrap()),
             None, //<- plugin API, to load external modules
         )?;
 
@@ -50,12 +46,7 @@ fn doit(args: Cli) -> SimusaResult<()> {
         return Ok(());
     }
 
-    let config_path = args
-        .config_path
-        .as_ref()
-        .map(|p| Path::new(unsafe { std::mem::transmute::<&String, &'static String>(p) }));
-
-    gui::run_gui(config_path, None, args.load_results);
+    gui::run_gui(args.config_path, None, args.load_results);
     Ok(())
 }
 

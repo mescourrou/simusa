@@ -222,7 +222,7 @@ impl SimusaApp {
     /// Called once before the first frame.
     pub fn new(
         cc: &eframe::CreationContext<'_>,
-        default_config_path: Option<&'static Path>,
+        default_config_path: Option<String>,
         plugin_api: Option<Arc<dyn PluginAPI>>,
         load_results: bool,
     ) -> Self {
@@ -243,7 +243,7 @@ impl SimusaApp {
     }
 
     fn new_full(
-        default_config_path: Option<&'static Path>,
+        default_config_path: Option<String>,
         plugin_api: Option<Arc<dyn PluginAPI>>,
         load_results: bool,
     ) -> Self {
@@ -269,7 +269,7 @@ impl SimusaApp {
             ..Default::default()
         };
         if let Some(config) = default_config_path {
-            n.config_path = config.to_str().unwrap().to_string();
+            n.config_path = config;
             n.p.config = None;
             match SimulatorConfig::load_from_path(Path::new(&n.config_path)) {
                 Ok(cfg) => {
@@ -319,7 +319,7 @@ impl SimusaApp {
 
     fn update_api(
         mut self,
-        default_config_path: Option<&'static Path>,
+        default_config_path: Option<String>,
         plugin_api: Option<Arc<dyn PluginAPI>>,
         load_results: bool,
     ) -> Self {
@@ -338,7 +338,7 @@ impl SimusaApp {
         self.p.api = Some(api);
         self.p.plugin_api = plugin_api;
         if let Some(config) = default_config_path {
-            self.config_path = config.to_str().unwrap().to_string();
+            self.config_path = config;
             self.p.config = None;
             match SimulatorConfig::load_from_path(Path::new(&self.config_path)) {
                 Ok(cfg) => {

@@ -1,4 +1,8 @@
 # Changelogs
+
+## v1.9.1
+Changes to fit `crates.io` publication.
+
 ## v1.9.0
 [BREAKING] Name change: from simba to simusa
 

@@ -2,7 +2,6 @@
 //! This is used by the GUI and the Python API to communicate with the simulator without blocking the main thread.
 
 use std::{
-    os::unix::thread::JoinHandleExt,
     sync::{Arc, Mutex, RwLock, mpsc},
     thread::{self, JoinHandle, sleep},
     time::Duration,
@@ -24,7 +23,6 @@ use crate::{
     utils::{
         SharedMutex, SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory,
     },
-    warning,
 };
 
 /// Asynchronous API for [`Simulator`] in order to allow running the simulator in a separate thread, and communicate with it through channels. This is a client of [`AsyncApiServer`].
@@ -174,13 +172,10 @@ impl AsyncApiRunner {
         self.keep_alive_tx.send(()).unwrap();
         info!(self.context, "Stop requested...");
         if let Some(handle) = self.thread_handle.take() {
-            sleep(Duration::new(0, 200000000));
+            sleep(Duration::new(0, 200_000_000));
             if !handle.is_finished() {
                 // Need to find a generic way to stop threads
-                warning!(self.context, "Force stopping AsyncApiRunner thread...");
-                unsafe {
-                    libc::pthread_cancel(handle.as_pthread_t());
-                }
+                panic!("AsyncApiRunner thread is not stopping");
             }
             handle
                 .join()

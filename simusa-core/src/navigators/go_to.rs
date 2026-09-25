@@ -26,7 +26,6 @@ use crate::{
 };
 
 extern crate nalgebra as na;
-use libm::atan2;
 
 use config_checker::*;
 use nalgebra::SVector;
@@ -327,10 +326,8 @@ impl Navigator for GoTo {
             self.target_speed = 0.;
         }
 
-        let target_direction = atan2(
-            (target_point[1] - state.pose.y).into(),
-            (target_point[0] - state.pose.x).into(),
-        ) as f32;
+        let target_direction =
+            (target_point[1] - state.pose.y).atan2(target_point[0] - state.pose.x);
 
         let theta_error = smallest_theta_diff(target_direction, state.pose.z);
 

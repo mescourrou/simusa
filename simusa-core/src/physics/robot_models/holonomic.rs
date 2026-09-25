@@ -4,7 +4,6 @@
 //! [`RobotModel`], along with command and configuration types.
 
 use config_checker::*;
-use libm::atan2f;
 use nalgebra::SMatrix;
 use serde::{Deserialize, Serialize};
 use simusa_macros::config_derives;
@@ -218,7 +217,7 @@ impl RobotModel for Holonomic {
 
         // let rot = nalgebra::Rotation2::from_matrix(&se2_mat.fixed_view::<2, 2>(0, 0).into());
         // self.state.pose.z = rot.angle();
-        state.pose.z = atan2f(se2_mat[(1, 0)], se2_mat[(0, 0)]);
+        state.pose.z = se2_mat[(1, 0)].atan2(se2_mat[(0, 0)]);
 
         state.pose.x = se2_mat[(0, 2)];
         state.pose.y = se2_mat[(1, 2)];

@@ -18,10 +18,13 @@ use crate::{
         SensorConfig,
         robot_sensor::RobotSensorConfig,
         sensor_manager::{ManagedSensorConfig, SensorManagerConfig},
-    }, simulator::{ResultConfig, Simulator, SimulatorConfig}, state_estimators::{
+    },
+    simulator::{ResultConfig, Simulator, SimulatorConfig},
+    state_estimators::{
         BenchStateEstimatorConfig, StateEstimator, StateEstimatorConfig,
         external_estimator::ExternalEstimatorConfig, perfect_estimator::PerfectEstimatorConfig,
-    }, utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
+    },
+    utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
 };
 
 struct PluginAPITest<SE: StateEstimator + 'static> {

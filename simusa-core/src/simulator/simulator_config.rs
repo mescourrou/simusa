@@ -68,9 +68,6 @@ impl Check for OptimizationConfig {
         {
             let mut ret = CheckResult::new();
             if self.threads != 1 {
-                use crate::context::Context;
-                use crate::warning;
-
                 ret.add_warning(format!("The 'monothreaded' feature is enabled, so only 1 thread (no parallelization) is supported, got {} in the configuration (ignoring the 'threads' value)",
                     self.threads
                 ));
@@ -347,7 +344,7 @@ impl crate::gui::UIComponent for SimulatorConfig {
                 ui.label("Robots:");
                 let mut remove = None;
                 for (i, r) in self.robots.iter_mut().enumerate() {
-                    let robot_unique_id = format!("{}-{}", unique_id, &r.name);
+                    let robot_unique_id = format!("{}-{}", unique_id, r.name);
                     ui.horizontal_top(|ui| {
                         r.show_mut(ui, ctx, buffer_stack, global_config, None, &robot_unique_id);
                         if ui.button("X").clicked() {
@@ -367,7 +364,7 @@ impl crate::gui::UIComponent for SimulatorConfig {
                 ui.label("Computation Units:");
                 let mut remove = None;
                 for (i, cu) in self.computation_units.iter_mut().enumerate() {
-                    let cu_unique_id = format!("{}-{}", unique_id, &cu.name);
+                    let cu_unique_id = format!("{}-{}", unique_id, cu.name);
                     ui.horizontal_top(|ui| {
                         cu.show_mut(ui, ctx, buffer_stack, global_config, None, &cu_unique_id);
                         if ui.button("X").clicked() {
@@ -430,7 +427,7 @@ impl crate::gui::UIComponent for SimulatorConfig {
             ui.vertical(|ui| {
                 ui.label("Robots:");
                 for r in &self.robots {
-                    let robot_unique_id = format!("{}-{}", unique_id, &r.name);
+                    let robot_unique_id = format!("{}-{}", unique_id, r.name);
                     r.show(ui, ctx, &robot_unique_id);
                 }
             });
@@ -438,7 +435,7 @@ impl crate::gui::UIComponent for SimulatorConfig {
             ui.vertical(|ui| {
                 ui.label("Computation Units:");
                 for cu in &self.computation_units {
-                    let cu_unique_id = format!("{}-{}", unique_id, &cu.name);
+                    let cu_unique_id = format!("{}-{}", unique_id, cu.name);
                     cu.show(ui, ctx, &cu_unique_id);
                 }
             });

@@ -31,8 +31,6 @@
 //! simulator.compute_results().unwrap();
 //! ```
 
-#![doc = include_str!("../../doc/user_manual/docs/config_documentation.md")]
-
 use pyo3::prelude::*;
 
 pub use simusa_com;

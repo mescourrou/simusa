@@ -6,7 +6,7 @@
 
 mod app;
 
-use std::{collections::BTreeMap, path::Path, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc};
 
 pub use app::SimusaApp;
 mod configurator;
@@ -27,7 +27,7 @@ use crate::{
 /// * `plugin_api` - The plugin API to load external modules. Required to load external modules of the simulator.
 /// * `load_results` - Whether to load simulation results at startup. The `default_config_path` must be given to load the results, as the results path is loaded from the configuration file. If `default_config_path` is not given, this argument is ignored.
 pub fn run_gui(
-    default_config_path: Option<&'static Path>,
+    default_config_path: Option<String>,
     plugin_api: Option<Arc<dyn PluginAPI>>,
     load_results: bool,
 ) {

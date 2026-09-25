@@ -20,10 +20,13 @@ default-members = [
 resolver = "2"
 
 [workspace.package]
-version = "1.9.0"
+version = "1.9.1"
 edition = "2024"
 authors = ["Maxime Escourrou <maxime.escourrou@laas.fr>"]
 license = "MIT"
+description = "SiMuSA is a simulator designed to abstract sensor measurements to facilitate the implementation of backend fusion algorithms or servoing. The simulator supports multiple robots, and the time rate is dynamic, waiting for the algorithms to finish before jumping to the next time step. Its modular architecture allows for extension of different components while using the default version of the others."
+repository = "https://gitlab.laas.fr/mescourrou/simusa.git"
+readme = "README.md"
 
 [profile.release]
 opt-level = 2 # fast and small wasm

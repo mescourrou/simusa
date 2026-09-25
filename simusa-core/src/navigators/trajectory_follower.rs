@@ -20,7 +20,6 @@ use crate::{
 };
 
 extern crate nalgebra as na;
-use libm::atan2;
 use na::Vector3;
 
 use config_checker::*;
@@ -347,16 +346,12 @@ impl Navigator for TrajectoryFollower {
                 self.target_speed = 0.;
             }
         }
-        let segment_angle: f32 = atan2(
-            (segment.1.y - segment.0.y).into(),
-            (segment.1.x - segment.0.x).into(),
-        ) as f32;
+        let segment_angle: f32 = (segment.1.y - segment.0.y).atan2(segment.1.x - segment.0.x);
         let projected_point = Vector3::new(projected_point.x, projected_point.y, segment_angle);
         let projection_vector =
             projected_point.fixed_view::<2, 1>(0, 0) - state.pose.fixed_view::<2, 1>(0, 0);
         // Compute the orientation error
-        let mut projected_point_direction =
-            atan2(projection_vector.y.into(), projection_vector.x.into()) as f32;
+        let mut projected_point_direction = projection_vector.y.atan2(projection_vector.x);
 
         self.projected_point = [projected_point.x, projected_point.y];
 

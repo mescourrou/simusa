@@ -195,7 +195,7 @@ impl UIComponent for SensorManagerConfig {
             .show(ui, |ui| {
                 let mut sensor_to_remove = None;
                 for (i, sensor) in self.sensors.iter_mut().enumerate() {
-                    let sensor_unique_id = format!("{}-{}", unique_id, &sensor.name);
+                    let sensor_unique_id = format!("{}-{}", unique_id, sensor.name);
                     ui.horizontal_top(|ui| {
                         sensor.show_mut(
                             ui,
@@ -224,7 +224,7 @@ impl UIComponent for SensorManagerConfig {
             .id_salt(format!("sensor-manager-{}", unique_id))
             .show(ui, |ui| {
                 for sensor in &self.sensors {
-                    let sensor_unique_id = format!("{}-{}", unique_id, &sensor.name);
+                    let sensor_unique_id = format!("{}-{}", unique_id, sensor.name);
                     ui.horizontal_top(|ui| {
                         sensor.show(ui, ctx, &sensor_unique_id);
                     });

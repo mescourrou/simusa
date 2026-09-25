@@ -23,9 +23,6 @@ use simusa_com::pub_sub::{MultiClientTrait, PathKey};
 use simusa_macros::EnumToString;
 
 #[cfg(feature = "gui")]
-use std::path::Path;
-
-#[cfg(feature = "gui")]
 use crate::api::async_api::PluginAsyncAPI;
 
 use crate::{
@@ -1609,13 +1606,7 @@ pub fn run_gui(
     // allow_threads reacquire the GIL when it exits the function. At this point, we are sure that the other thread is finished.
     py.detach(|| {
         gui::run_gui(
-            match &default_config_path {
-                Some(path_str) => {
-                    let p = Path::new(path_str);
-                    Some(unsafe { std::mem::transmute::<&Path, &'static Path>(p) })
-                }
-                None => None,
-            },
+            default_config_path,
             async_plugin_api.map(|api| api as Arc<dyn PluginAPI>),
             load_results,
         );

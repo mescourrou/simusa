@@ -54,6 +54,8 @@ use crate::info;
 use crate::internal;
 use crate::physics::Physics;
 use crate::utils::SharedRoLock;
+#[cfg(not(feature = "monothreaded"))]
+use crate::utils::barrier::Barrier;
 use crate::warning;
 use crate::{
     VERSION,
@@ -74,7 +76,7 @@ use crate::{
     scenario::{Scenario, config::ScenarioConfig},
     time_analysis::{TimeAnalysisConfig, TimeAnalysisFactory},
     utils::{
-        SharedMutex, SharedRwLock, barrier::Barrier,
+        SharedMutex, SharedRwLock,
         determinist_random_variable::DeterministRandomVariableFactory, maths::round_precision,
         python::CONVERT_TO_DICT,
     },
@@ -86,7 +88,6 @@ use std::{
     fs::OpenOptions,
     io::SeekFrom,
     path::{Path, PathBuf},
-    thread::JoinHandle,
 };
 use std::{collections::BTreeMap, ffi::CString};
 
@@ -95,7 +96,8 @@ use std::default::Default;
 use std::fs::{self, File};
 use std::io::prelude::*;
 use std::sync::{Arc, Condvar, Mutex, RwLock};
-use std::thread;
+#[cfg(not(feature = "monothreaded"))]
+use std::thread::{self, JoinHandle};
 
 /// One time record.
 ///
@@ -178,16 +180,23 @@ impl Default for TimeCv {
 
 pub(crate) struct RunningParameters {
     max_time: f32,
+    #[cfg(not(feature = "monothreaded"))]
     nb_nodes: SharedRwLock<usize>,
+    #[cfg(not(feature = "monothreaded"))]
     finishing_cv: Arc<(Mutex<usize>, Condvar)>,
+    #[cfg(not(feature = "monothreaded"))]
     barrier: Arc<Barrier>,
+    #[cfg(not(feature = "monothreaded"))]
     handles: Vec<JoinHandle<SimusaResult<Option<Node>>>>,
+    #[cfg(not(feature = "monothreaded"))]
     end_time_step_syncs: Vec<Arc<Mutex<bool>>>,
+    #[cfg(not(feature = "monothreaded"))]
     running_nodes_names: Vec<String>,
     nb_threads: usize,
     last_sim_time: f32,
 }
 
+#[cfg(not(feature = "monothreaded"))]
 struct NodeSyncParams {
     nb_nodes: SharedRwLock<usize>,
     time_cv: Arc<TimeCv>,
@@ -692,11 +701,17 @@ impl Simulator {
         let mut running_parameters = RunningParameters {
             max_time: self.config.max_time,
             last_sim_time: self.last_sim_time,
+            #[cfg(not(feature = "monothreaded"))]
             nb_nodes: Arc::new(RwLock::new(0)),
+            #[cfg(not(feature = "monothreaded"))]
             finishing_cv: Arc::new((Mutex::new(0usize), Condvar::new())),
+            #[cfg(not(feature = "monothreaded"))]
             barrier: Arc::new(Barrier::new(1)),
+            #[cfg(not(feature = "monothreaded"))]
             handles: vec![],
+            #[cfg(not(feature = "monothreaded"))]
             end_time_step_syncs: Vec::new(),
+            #[cfg(not(feature = "monothreaded"))]
             running_nodes_names: Vec::new(),
             nb_threads: self.max_threads,
         };
@@ -1507,7 +1522,7 @@ impl Simulator {
                         SimusaErrorTypes::ImplementationError,
                         format!(
                             "Error during json serialization of record {:?}: {}",
-                            &record, e
+                            record, e
                         ),
                     ));
                 }
@@ -1735,6 +1750,7 @@ impl Simulator {
     }
 
     /// Main loop for the simulator main thread. This loop is responsible for synchronizing the nodes at each time step, executing the scenario, and processing the messages between nodes.
+    #[cfg(not(feature = "monothreaded"))]
     fn simulator_spin(&mut self, running_parameters: &mut RunningParameters) -> SimusaResult<()> {
         let time_cv = self.time_cv.clone();
         let context = self.context.new_callstack_level("spin");
@@ -1953,7 +1969,7 @@ def show():
                 fs::create_dir_all(&figure_path).unwrap_or_else(|_| {
                     panic!(
                         "Impossible to create figure directory ({:#?})",
-                        &figure_path
+                        figure_path
                     )
                 });
             } else {

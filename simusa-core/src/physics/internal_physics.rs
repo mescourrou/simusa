@@ -20,7 +20,10 @@ use crate::{
         robot_models::{
             Command, RobotModel, RobotModelConfig, make_model_from_config, unicycle::UnicycleConfig,
         },
-    }, recordable::Recordable, state_estimators::{State, StateConfig, StateRecord}, utils::{SharedMutex, determinist_random_variable::DeterministRandomVariableFactory},
+    },
+    recordable::Recordable,
+    state_estimators::{State, StateConfig, StateRecord},
+    utils::{SharedMutex, determinist_random_variable::DeterministRandomVariableFactory},
 };
 use config_checker::*;
 use serde_derive::{Deserialize, Serialize};

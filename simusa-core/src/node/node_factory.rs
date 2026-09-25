@@ -453,7 +453,7 @@ impl UIComponent for RobotConfig {
             ui.label("State estimator bench:");
             let mut seb_to_remove = None;
             for (i, seb) in self.state_estimator_bench.iter_mut().enumerate() {
-                let seb_unique_id = format!("{}-{}", unique_id, &seb.name);
+                let seb_unique_id = format!("{}-{}", unique_id, seb.name);
                 ui.horizontal_top(|ui| {
                     seb.show_mut(
                         ui,
@@ -513,7 +513,7 @@ impl UIComponent for RobotConfig {
 
             ui.label("State estimator bench:");
             for seb in &self.state_estimator_bench {
-                let seb_unique_id = format!("{}-{}", unique_id, &seb.name);
+                let seb_unique_id = format!("{}-{}", unique_id, seb.name);
                 ui.horizontal_top(|ui| {
                     seb.show(ui, ctx, &seb_unique_id);
                 });
@@ -714,7 +714,7 @@ impl UIComponent for ComputationUnitConfig {
             ui.label("State estimators:");
             let mut se_to_remove = None;
             for (i, seb) in self.state_estimators.iter_mut().enumerate() {
-                let seb_unique_id = format!("{}-{}", unique_id, &seb.name);
+                let seb_unique_id = format!("{}-{}", unique_id, seb.name);
                 ui.horizontal_top(|ui| {
                     seb.show_mut(
                         ui,
@@ -758,7 +758,7 @@ impl UIComponent for ComputationUnitConfig {
 
             ui.label("State estimators:");
             for seb in &self.state_estimators {
-                let seb_unique_id = format!("{}-{}", unique_id, &seb.name);
+                let seb_unique_id = format!("{}-{}", unique_id, seb.name);
                 ui.horizontal_top(|ui| {
                     seb.show(ui, ctx, &seb_unique_id);
                 });

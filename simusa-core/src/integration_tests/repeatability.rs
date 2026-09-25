@@ -61,6 +61,7 @@ macro_rules! replication_test {
     };
 }
 
+#[cfg(not(feature = "monothreaded"))]
 macro_rules! threading_replication_test {
     ($config:ident) => {
         #[test]

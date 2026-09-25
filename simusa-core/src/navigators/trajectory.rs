@@ -4,7 +4,6 @@ Trajectory tool.
 
 extern crate nalgebra as na;
 use config_checker::macros::Check;
-use libm::atan2;
 use na::{DMatrix, SVector};
 use nalgebra::Vector2;
 use simusa_macros::config_derives;
@@ -216,7 +215,7 @@ impl Trajectory {
             };
             d = ((pt2.x - pt1.x).powf(2.) + (pt2.y - pt1.y).powf(2.)).sqrt();
         }
-        let segment_direction = atan2((pt2.y - pt1.y).into(), (pt2.x - pt1.x).into()) as f32;
+        let segment_direction = (pt2.y - pt1.y).atan2(pt2.x - pt1.x);
 
         let projected_point = start_point
             + forward_distance * Vector2::new(segment_direction.cos(), segment_direction.sin());

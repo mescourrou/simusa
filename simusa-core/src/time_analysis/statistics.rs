@@ -1,7 +1,5 @@
 use std::collections::BTreeMap;
 
-use libm::ceilf;
-
 #[derive(Debug)]
 pub(super) struct TimeAnalysisStatistics {
     pub mean: f32,
@@ -37,10 +35,10 @@ impl TimeAnalysisStatistics {
                 .min_by(|a, b| a.partial_cmp(b).unwrap())
                 .unwrap_or(&0.),
             n: (n as u32),
-            q1: v[(ceilf(nf32 / 4.) as usize).min(n - 1)],
-            q3: v[(ceilf(nf32 * 0.75) as usize).min(n - 1)],
-            q01: v[(ceilf(nf32 * 0.01) as usize).min(n - 1)],
-            q99: v[(ceilf(nf32 * 0.99) as usize).min(n - 1)],
+            q1: v[((nf32 / 4.).ceil() as usize).min(n - 1)],
+            q3: v[((nf32 * 0.75).ceil() as usize).min(n - 1)],
+            q01: v[((nf32 * 0.01).ceil() as usize).min(n - 1)],
+            q99: v[((nf32 * 0.99).ceil() as usize).min(n - 1)],
         }
     }
 
