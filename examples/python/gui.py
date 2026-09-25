@@ -1,9 +1,9 @@
 #!/bin/env python3
 
-import simba
+import simusa
 import json
 
-class Controller(simba.Controller):
+class Controller(simusa.Controller):
     def __init__(self, config: dict, initial_time: float):
         self.last_time = initial_time
         if "speed" in config:
@@ -11,7 +11,7 @@ class Controller(simba.Controller):
         else:
             self.speed = 2
 
-    def post_init(self, node: simba.Node) -> None:
+    def post_init(self, node: simusa.Node) -> None:
         pass
 
     def record(self) -> str:
@@ -19,20 +19,20 @@ class Controller(simba.Controller):
         return json.dumps({
             "last_time": self.last_time})
 
-    def make_command(self, node: simba.Node, error: simba.ControllerError, time: float) -> simba.Command:
+    def make_command(self, node: simusa.Node, error: simusa.ControllerError, time: float) -> simusa.Command:
         self.last_time = time
-        command = simba.Command()
+        command = simusa.Command()
         command.left_wheel_speed = self.speed
         command.right_wheel_speed = self.speed
         return command
 
-    def pre_loop_hook(self, node: simba.Node, time: float):
+    def pre_loop_hook(self, node: simusa.Node, time: float):
         pass
 
     def next_time_step(self):
         return None
 
-class SimulatorAPI(simba.PluginAPI):
+class SimulatorAPI(simusa.PluginAPI):
     def get_controller(self, config: dict, global_config: dict, initial_time: float):
         config = json.loads(config)
         print(f"Config received by python: {type(config)} {config}")
@@ -42,7 +42,7 @@ def main():
 
     simulator_api = SimulatorAPI()
 
-    simba.run_gui(simulator_api)
+    simusa.run_gui(simulator_api)
 
 if __name__ == "__main__":
     main()

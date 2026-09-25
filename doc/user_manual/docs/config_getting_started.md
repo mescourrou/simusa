@@ -6,11 +6,11 @@
     - Need help troubleshooting? → [Tips & Tricks](config_tips.md)
     - Looking for specific field? → [Auto-generated Docs](config_documentation.md)
 
-This guide will help you create your first configuration file for SiMBA. We'll start with a minimal working example and gradually explore what you can configure.
+This guide will help you create your first configuration file for SiMuSA. We'll start with a minimal working example and gradually explore what you can configure.
 
 ## What is a Configuration File?
 
-A SiMBA configuration file is a YAML file that describes:
+A SiMuSA configuration file is a YAML file that describes:
 - **Simulation parameters**: simulation duration, random seed, logging
 - **Robots**: their navigation strategy, control method, physics model, and sensors
 - **Computation units**: non-physical nodes that can perform state estimation based on message reception
@@ -30,7 +30,7 @@ robots:
 After default application, it will result in:
 
 ```yaml
-version: 1.8.0
+version: 1.9.0
 max_time: 10.0
 log:
   log_level: 

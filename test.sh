@@ -7,8 +7,8 @@ cargo build --release
 cargo nextest run --release
 cargo nextest run --release --all-features
 
-target/release/simba-cmd config_example/config_2.yaml --no-gui
-target/release/simba-cmd config_example/config_scenario.yaml --no-gui
+target/release/simusa-cmd config_example/config_2.yaml --no-gui
+target/release/simusa-cmd config_example/config_scenario.yaml --no-gui
 
 maturin develop
 

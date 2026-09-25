@@ -5,7 +5,7 @@ The sensor uses Physics to simulate realistic measurements of the robot state. I
 The minimal code is composed of a struct which implements the `Sensor` trait and the `Recordable<SensorRecord>` trait.
 The `Sensor` trait has multiple functions which need to be implemented:
 ```Rust
-fn post_init(&mut self, node: &mut Node, initial_time: f32, context: &Context) -> SimbaResult<()>;
+fn post_init(&mut self, node: &mut Node, initial_time: f32, context: &Context) -> SimusaResult<()>;
 
 fn get_observations(&mut self, node: &mut Node, time: f32, context: &Context) -> Vec<SensorObservation>;
 
@@ -55,9 +55,9 @@ impl Sensor for MyWonderfulSensor {
         &mut self,
         node: &mut Node,
         _initial_time: f32,
-        context: &simba::context::Context,
-    ) -> SimbaResult<()> {
-        simba::info!(context, "Initializing MyWonderfulSensor for node {}", node.name());
+        context: &simusa::context::Context,
+    ) -> SimusaResult<()> {
+        simusa::info!(context, "Initializing MyWonderfulSensor for node {}", node.name());
         Ok(())
     }
 
@@ -65,7 +65,7 @@ impl Sensor for MyWonderfulSensor {
         &mut self,
         _node: &mut Node,
         time: f32,
-        _context: &simba::context::Context,
+        _context: &simusa::context::Context,
     ) -> Vec<SensorObservation> {
         self.last_observation = Some(MyWonderfulSensorObservation { data: time });
         self.last_time = time;

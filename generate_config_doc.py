@@ -16,8 +16,8 @@ with open(root_cargo_toml_path) as f:
     cargo_data = toml.load(f)
     version = cargo_data["workspace"]["package"]["version"]
 
-CRATE_NAME = f"simba@{version}"
-CRATE_DIR = "simba-core"
+CRATE_NAME = f"simusa@{version}"
+CRATE_DIR = "simusa-core"
 DOC_FILE = "doc/user_manual/docs/config_documentation.md"
 CONFIG_SUFFIX = "Config"
 ENTRY_CONFIG = "SimulatorConfig"
@@ -28,7 +28,7 @@ EXPANDED_FILE = "expanded.rs"
 
 ENUMERATION_COMMENT = "Enum"
 
-BASE_DOC_URL = "https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simba/"
+BASE_DOC_URL = "https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/"
 
 ADDITIONNAL_CONFIG_ITEMS = ["Source", "Sort", "TimeMode", "LogLevel", "InternalLog"]
 
@@ -49,7 +49,7 @@ def main():
     else:
         # Load the JSON doc to build type->file mapping
         import json
-        json_path = "target/doc/simba.json"
+        json_path = "target/doc/simusa.json"
         try:
             with open(json_path) as f:
                 rustdoc_data = json.load(f)

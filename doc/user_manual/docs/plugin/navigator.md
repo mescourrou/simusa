@@ -42,9 +42,9 @@ impl MyWonderfulNavigator {
 impl Navigator for MyWonderfulNavigator {
     fn compute_error(
         &mut self,
-        _robot: &mut simba::node::Node,
+        _robot: &mut simusa::node::Node,
         _state: WorldState,
-        _context: &simba::context::Context,
+        _context: &simusa::context::Context,
     ) -> ControllerError {
         ControllerError {
             lateral: 0.,
@@ -56,9 +56,9 @@ impl Navigator for MyWonderfulNavigator {
 
     fn pre_loop_hook(
         &mut self,
-        _node: &mut simba::node::Node,
+        _node: &mut simusa::node::Node,
         _time: f32,
-        _context: &simba::context::Context,
+        _context: &simusa::context::Context,
     ) {
     }
 }

@@ -1,4 +1,4 @@
-site_name: SiMBA
+site_name: SiMuSA
 theme: readthedocs
 markdown_extensions:
   - admonition

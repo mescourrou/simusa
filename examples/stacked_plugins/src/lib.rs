@@ -1,17 +1,17 @@
 use serde::{Deserialize, Serialize};
-use simba::context::Context;
-use simba::controllers::ControllerError;
-use simba::info;
-use simba::navigators::external_navigator::ExternalNavigatorRecord;
-use simba::navigators::{Navigator, NavigatorRecord};
-use simba::networking::network::Network;
-use simba::plugin_api::PluginAPI;
-use simba::pybinds::PythonAPI;
-use simba::recordable::Recordable;
-use simba::simulator::{AsyncSimulator, Simulator, SimulatorConfig};
-use simba::state_estimators::{StateEstimator, WorldState};
-use simba::utils::determinist_random_variable::DeterministRandomVariableFactory;
-use simba::utils::SharedRwLock;
+use simusa::context::Context;
+use simusa::controllers::ControllerError;
+use simusa::info;
+use simusa::navigators::external_navigator::ExternalNavigatorRecord;
+use simusa::navigators::{Navigator, NavigatorRecord};
+use simusa::networking::network::Network;
+use simusa::plugin_api::PluginAPI;
+use simusa::pybinds::PythonAPI;
+use simusa::recordable::Recordable;
+use simusa::simulator::{AsyncSimulator, Simulator, SimulatorConfig};
+use simusa::state_estimators::{StateEstimator, WorldState};
+use simusa::utils::determinist_random_variable::DeterministRandomVariableFactory;
+use simusa::utils::SharedRwLock;
 use std::sync::Arc;
 
 use pyo3::prelude::*;
@@ -38,7 +38,7 @@ impl MyWonderfulNavigator {
 impl Navigator for MyWonderfulNavigator {
     fn compute_error(
         &mut self,
-        _robot: &mut simba::node::Node,
+        _robot: &mut simusa::node::Node,
         _state: WorldState,
         context: &Context,
     ) -> ControllerError {
@@ -51,7 +51,7 @@ impl Navigator for MyWonderfulNavigator {
         }
     }
 
-    fn pre_loop_hook(&mut self, _node: &mut simba::node::Node, _time: f32, _context: &Context) {}
+    fn pre_loop_hook(&mut self, _node: &mut simusa::node::Node, _time: f32, _context: &Context) {}
 }
 
 impl Recordable<NavigatorRecord> for MyWonderfulNavigator {
@@ -113,7 +113,7 @@ mod my_rust_plugin {
     #[pymodule_export]
     use super::start;
     #[pymodule_export]
-    use simba::simba;
+    use simusa::simusa;
 }
 
 #[pyfunction]

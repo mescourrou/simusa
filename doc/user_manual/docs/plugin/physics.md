@@ -56,15 +56,15 @@ impl Physics for MyWonderfulPhysics {
         &mut self,
         _command: &Command,
         _time: f32,
-        _context: &simba::context::Context,
+        _context: &simusa::context::Context,
     ) {
     }
 
-    fn state(&self, _time: f32, _context: &simba::context::Context) -> State {
+    fn state(&self, _time: f32, _context: &simusa::context::Context) -> State {
         self.state.clone()
     }
 
-    fn update_state(&mut self, _time: f32, _context: &simba::context::Context) {}
+    fn update_state(&mut self, _time: f32, _context: &simusa::context::Context) {}
 }
 
 impl Recordable<PhysicsRecord> for MyWonderfulPhysics {

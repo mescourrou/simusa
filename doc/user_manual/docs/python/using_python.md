@@ -1,13 +1,13 @@
 # Using Python bindings
 
 ## Installation
-First, download and install the wheel package on the [release page](https://gitlab.laas.fr/mescourrou/simba/-/releases).
+First, download and install the wheel package on the [release page](https://gitlab.laas.fr/mescourrou/simusa/-/releases).
 You might want to use a virtual environment.
 
 The built package support Python version from 3.10.
 
 ## Start the simulator
-Examples of Python usage are available on [Gitlab](https://gitlab.laas.fr/mescourrou/simba/-/tree/master/examples/python).
+Examples of Python usage are available on [Gitlab](https://gitlab.laas.fr/mescourrou/simusa/-/tree/master/examples/python).
 
 Writing a Python program is close to writing a [Rust Plugin](../plugin/index.md), but some steps are simplified.
 

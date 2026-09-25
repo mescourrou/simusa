@@ -1,8 +1,8 @@
 # Write a plugin
 
-SiMBA embed some minimal algorithms for each module. The user is then expected to implement its own algorithms using the plugin API.
+SiMuSA embed some minimal algorithms for each module. The user is then expected to implement its own algorithms using the plugin API.
 
-Minimal code that build is available in the [example directory](https://gitlab.laas.fr/mescourrou/simba/-/tree/master/examples).
+Minimal code that build is available in the [example directory](https://gitlab.laas.fr/mescourrou/simusa/-/tree/master/examples).
 
 ## Structure
 

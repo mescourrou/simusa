@@ -1,0 +1,202 @@
+//! Range-based sensor filter over named numeric variables.
+//!
+//! This module provides a generic filter that evaluates one or more numeric
+//! variables against configured inclusive ranges. The variable identifiers are
+//! generic and constrained by [`EnumVariables`], which allows each sensor type
+//! to define its own valid set of filterable variables.
+//!
+//! Filtering behavior depends on the `inside` flag:
+//! - if `inside` is `true`, every configured variable must stay inside its range,
+//! - if `inside` is `false`, configured variables must stay outside the ranges.
+
+use std::collections::HashMap;
+
+use simusa_macros::config_derives;
+
+#[cfg(feature = "gui")]
+use crate::gui::{UIComponent, utils::enum_combobox};
+use crate::{context::Context, utils::enum_tools::EnumVariables};
+
+#[config_derives]
+/// Configuration for a range-based filter over sensor variables.
+///
+/// Each entry in `variables` is paired with the corresponding entries in
+/// `min_range` and `max_range`. These vectors must therefore have identical
+/// lengths. Range checks are inclusive.
+///
+/// The generic parameter `SV` defines the allowed variable identifiers and is
+/// typically a sensor-specific enum generated through Simusa macros.
+pub struct RangeFilterConfig<SV: EnumVariables> {
+    /// Ordered list of variables to test.
+    pub variables: Vec<SV>,
+    /// Inclusive lower bounds associated with `variables`.
+    pub min_range: Vec<f32>,
+    /// Inclusive upper bounds associated with `variables`.
+    pub max_range: Vec<f32>,
+    /// Whether matching values should stay inside (`true`) or outside (`false`) ranges.
+    pub inside: bool,
+}
+
+impl<SV: EnumVariables> Check for RangeFilterConfig<SV> {
+    fn do_check(&self) -> CheckResult {
+        let mut ret = CheckResult::new();
+        if self.variables.len() != self.min_range.len()
+            || self.variables.len() != self.max_range.len()
+        {
+            ret.add_error(format!(
+                "variables, min_range and max_range should have the same length, got {} variables, {} min_range and {} max_range",
+                self.variables.len(),
+                self.min_range.len(),
+                self.max_range.len()
+            ));
+        }
+        let possible_variables = SV::to_vec();
+        for var in &self.variables {
+            if !possible_variables.contains(&var.to_string().as_str()) {
+                ret.add_error(format!(
+                    "Unknown variable name: '{}'. Available variable names: [{}]",
+                    var,
+                    possible_variables.join(", ")
+                ));
+            }
+        }
+        ret
+    }
+}
+
+impl<SV: EnumVariables> Default for RangeFilterConfig<SV> {
+    fn default() -> Self {
+        Self {
+            variables: Vec::new(),
+            min_range: Vec::new(),
+            max_range: Vec::new(),
+            inside: true,
+        }
+    }
+}
+
+#[cfg(feature = "gui")]
+impl<SV: EnumVariables> UIComponent for RangeFilterConfig<SV> {
+    fn show_mut(
+        &mut self,
+        ui: &mut egui::Ui,
+        _ctx: &egui::Context,
+        _buffer_stack: &mut std::collections::BTreeMap<String, String>,
+        _global_config: &crate::simulator::SimulatorConfig,
+        _current_node_name: Option<&String>,
+        unique_id: &str,
+    ) {
+        ui.vertical(|ui| {
+            let possible_variables: Vec<SV> = SV::to_vec();
+            ui.horizontal(|ui| {
+                ui.label("Variable order:");
+                for (i, var) in self.variables.iter_mut().enumerate() {
+                    let unique_var_id = format!("variable-{i}-{unique_id}");
+                    enum_combobox(ui, var, unique_var_id);
+                }
+                if !self.variables.is_empty() && ui.button("-").clicked() {
+                    self.variables.pop();
+                    self.max_range.pop();
+                    self.min_range.pop();
+                }
+                if ui.button("+").clicked() {
+                    self.variables.push(
+                        possible_variables
+                            .get(self.variables.len().min(possible_variables.len()))
+                            .unwrap()
+                            .clone(),
+                    );
+                    self.min_range.push(0.);
+                    self.max_range.push(1.);
+                }
+            });
+
+            for (i, variable) in self.variables.iter().enumerate() {
+                ui.horizontal(|ui| {
+                    ui.label(format!("Range for {}:", variable));
+                    ui.add(egui::DragValue::new(&mut self.min_range[i]));
+                    ui.label("-");
+                    ui.add(egui::DragValue::new(&mut self.max_range[i]));
+                });
+            }
+
+            ui.horizontal(|ui| {
+                ui.label("Inside range:");
+                ui.checkbox(&mut self.inside, "");
+            });
+        });
+    }
+
+    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
+        ui.vertical(|ui| {
+            ui.label("Variable order:");
+            for (i, var) in self.variables.iter().enumerate() {
+                ui.label(format!(
+                    "{}: [{} - {}]",
+                    var, self.min_range[i], self.max_range[i]
+                ));
+            }
+            ui.label(format!("Inside range: {}", self.inside));
+        });
+    }
+}
+
+#[derive(Debug, Clone)]
+/// Runtime range filter built from [`RangeFilterConfig`].
+pub struct RangeFilter<SV: EnumVariables> {
+    config: RangeFilterConfig<SV>,
+}
+
+impl<SV: EnumVariables> RangeFilter<SV> {
+    /// Build a range filter from its configuration.
+    ///
+    /// `_context` is currently unused and kept for API consistency.
+    ///
+    /// ## Arguments
+    /// * `config` - Filter configuration to instantiate.
+    /// * `_initial_time` - Initial simulation time (currently unused).
+    /// * `_context` - Shared simulation context (currently unused in this constructor).
+    pub fn from_config(
+        config: &RangeFilterConfig<SV>,
+        _initial_time: f32,
+        _context: &Context,
+    ) -> Self {
+        Self {
+            config: config.clone(),
+        }
+    }
+
+    /// Return whether the provided variable map passes the exclusion filter.
+    ///
+    /// The method evaluates every configured variable and returns `true` when the
+    /// input should be kept according to the configured range policy.
+    pub fn match_exclusion(&self, variable_map: &HashMap<SV, f32>) -> bool {
+        let mut keep = true;
+        for (i, var) in self.config.variables.iter().enumerate() {
+            if let Some(value) = variable_map.get(var) {
+                let in_range =
+                    *value >= self.config.min_range[i] && *value <= self.config.max_range[i];
+                if self.config.inside {
+                    if !in_range {
+                        keep = false;
+                        break;
+                    }
+                } else if in_range {
+                    keep = false;
+                    break;
+                }
+            } else {
+                panic!(
+                    "Variable '{}' not accepted in this situation. Accepted variables: [{}]",
+                    var,
+                    variable_map
+                        .keys()
+                        .map(|v| v.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                );
+            }
+        }
+        keep
+    }
+}
