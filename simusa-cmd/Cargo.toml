@@ -1,0 +1,10 @@
+[package]
+name = "simusa-cmd"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+simusa = { path = "../simusa-core", version = "*"}
+clap = { version = "4.5.48", features = ["derive"] }

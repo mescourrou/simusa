@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "SimulatorConfig",
-  "description": "Scenario configuration for the simulator.\nThe Simulator configuration is the root of the scenario configuration.\n\n# Example\n\n```yaml\nversion: 1.8.0\nmax_time: 10.0\nlog:\n  log_level:\n    type: Info\nresults: null\ntime_analysis:\n  exporter:\n    type: TraceEventExporter\n  output_path: time_performance # .json or .csv will be appended\n  analysis_unit: s\nrandom_seed: null # Different seed each run\nenvironment:\n  map_path: null\nrobots:\n  - name: robot1\n    navigator:\n      type: GoTo\n      target_point: null\n      target_speed: 0.5\n      stop_distance: 0.2\n      stop_ramp_coefficient: 0.5\n    controller:\n      type: PID\n      robot_model:\n        type: Unicycle\n        wheel_distance: 0.25\n      proportional_gains: [1.0, 1.0]\n      derivative_gains: [0.0, 0.1]\n      integral_gains: [0.0, 0.0]\n    physics:\n      type: Internal\n      model:\n        type: Unicycle\n        wheel_distance: 0.25\n      initial_state:\n        pose: [0.0, 0.0, 0.0]\n        velocity: [0.0, 0.0]\n    state_estimator:\n      type: Perfect\n      prediction_activation:\n        perdiod: {type: Num, value: 0.1}\n      targets:\n        - self\n    sensor_manager:\n      sensors: []\n    network:\n      range: 0.0 # unlimited range\n      reception_delay: 0.0\ncomputation_units: []\nscenario:\n  events: []\n```",
+  "description": "Scenario configuration for the simulator.\nThe Simulator configuration is the root of the scenario configuration.\n\n# Example\n\n```yaml\nversion: 1.9.0\nmax_time: 10.0\nlog:\n  log_level:\n    type: Info\nresults: null\ntime_analysis:\n  exporter:\n    type: TraceEventExporter\n  output_path: time_performance # .json or .csv will be appended\n  analysis_unit: s\nrandom_seed: null # Different seed each run\nenvironment:\n  map: null\nrobots:\n  - name: robot1\n    navigator:\n      type: GoTo\n      target_point: null\n      target_speed: 0.5\n      stop_distance: 0.2\n      stop_ramp_coefficient: 0.5\n    controller:\n      type: PID\n      robot_model:\n        type: Unicycle\n        wheel_distance: 0.25\n      proportional_gains: [1.0, 1.0]\n      derivative_gains: [0.0, 0.1]\n      integral_gains: [0.0, 0.0]\n    physics:\n      type: Internal\n      model:\n        type: Unicycle\n        wheel_distance: 0.25\n      initial_state:\n        pose: [0.0, 0.0, 0.0]\n        velocity: [0.0, 0.0]\n    state_estimator:\n      type: Perfect\n      prediction_activation:\n        perdiod: {type: Num, value: 0.1}\n      targets:\n        - self\n    sensor_manager:\n      sensors: []\n    network:\n      range: 0.0 # unlimited range\n      reception_delay: 0.0\ncomputation_units: []\nscenario:\n  events: []\n```",
   "type": "object",
   "properties": {
     "base_path": {
@@ -21,7 +21,10 @@
       "description": "Global environment settings (maps).",
       "$ref": "#/$defs/EnvironmentConfig",
       "default": {
-        "map_path": null
+        "map": {
+          "landmarks": [],
+          "random": []
+        }
       }
     },
     "log": {
@@ -33,11 +36,7 @@
         "log_level": {
           "type": "Info"
         },
-        "outputs": [
-          {
-            "type": "Console"
-          }
-        ]
+        "outputs": []
       }
     },
     "max_time": {
@@ -110,7 +109,7 @@
     "version": {
       "description": "Version of the simulator used by the configuration. Produces a warning the the major version (second number)\nis different from the current one.",
       "type": "string",
-      "default": "1.8.1"
+      "default": "1.9.0"
     }
   },
   "additionalProperties": false,
@@ -764,13 +763,13 @@
       "description": "Configuration for building an [`Environment`].\n\nThe map contains the map geometry. It is loaded from a file when `map_path` is provided, or initialized as empty otherwise. The map file should be parsable by the [`Map`] struct, which currently supports a simple custom format (see its documentation for details).\n\nThe map path is relative to the simulator config path.",
       "type": "object",
       "properties": {
-        "map_path": {
-          "description": "Optional map file path.\n\nIf `None` (default), an empty [`Map`] is used.",
-          "type": [
-            "string",
-            "null"
-          ],
-          "default": null
+        "map": {
+          "description": "Optional map of the environment.\n\nTo use an external file, use the !include tag.",
+          "$ref": "#/$defs/MapConfig",
+          "default": {
+            "landmarks": [],
+            "random": []
+          }
         }
       },
       "additionalProperties": false
@@ -1694,13 +1693,9 @@
           }
         },
         "outputs": {
-          "description": "List of log targets to which log messages will be sent.\nEach target can be configured with different logging mechanisms (e.g., console, file, custom).\n\nDefault is a single console logger [`LoggerTypeConfig::Console`]. If the configuration is\nchanged, the console logger is lost.",
+          "description": "List of log targets to which log messages will be sent.\nEach target can be configured with different logging mechanisms (only file for now).\n\nThe logs will always be sent to the console, even if this list is empty.\nAdditional target can be added at runtime using\n[`Context::add_write_target`](crate::context::Context::add_write_target).",
           "type": "array",
-          "default": [
-            {
-              "type": "Console"
-            }
-          ],
+          "default": [],
           "items": {
             "$ref": "#/$defs/LoggerTypeConfig"
           }
@@ -1711,20 +1706,6 @@
     "LoggerTypeConfig": {
       "description": "Configuration for different types of log targets, allowing users to specify where log messages should be sent (e.g., console, file, etc.) when configuring the logger.",
       "oneOf": [
-        {
-          "description": "Output log messages to the console (standard output and standard error).",
-          "type": "object",
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "Console"
-            }
-          },
-          "additionalProperties": false,
-          "required": [
-            "type"
-          ]
-        },
         {
           "description": "Write log messages to a file at a specified path. The `value` field should contain the file path where log messages will be written.",
           "type": "object",
@@ -1792,6 +1773,59 @@
       },
       "additionalProperties": false
     },
+    "MapConfig": {
+      "description": "Map containing multiple [`OrientedLandmark`] and possibility for random generation.\n\n# Config Example\n```yaml\nlandmarks:\n  - id: 1\n    x: 3\n    y: 2\n    theta: 0.7854\n    width: 2.8284\n    height: 0\n  - id: 2\n    x: 5.5\n    y: 7\n    theta: 1.5708\n    width: 3\n    height: 1\nrandom:\n  - number:\n      type: Num\n      value: 5\n    distributions:\n      - type: Uniform  \n        min: [0, 0, -3.1416]\n        max: [10, 10, 3.1416]\n    variable_order: [x, y, theta]\n```",
+      "type": "object",
+      "properties": {
+        "landmarks": {
+          "description": "Landmarks contained in the map.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/OrientedLandmarkConfig"
+          }
+        },
+        "random": {
+          "description": "Random generation parameters.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/RandomMap"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "MapVariables": {
+      "description": "Variables of the [`RandomMap`].",
+      "oneOf": [
+        {
+          "description": "X position of the landmark\n\n\nSerialization values(s) for this variable: `x`",
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "description": "Y position of the landmark\n\n\nSerialization values(s) for this variable: `y`",
+          "type": "string",
+          "const": "y"
+        },
+        {
+          "description": "Orientation of the landmark\n\n\nSerialization values(s) for this variable: `theta`, `orientation`",
+          "type": "string",
+          "const": "theta"
+        },
+        {
+          "description": "Height of the landmark\n\n\nSerialization values(s) for this variable: `height`, `h`",
+          "type": "string",
+          "const": "height"
+        },
+        {
+          "description": "Width of the landmark\n\n\nSerialization values(s) for this variable: `width`, `w`",
+          "type": "string",
+          "const": "width"
+        }
+      ]
+    },
     "NavigatorConfig": {
       "description": "Enumerate the configuration of the different strategies.\n\nThe navigator computes control errors from a target behavior.",
       "oneOf": [
@@ -1823,10 +1857,13 @@
               "format": "float",
               "default": 0.5
             },
-            "trajectory_path": {
-              "description": "Path of the trajectory configuration file.\n\nThe file must deserialize as [`TrajectoryConfig`]. Relative paths are resolved from\nthe configuration path.\nDefault: empty string (`\"\"`), which makes [`TrajectoryFollower::from_config`] fall back to\n[`TrajectoryFollower::new`].",
-              "type": "string",
-              "default": ""
+            "trajectory": {
+              "description": "Path to follow.\n\nTo use an external file, use !include path/to/file.yaml. The path is relative to the path of the configuration file.",
+              "$ref": "#/$defs/TrajectoryConfig",
+              "default": {
+                "do_loop": true,
+                "point_list": []
+              }
             },
             "type": {
               "type": "string",
@@ -1985,6 +2022,57 @@
           "format": "uint",
           "default": 0,
           "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "OrientedLandmarkConfig": {
+      "description": "Landmark entry loaded from map data.",
+      "type": "object",
+      "properties": {
+        "height": {
+          "description": "Height of the landmark used for obstruction checks.\n\nUse `0.0` for fully transparent landmarks. Default is `1.0` for non-transparent landmarks.",
+          "type": "number",
+          "format": "float",
+          "default": 1.0
+        },
+        "id": {
+          "description": "Unique landmark identifier.",
+          "type": "integer",
+          "format": "int32",
+          "default": 0
+        },
+        "labels": {
+          "description": "Optional semantic labels associated with this landmark.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "theta": {
+          "description": "Landmark orientation in radians.",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
+        },
+        "width": {
+          "description": "Landmark width, in meters.\n\nCan be `0.0` for point-like landmarks.",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
+        },
+        "x": {
+          "description": "Landmark x position.",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
+        },
+        "y": {
+          "description": "Landmark y position.",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
         }
       },
       "additionalProperties": false
@@ -2888,6 +2976,37 @@
       "file": {
         "type": "string"
       }
+    },
+    "RandomMap": {
+      "description": "Configuration for generating random landmarks in the map.",
+      "type": "object",
+      "properties": {
+        "distributions": {
+          "description": "List of distributions to generate the landmarks. The order should be consistent\nwith `variable_order`.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/RandomVariableTypeConfig"
+          }
+        },
+        "number": {
+          "description": "Number of landmarks to generate randomly.",
+          "$ref": "#/$defs/NumberConfig",
+          "default": {
+            "type": "Num",
+            "value": 0.0
+          }
+        },
+        "variable_order": {
+          "description": "Ordered list of target variables receiving sampled perturbations.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/MapVariables"
+          }
+        }
+      },
+      "additionalProperties": false
     },
     "RandomVariableTypeConfig": {
       "description": "Configuration of random-variable type and parameters.",
@@ -4535,7 +4654,7 @@
       ]
     },
     "ScenarioConfig": {
-      "description": "Root scenario configuration.\n\nContains the list of event declarations evaluated by the scenario system.\n\nThe events will be published on the chanel `/simba/scenario` when they are triggered, with the content of the event record (see [`EventRecord`]).\n\nDefault values:\n- `events`: empty vector",
+      "description": "Root scenario configuration.\n\nContains the list of event declarations evaluated by the scenario system.\n\nThe events will be published on the chanel `/simusa/scenario` when they are triggered, with the content of the event record (see [`EventRecord`]).\n\nDefault values:\n- `events`: empty vector",
       "type": "object",
       "properties": {
         "events": {
@@ -5474,6 +5593,30 @@
           "default": {
             "type": "Num",
             "value": 0.0
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "TrajectoryConfig": {
+      "description": "Config of the [`Trajectory`].\n\nThis configuration takes a list of points and a boolean for looping (return to first point after the last one).\nPoints are 1- or 2-dimensional. Any extra dimension is ignored, and missing dimensions are filled with 0.",
+      "type": "object",
+      "properties": {
+        "do_loop": {
+          "description": "Closing the loop or not.",
+          "type": "boolean",
+          "default": true
+        },
+        "point_list": {
+          "description": "Ordered list of the points to follow.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "float"
+            }
           }
         }
       },

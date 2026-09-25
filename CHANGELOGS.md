@@ -1,4 +1,18 @@
 # Changelogs
+## v1.9.0
+[BREAKING] Name change: from simba to simusa
+
+Licence change, now MIT.
+
+Features:
+- [gui] Add customization options for element of the GUI
+- [breaking config] Add yaml !include feature for huge config files: 
+  map and path are now in the main config struct.
+
+Fix:
+- Physics list was not reset when reset() is called
+- [gui] Fix some Configuration-showing issues
+- [gui] Fix log printing
 
 ## v1.8.1
 - Add static frames to sensors (relative to node state)

@@ -69,7 +69,7 @@ network:
 !!! warning "Important"
     Adding reception delay increases the number of time step to compute, slowing down the simulation.
 
-## How Networks Work in SiMBA
+## How Networks Work in SiMuSA
 
 Network configuration controls how sensor data and state estimates propagate:
 

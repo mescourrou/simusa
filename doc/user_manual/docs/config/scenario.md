@@ -241,7 +241,7 @@ event_type:
 2. `node_name` must be unique.  You can use variables like `$0`, etc. for dynamic naming when spawning multiple robots (time with occurences > 1)
 
 **How it works**:
-- SiMBA copies the specified robot configuration
+- SiMuSA copies the specified robot configuration
 - New robot starts at the same initial position as the template (redraw if random)
 - New robot name is `node_name`
 

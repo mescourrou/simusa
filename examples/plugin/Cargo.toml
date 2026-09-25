@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-simba = { path = "../../simba-core", version = "*"}
+simusa = { path = "../../simusa-core", version = "*"}
 
 nalgebra = { version = "^0.34", features = ["serde-serialize"] }
 serde_derive = "^1.0"

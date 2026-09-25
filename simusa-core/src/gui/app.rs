@@ -1,0 +1,953 @@
+use std::{
+    collections::BTreeSet,
+    path::Path,
+    sync::{Arc, Mutex},
+    time::{self, Duration},
+};
+
+use egui::{Align2, Color32, Id, Pos2, Rect, Response, Sense, Shape, Vec2};
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    AUTHORS, VERSION,
+    api::async_api::{AsyncApi, AsyncApiLoadConfigRequest, AsyncApiRunRequest, AsyncApiRunner},
+    constants::{TIME_ROUND, TIME_ROUND_DECIMALS},
+    context::Context,
+    error,
+    errors::{SimusaError, SimusaErrorTypes},
+    gui::{
+        UIComponent,
+        drawables::{DrawableManager, popup::Popup},
+        panels::{
+            broker::BrokerPanel, drawable_selector::DrawableSelectorPanel, logs::LogsPanel,
+            virtual_nodes::VirtualNodesPanel,
+        },
+    },
+    info,
+    node::node_factory::RecordType,
+    plugin_api::PluginAPI,
+    simulator::{Record, Simulator, SimulatorConfig, SimusaBroker},
+    utils::{SharedMutex, SharedRoLock, maths::round_precision, numbers::OrderedF32},
+};
+
+use super::configurator::Configurator;
+
+pub struct PainterInfo {
+    pub top_left: Pos2,
+    pub bottom_right: Pos2,
+    pub shift: Pos2,
+}
+
+impl Default for PainterInfo {
+    fn default() -> Self {
+        Self {
+            top_left: Pos2 { x: -10., y: -10. },
+            bottom_right: Pos2 { x: 10., y: 10. },
+            shift: Pos2 { x: 0., y: 0. },
+        }
+    }
+}
+
+impl PainterInfo {
+    pub fn zero(&self, scale: f32) -> Pos2 {
+        Pos2 {
+            x: -self.top_left.x * scale + self.shift.x,
+            y: -self.top_left.y * scale + self.shift.y,
+        }
+    }
+
+    pub fn include_point(&mut self, pt: Vec2) {
+        if pt.x < self.top_left.x {
+            // Left of paint area
+            self.top_left.x = pt.x * 1.1;
+        } else if pt.x > self.bottom_right.x {
+            // Right of paint area
+            self.bottom_right.x = pt.x * 1.1;
+        }
+
+        if pt.y < self.top_left.y {
+            // Above paint area
+            self.top_left.y = pt.y * 1.1;
+        } else if pt.y > self.bottom_right.y {
+            // Bottom of paint area
+            self.bottom_right.y = pt.y * 1.1;
+        }
+    }
+
+    pub fn size(&self) -> Vec2 {
+        Vec2 {
+            x: self.bottom_right.x - self.top_left.x,
+            y: self.bottom_right.y - self.top_left.y,
+        }
+    }
+
+    pub fn is_inside(&self, pt: &Vec2) -> bool {
+        if pt.x < self.top_left.x || pt.x > self.bottom_right.x {
+            return false;
+        }
+
+        if pt.y < self.top_left.y || pt.y > self.bottom_right.y {
+            return false;
+        }
+
+        true
+    }
+
+    pub fn set_shift(&mut self, shift: Pos2) {
+        self.shift = shift;
+    }
+
+    pub fn rect_painter(&self, scale: f32) -> Rect {
+        let size = self.size();
+        Rect {
+            min: self.shift,
+            max: self.shift
+                + Vec2 {
+                    x: size.x * scale,
+                    y: size.y * scale,
+                },
+        }
+    }
+
+    pub fn is_position_clicked(
+        &self,
+        response_click: Option<Pos2>,
+        scale: f32,
+        position: Vec2,
+    ) -> bool {
+        if let Some(click_pos) = response_click {
+            let position = self.zero(scale) + position * scale;
+            let dist = (click_pos - position).length();
+            if dist < 10. {
+                return true;
+            }
+        }
+        false
+    }
+}
+
+struct PrivateParams {
+    server: Option<SharedMutex<AsyncApiRunner>>,
+    api: Option<SharedMutex<AsyncApi>>,
+    plugin_api: Option<Arc<dyn PluginAPI>>,
+    config: Option<SimulatorConfig>,
+    current_draw_time: f32,
+    playing: Option<(f32, std::time::Instant)>,
+    simulation_run: bool,
+    configurator: Option<Configurator>,
+    error_buffer: SharedMutex<Vec<(time::Instant, SimusaError)>>,
+    painter_info: PainterInfo,
+    popups: Vec<Popup>,
+    record_buffer: SharedMutex<Vec<Record>>,
+    virtual_nodes_panel: VirtualNodesPanel,
+    broker_panel: Option<BrokerPanel>,
+    log_panel: Option<LogsPanel>,
+    drawable_selector_panel: DrawableSelectorPanel,
+    current_max_time: f32,
+    drawable_instants: BTreeSet<OrderedF32>,
+    context: Option<Context>,
+}
+
+impl Default for PrivateParams {
+    fn default() -> Self {
+        Self {
+            server: None,
+            api: None,
+            plugin_api: None,
+            config: None,
+            current_draw_time: 0.,
+            drawable_selector_panel: DrawableSelectorPanel::new(),
+            playing: None,
+            simulation_run: false,
+            configurator: None,
+            error_buffer: Arc::new(Mutex::new(Vec::new())),
+            painter_info: PainterInfo::default(),
+            popups: Vec::new(),
+            record_buffer: Arc::new(Mutex::new(Vec::new())),
+            virtual_nodes_panel: VirtualNodesPanel::new(),
+            broker_panel: None,
+            log_panel: None,
+            current_max_time: 0.,
+            drawable_instants: BTreeSet::new(),
+            context: None,
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, Default)]
+struct EnabledViews {
+    configuration: bool,
+    virtual_nodes: bool,
+    broker: bool,
+    logs: bool,
+    drawable_selector: bool,
+}
+
+/// We derive Deserialize/Serialize so we can persist app state on shutdown.
+#[derive(Deserialize, Serialize)]
+#[serde(default)] // if we add new fields, give them default values when deserializing old state
+pub struct SimusaApp {
+    // Example stuff:
+    config_path: String,
+    result_path: String,
+    duration: f32,
+    #[serde(skip_serializing, skip_deserializing)]
+    p: PrivateParams,
+    drawing_scale: f32,
+    follow_sim_time: bool,
+    enabled_views: EnabledViews,
+    drawable_manager: DrawableManager,
+}
+
+impl Default for SimusaApp {
+    fn default() -> Self {
+        Self {
+            config_path: "".to_owned(),
+            result_path: "".to_owned(),
+            duration: 60.,
+            p: PrivateParams {
+                server: None,
+                api: None,
+                ..Default::default()
+            },
+            drawing_scale: 100.,
+            follow_sim_time: true,
+            enabled_views: EnabledViews::default(),
+            drawable_manager: DrawableManager::new(),
+        }
+    }
+}
+
+impl SimusaApp {
+    /// Called once before the first frame.
+    pub fn new(
+        cc: &eframe::CreationContext<'_>,
+        default_config_path: Option<&'static Path>,
+        plugin_api: Option<Arc<dyn PluginAPI>>,
+        load_results: bool,
+    ) -> Self {
+        // This is also where you can customize the look and feel of egui using
+        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
+
+        // // Load previous app state (if any).
+        // // Note that you must enable the `persistence` feature for this to work.
+        if let Some(storage) = cc.storage {
+            if let Some(app) = eframe::get_value::<SimusaApp>(storage, eframe::APP_KEY) {
+                app.update_api(default_config_path, plugin_api, load_results)
+            } else {
+                Self::new_full(default_config_path, plugin_api, load_results)
+            }
+        } else {
+            Self::new_full(default_config_path, plugin_api, load_results)
+        }
+    }
+
+    fn new_full(
+        default_config_path: Option<&'static Path>,
+        plugin_api: Option<Arc<dyn PluginAPI>>,
+        load_results: bool,
+    ) -> Self {
+        let server = Arc::new(Mutex::new(AsyncApiRunner::new()));
+        let api = Arc::new(Mutex::new(server.lock().unwrap().get_api()));
+        let context = server
+            .lock()
+            .unwrap()
+            .get_simulator()
+            .lock()
+            .unwrap()
+            .get_context();
+        server.lock().unwrap().run(plugin_api.clone());
+        let mut n = Self {
+            p: PrivateParams {
+                server: Some(server),
+                api: Some(api),
+                plugin_api,
+                log_panel: Some(LogsPanel::new(&context)),
+                context: Some(context),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        if let Some(config) = default_config_path {
+            n.config_path = config.to_str().unwrap().to_string();
+            n.p.config = None;
+            match SimulatorConfig::load_from_path(Path::new(&n.config_path)) {
+                Ok(cfg) => {
+                    n.p.api
+                        .as_ref()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .load_config
+                        .async_call(AsyncApiLoadConfigRequest {
+                            config: cfg,
+                            force_send_results: true,
+                        });
+                }
+                Err(e) => {
+                    error!(
+                        n.p.context.as_ref().unwrap(),
+                        "Error loading config: {}",
+                        e.detailed_error()
+                    );
+                }
+            }
+            if load_results {
+                n.p.api
+                    .as_ref()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .load_results
+                    .async_call(None);
+                n.p.simulation_run = true;
+            }
+        }
+        n.p.broker_panel = Some(BrokerPanel::new(
+            n.p.server
+                .as_ref()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .get_simulator()
+                .lock()
+                .unwrap()
+                .get_broker() as SharedRoLock<SimusaBroker>,
+        ));
+        n
+    }
+
+    fn update_api(
+        mut self,
+        default_config_path: Option<&'static Path>,
+        plugin_api: Option<Arc<dyn PluginAPI>>,
+        load_results: bool,
+    ) -> Self {
+        let server = Arc::new(Mutex::new(AsyncApiRunner::new()));
+        let api = Arc::new(Mutex::new(server.lock().unwrap().get_api()));
+        server.lock().unwrap().run(plugin_api.clone());
+        let context = server
+            .lock()
+            .unwrap()
+            .get_simulator()
+            .lock()
+            .unwrap()
+            .get_context();
+        self.p.context = Some(context);
+        self.p.server = Some(server);
+        self.p.api = Some(api);
+        self.p.plugin_api = plugin_api;
+        if let Some(config) = default_config_path {
+            self.config_path = config.to_str().unwrap().to_string();
+            self.p.config = None;
+            match SimulatorConfig::load_from_path(Path::new(&self.config_path)) {
+                Ok(cfg) => {
+                    self.p
+                        .api
+                        .as_ref()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .load_config
+                        .async_call(AsyncApiLoadConfigRequest {
+                            config: cfg,
+                            force_send_results: true,
+                        });
+                }
+                Err(e) => {
+                    error!(
+                        self.p.context.as_ref().unwrap(),
+                        "Error loading config: {}",
+                        e.detailed_error()
+                    );
+                }
+            }
+            if load_results {
+                self.p
+                    .api
+                    .as_ref()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .load_results
+                    .async_call(None);
+                self.p.simulation_run = true;
+            }
+        }
+        self.p.log_panel = Some(LogsPanel::new(self.p.context.as_ref().unwrap()));
+        self.p.broker_panel = Some(BrokerPanel::new(
+            self.p
+                .server
+                .as_ref()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .get_simulator()
+                .lock()
+                .unwrap()
+                .get_broker() as SharedRoLock<SimusaBroker>,
+        ));
+        self
+    }
+
+    fn quit(&mut self) {
+        self.p.server.as_ref().unwrap().lock().unwrap().stop();
+    }
+
+    fn draw(&mut self, ui: &mut egui::Ui, viewport: Rect) -> Result<Vec<Shape>, Vec2> {
+        self.drawable_manager.draw(
+            ui,
+            viewport,
+            &self.p.painter_info,
+            self.drawing_scale,
+            self.p.current_draw_time,
+        )
+    }
+
+    fn react(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, response: &Response) {
+        self.drawable_manager.react(
+            ui,
+            ctx,
+            response,
+            &self.p.painter_info,
+            self.drawing_scale,
+            self.p.current_draw_time,
+        );
+    }
+
+    fn add_result(&mut self, time: f32, record: RecordType) {
+        let time = round_precision(time, TIME_ROUND).unwrap();
+        if let RecordType::ComputationUnit(rec) = &record {
+            self.p
+                .virtual_nodes_panel
+                .add_record(rec.name.clone(), time, *rec.clone());
+        }
+        self.drawable_manager.add_record(
+            time,
+            &record,
+            &self.p.config,
+            self.p.context.as_ref().unwrap(),
+        );
+        if time > self.p.current_max_time {
+            self.p.current_max_time = time;
+        }
+        self.p.drawable_instants.insert(OrderedF32(time));
+    }
+}
+
+impl eframe::App for SimusaApp {
+    /// Called by the frame work to save state before shutdown.
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        eframe::set_value(storage, eframe::APP_KEY, self);
+    }
+
+    /// Called each time the UI needs repainting, which may be many times per second.
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        {
+            let api = self.p.api.clone();
+            for Record { time, node } in api
+                .as_ref()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .simulator_api
+                .records
+                .lock()
+                .unwrap()
+                .try_iter()
+            {
+                self.add_result(time, node);
+            }
+        }
+        {
+            let record_buffer = self.p.record_buffer.clone();
+            for Record { time, node } in record_buffer.lock().unwrap().drain(..) {
+                self.add_result(time, node);
+            }
+        }
+
+        let mut to_close = Vec::new();
+        for (i, pup) in self.p.popups.iter_mut().enumerate() {
+            pup.draw(ctx);
+            if pup.is_clicked() {
+                to_close.push(i);
+            }
+        }
+        for i in to_close.iter().rev() {
+            self.p.popups.remove(*i);
+        }
+
+        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+            // The top panel is often a good place for a menu bar:
+
+            egui::MenuBar::new().ui(ui, |ui| {
+                // NOTE: no File->Quit on web pages!
+                let is_web = cfg!(target_arch = "wasm32");
+                if !is_web {
+                    ui.menu_button("File", |ui| {
+                        if ui.button("Quit").clicked() {
+                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                            self.quit();
+                        }
+                    });
+                    ui.add_space(16.0);
+                    ui.menu_button("View", |ui| {
+                        ui.checkbox(&mut self.enabled_views.configuration, "Configuration");
+                        ui.checkbox(&mut self.enabled_views.virtual_nodes, "Virtual Nodes");
+                        ui.checkbox(&mut self.enabled_views.broker, "Communication Broker");
+                        ui.checkbox(&mut self.enabled_views.logs, "Logs");
+                        ui.checkbox(&mut self.enabled_views.drawable_selector, "Element Selector");
+                    });
+                    ui.add_space(16.0);
+                    ui.menu_button("Help", |ui| {
+                        if ui.button("Version").clicked() {
+                            self.p.popups.push(Popup::new_ok(
+                                "Version".to_string(),
+                                format!("SiMuSA\nVersion {}\nGPLv3\n{}", VERSION, AUTHORS),
+                                Box::new(|_| {}),
+                            ));
+                        }
+                    });
+                    ui.add_space(16.0);
+                }
+
+                egui::widgets::global_theme_preference_switch(ui);
+            });
+            ui.heading("SiMuSA: Simulator for Multi-robot Sensing Abstraction");
+
+            ui.horizontal(|ui| {
+                ui.label("Config path: ");
+                ui.text_edit_singleline(&mut self.config_path);
+
+                if ui.button("Load").clicked() {
+                    info!(self.p.context.as_ref().unwrap(), "Load configuration");
+                    self.p.config = None;
+                    match SimulatorConfig::load_from_path(Path::new(&self.config_path)) {
+                        Ok(cfg) => {
+                            self.p
+                                .api.as_ref().unwrap()
+                                .lock()
+                                .unwrap()
+                                .load_config
+                                .async_call(AsyncApiLoadConfigRequest {
+                                    config: cfg,
+                                    force_send_results: true,
+                                });
+                            self.p.current_max_time = 0.;
+                        }
+                        Err(e) => {
+                            let now = time::Instant::now();
+                            self.p.error_buffer.lock().unwrap().push((now, e));
+                        }
+                    }
+                }
+                if self.p.config.is_none() {
+                    let api = self.p.api.clone();
+                    if let Some(res) = api.as_ref().unwrap().lock().unwrap().load_config.try_get_result() {
+                        match res {
+                            Err(e) => {
+                                let now = time::Instant::now();
+                                if let SimusaErrorTypes::ExternalAPIError = e.error_type() {
+                                    self.p.config = Some(SimulatorConfig::load_from_path(Path::new(&self.config_path)).unwrap());
+                                }
+                                self.p.error_buffer.lock().unwrap().push((now, e));
+                            }
+                            Ok(c) => {
+                                self.duration = c.max_time;
+                                self.p.config = Some(c);
+                                if let Some(cfg) = &self.p.config.as_ref().unwrap().results && let Some(path) = &cfg.result_path {
+                                    self.result_path = self.p.config.as_ref().unwrap().base_path.join(Path::new(&path)).to_str().unwrap().to_string();
+                                }
+                                self.drawable_manager.init_drawables(self.p.config.as_ref().unwrap(), &self.p.plugin_api, &self.p.server, self.p.context.as_ref().unwrap());
+                            }
+                        }
+                    }
+                }
+                if ui.button("Configurator").clicked() {
+                    self.p.configurator = Some(Configurator::init(&self.config_path, self.p.context.as_ref().unwrap()));
+                }
+                if let Some(configurator) = &mut self.p.configurator
+                    && configurator.show(ui, ctx)
+                {
+                    //Closing
+                    self.p.configurator = None;
+                }
+
+                ui.add_space(50.);
+
+                ui.label("Result path: ");
+                ui.text_edit_singleline(&mut self.result_path);
+
+                if ui.button("Load results").clicked() {
+                    info!(self.p.context.as_ref().unwrap(), "Load previous results");
+                    let api = self.p.api.clone();
+                    let records = self.p.record_buffer.clone();
+                    let result_path = self.result_path.clone();
+                    let context = self.p.context.clone();
+                    let config_is_none = self.p.config.is_none();
+                    let error_buffer = self.p.error_buffer.clone();
+                    self.p.popups.push(Popup::new_yes_no(
+                        "Viewer only?".to_string(),
+                        "Load results on the GUI only and not inside the simulator?\nResult analysis would not use these results.".to_string(),
+                        Box::new(move |btn| {
+                            if btn == 0 {
+                                if config_is_none {
+                                    let error = "Cannot load results in view only mode without a valid configuration loaded.";
+                                    error!(context.as_ref().unwrap(), "{}", error);
+                                    error_buffer.lock().unwrap().push((time::Instant::now(), SimusaError::new(SimusaErrorTypes::InitializationError, error.to_string())));
+                                } else {
+                                    info!(context.as_ref().unwrap(), "Load results in view");
+                                    let results = match Simulator::deserialize_results_from_file(Path::new(&result_path), context.as_ref().unwrap()) {
+                                        Ok(r) => r,
+                                        Err(e) => {
+                                            error!(context.as_ref().unwrap(), "Error loading results: {}", e.detailed_error());
+                                            error_buffer.lock().unwrap().push((time::Instant::now(), e));
+                                            return;
+                                        }
+                                    };
+                                    records.lock().unwrap().extend(results.records);
+                                }
+                            } else {
+                                info!(context.as_ref().unwrap(), "Load results in simulator and view");
+                                api.as_ref().unwrap().lock().unwrap().load_results.async_call(Some(result_path.clone()));
+                            }
+                        }),
+                    ));
+                    self.p.simulation_run = true;
+                }
+                if let Some(Err(e)) = self.p.api.as_ref().unwrap().lock().unwrap().load_results.try_get_result() {
+                    let now = time::Instant::now();
+                    self.p.error_buffer.lock().unwrap().push((now, e.clone()));
+                    self.p.simulation_run = false;
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.label("Duration: ");
+                ui.add(egui::DragValue::new(&mut self.duration).speed(0.1));
+            });
+        });
+
+        egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
+            ui.vertical(|ui| {
+                ui.add(
+                    egui::Slider::new(&mut self.drawing_scale, 1.0..=1000.)
+                        .text("Zoom")
+                        .show_value(false),
+                );
+                // Mouse wheel for zoom
+                ctx.input(|i| {
+                    if i.modifiers.ctrl {
+                        self.drawing_scale *= (i.zoom_delta() * i.zoom_delta() - 1.) / 50. + 1.;
+                    }
+                });
+
+                ui.horizontal(|ui| {
+                    if ui
+                        .add_enabled(self.p.config.is_some(), egui::Button::new("Run"))
+                        .clicked()
+                    {
+                        info!(self.p.context.as_ref().unwrap(), "Run simulation");
+                        self.p.api.as_ref().unwrap().lock().unwrap().run.async_call(
+                            AsyncApiRunRequest {
+                                max_time: Some(self.duration),
+                                reset: self.p.simulation_run,
+                            },
+                        );
+                        self.p.simulation_run = true;
+                    }
+                    if let Some(Err(e)) = self
+                        .p
+                        .api
+                        .as_ref()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .run
+                        .try_get_result()
+                    {
+                        self.p
+                            .error_buffer
+                            .lock()
+                            .unwrap()
+                            .push((time::Instant::now(), e));
+                    }
+                    let play_pause_btn = if self.p.playing.is_none() {
+                        egui::Button::new("Play ")
+                    } else {
+                        egui::Button::new("Pause")
+                    };
+                    if ui
+                        .add_enabled(self.p.simulation_run, play_pause_btn)
+                        .clicked()
+                    {
+                        if self.p.playing.is_some() {
+                            // Press Pause
+                            self.p.playing = None;
+                        } else {
+                            self.p.playing =
+                                Some((self.p.current_draw_time, std::time::Instant::now()));
+                            self.follow_sim_time = false;
+                        }
+                    }
+                    if let Some((begin_sim_time, begin_sys_time)) = self.p.playing {
+                        self.p.current_draw_time = begin_sim_time
+                            + (std::time::Instant::now() - begin_sys_time).as_secs_f32();
+                    }
+                    // Set ALL slider size
+                    ui.style_mut().spacing.slider_width = ui.available_width() - 220.;
+                    if self.p.current_draw_time > self.p.current_max_time || self.follow_sim_time {
+                        self.p.current_draw_time = self.p.current_max_time;
+                    }
+                    if ui.button("<").clicked() {
+                        if let Some(&prev_instant) = self
+                            .p
+                            .drawable_instants
+                            .range(..OrderedF32(self.p.current_draw_time))
+                            .next_back()
+                        {
+                            self.p.current_draw_time = prev_instant.0;
+                        } else if self.p.current_draw_time > 0.0 {
+                            self.p.current_draw_time = 0.0;
+                        }
+                        self.follow_sim_time = false;
+                    }
+                    ui.add(
+                        egui::Slider::new(&mut self.p.current_draw_time, 0.0..=self.duration)
+                            .fixed_decimals(TIME_ROUND_DECIMALS),
+                    );
+                    if ui.button(">").clicked() {
+                        if let Some(&next_instant) = self
+                            .p
+                            .drawable_instants
+                            .range(OrderedF32(self.p.current_draw_time + TIME_ROUND)..)
+                            .next()
+                        {
+                            self.p.current_draw_time = next_instant.0;
+                        } else if self.p.current_draw_time < self.duration {
+                            self.p.current_draw_time = self.duration;
+                        }
+                        self.follow_sim_time = false;
+                    }
+                    ui.add(egui::Checkbox::new(&mut self.follow_sim_time, "Follow"));
+                    if ui
+                        .add_enabled(self.p.config.is_some(), egui::Button::new("Results"))
+                        .clicked()
+                    {
+                        info!(self.p.context.as_ref().unwrap(), "Analysing results");
+                        self.p
+                            .api
+                            .as_ref()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .compute_results
+                            .async_call(());
+                    }
+                    if let Some(Err(e)) = self
+                        .p
+                        .api
+                        .as_ref()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .compute_results
+                        .try_get_result()
+                    {
+                        self.p
+                            .error_buffer
+                            .lock()
+                            .unwrap()
+                            .push((time::Instant::now(), e));
+                    }
+                });
+
+                ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+                    egui::warn_if_debug_build(ui);
+                });
+            });
+        });
+
+        egui::SidePanel::right("right-panel").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.vertical(|ui| {
+                    if self.enabled_views.logs {
+                        self.p
+                            .log_panel
+                            .as_mut()
+                            .expect("GUI application not well initialized: LogPanel is None")
+                            .draw(ui, ctx, "logs_panel", self.p.current_draw_time);
+                    }
+                    if self.enabled_views.configuration {
+                        egui::CollapsingHeader::new("Configuration").show(ui, |ui| {
+                            let width = ui.available_width();
+                            egui::Resize::default()
+                                .id("config_resize".into())
+                                .resizable([false, true])
+                                .min_width(width)
+                                .max_width(width)
+                                .min_height(100.0)
+                                .show(ui, |ui| {
+                                    egui::ScrollArea::both().show(ui, |ui| {
+                                        ui.set_min_width(ui.available_width());
+                                        if let Some(cfg) = &self.p.config {
+                                            let unique_id = String::new();
+                                            cfg.show(ui, ctx, &unique_id);
+                                        }
+                                    });
+                                });
+                        });
+                    }
+                    if self.enabled_views.virtual_nodes {
+                        self.p.virtual_nodes_panel.draw(
+                            ui,
+                            ctx,
+                            "virtual_nodes_panel",
+                            self.p.current_draw_time,
+                        );
+                    }
+                    if self.enabled_views.broker {
+                        if let Some(panel) = &mut self.p.broker_panel {
+                            panel.draw(ui, ctx, "broker_panel", self.p.current_draw_time);
+                        } else {
+                            ui.label("Broker information not available.");
+                        }
+                    }
+                    if self.enabled_views.drawable_selector {
+                        self.p.drawable_selector_panel.draw(
+                            ui,
+                            ctx,
+                            "drawable_selector_panel",
+                            &mut self.drawable_manager,
+                        );
+                    }
+                });
+                // Allow resizing the side panel by dragging
+                ui.take_available_width();
+            });
+        });
+
+        egui::CentralPanel::default().show(ctx, |ui| {
+            egui::ScrollArea::both()
+                .auto_shrink([false; 2])
+                .scroll_source(egui::scroll_area::ScrollSource {
+                    scroll_bar: true,
+                    drag: true,
+                    mouse_wheel: true,
+                })
+                .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
+                .show_viewport(ui, |ui, viewport| {
+                    let mut shapes = Vec::new();
+                    loop {
+                        let rect = self.p.painter_info.rect_painter(self.drawing_scale);
+
+                        // Draw grid
+                        shapes.push(Shape::rect_stroke(
+                            rect,
+                            0.0,
+                            (1.0, Color32::LIGHT_GRAY),
+                            egui::StrokeKind::Middle,
+                        ));
+                        let x_min = rect.left(); //.max(viewport.left());
+                        let x_max = rect.right(); //.min(viewport.right());
+                        let y_min = rect.top(); //.max(viewport.top());
+                        let y_max = rect.bottom(); //.min(viewport.bottom());
+                        let zero = self.p.painter_info.zero(self.drawing_scale);
+                        let mut x = zero.x;
+                        while x > x_min {
+                            shapes.push(Shape::vline(
+                                x,
+                                rect.y_range(),
+                                (1.0, Color32::LIGHT_GRAY),
+                            ));
+                            x -= 1. * self.drawing_scale;
+                        }
+                        x = zero.x;
+                        while x < x_max {
+                            shapes.push(Shape::vline(
+                                x,
+                                rect.y_range(),
+                                (1.0, Color32::LIGHT_GRAY),
+                            ));
+                            x += 1. * self.drawing_scale;
+                        }
+                        let mut y = zero.y;
+                        while y > y_min {
+                            shapes.push(Shape::hline(
+                                rect.x_range(),
+                                y,
+                                (1.0, Color32::LIGHT_GRAY),
+                            ));
+                            y -= 1. * self.drawing_scale;
+                        }
+                        y = zero.y;
+                        while y < y_max {
+                            shapes.push(Shape::hline(
+                                rect.x_range(),
+                                y,
+                                (1.0, Color32::LIGHT_GRAY),
+                            ));
+                            y += 1. * self.drawing_scale;
+                        }
+
+                        shapes.push(Shape::vline(zero.x, rect.y_range(), (1.0, Color32::GREEN)));
+                        shapes.push(Shape::hline(rect.x_range(), zero.y, (1.0, Color32::RED)));
+
+                        match self.draw(ui, viewport) {
+                            Err(request_pos) => {
+                                self.p.painter_info.include_point(request_pos);
+                            }
+                            Ok(s) => {
+                                shapes.extend(s);
+                                break;
+                            }
+                        }
+                        shapes.clear();
+                    }
+
+                    let size = self.p.painter_info.size() * self.drawing_scale;
+                    let (response, painter) = ui.allocate_painter(size, Sense::click());
+                    painter.extend(shapes);
+
+                    self.p.painter_info.set_shift(response.rect.left_top());
+
+                    self.react(ui, ctx, &response);
+                });
+        });
+
+        let mut to_remove = Vec::new();
+        let mut curr_y_shift = 0.;
+        {
+            let mut error_buffer = self.p.error_buffer.lock().unwrap();
+            for (i, (inst, e)) in error_buffer.iter_mut().enumerate().rev() {
+                if egui::Window::new("Error")
+                    .id(Id::new(format!("error {i}")))
+                    .anchor(Align2::RIGHT_TOP, [-50., curr_y_shift])
+                    .fixed_size([500., 50.])
+                    .hscroll(true)
+                    .interactable(true)
+                    .title_bar(false)
+                    .show(ctx, |ui| {
+                        ui.colored_label(Color32::RED, e.detailed_error());
+                        if ui.button("Close").clicked() {
+                            to_remove.push(i);
+                        }
+                    })
+                    .unwrap()
+                    .response
+                    .contains_pointer()
+                {
+                    *inst = time::Instant::now();
+                }
+                curr_y_shift += 60.;
+                if inst.elapsed().as_secs_f32() > 5. {
+                    to_remove.push(i);
+                }
+            }
+            for i in to_remove.iter() {
+                error_buffer.remove(*i);
+            }
+        }
+
+        ctx.request_repaint_after(Duration::from_secs_f32(1.0 / 30.0));
+    }
+}

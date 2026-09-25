@@ -1,0 +1,275 @@
+//! Python utilities for embedding and interacting with Python code in Simusa.
+//!
+//! This module provides helper functions and traits for loading Python scripts, executing Python code, and bridging Python implementations of Simusa plugin components.
+use std::ffi::{CStr, CString};
+use std::fmt::Debug;
+use std::fs;
+
+use pyo3::call::PyCallArgs;
+use pyo3::ffi::c_str;
+use pyo3::{PyClass, prelude::*};
+use pyo3::{PyResult, Python};
+use serde::{Deserialize, Serialize};
+
+use crate::context::Context;
+use crate::errors::{SimusaError, SimusaErrorTypes, SimusaResult};
+use crate::info;
+use crate::simulator::SimulatorConfig;
+
+/// Ensure that the Python virtual environment's site-packages are included in sys.path.
+/// This is useful when the Rust application embeds Python and needs to access packages
+/// installed in a virtual environment.
+///
+/// WARNING: Does not support Windows paths yet.
+///
+/// Arguments:
+/// * `py` - The Python GIL token.
+///
+/// Returns:
+/// * `PyResult<()>` - Ok if successful, or an error if something went wrong
+pub fn ensure_venv_pyo3(py: Python<'_>) -> PyResult<()> {
+    // Ensure Python can find installed modules (like simusa)
+    // This augments sys.path to include virtual environment site-packages across
+    // common managers: venv/virtualenv/poetry/pipenv/hatch (VIRTUAL_ENV) and conda (CONDA_PREFIX).
+    use std::env;
+    use std::path::Path;
+
+    let sys = py.import("sys")?;
+
+    let major: i32 = sys.getattr("version_info")?.getattr("major")?.extract()?;
+    let minor: i32 = sys.getattr("version_info")?.getattr("minor")?.extract()?;
+
+    // Gather candidate prefixes to look for site-packages
+    let mut prefixes: Vec<String> = Vec::new();
+    if let Ok(p) = env::var("VIRTUAL_ENV") {
+        prefixes.push(p);
+    }
+    if let Ok(p) = env::var("CONDA_PREFIX") {
+        prefixes.push(p);
+    }
+    // Heuristic: local .venv or .env in CWD (useful when not "activated")
+    if let Ok(cwd) = env::current_dir() {
+        let venv = cwd.join(".venv");
+        if venv.exists()
+            && let Some(s) = venv.to_str()
+        {
+            prefixes.push(s.to_string());
+        }
+        let envdir = cwd.join(".env");
+        if envdir.exists()
+            && let Some(s) = envdir.to_str()
+        {
+            prefixes.push(s.to_string());
+        }
+    }
+
+    // Build candidate site-packages directories (Linux/macOS layout)
+    let mut candidates: Vec<String> = prefixes
+        .into_iter()
+        .map(|prefix| format!("{}/lib/python{}.{}/site-packages", prefix, major, minor))
+        .collect();
+
+    // Deduplicate while preserving order
+    use std::collections::HashSet;
+    let mut seen: HashSet<String> = HashSet::new();
+    candidates.retain(|p| seen.insert(p.clone()));
+
+    // Add any existing candidate via site.addsitedir (honors .pth files)
+    let site = py.import("site")?;
+    let sys_path_vec: Vec<String> = sys.getattr("path")?.extract()?;
+    for cand in candidates {
+        if Path::new(&cand).exists() && !sys_path_vec.iter().any(|p| p == &cand) {
+            // Use addsitedir for proper processing of .pth files
+            site.call_method1("addsitedir", (cand.as_str(),))?;
+        }
+    }
+    Ok(())
+}
+
+/// Embedded Python helper script used to convert JSON objects into dictionaries
+/// that return `None` for missing keys.
+///
+/// This is used to pass configuration from Rust to Python while tolerating absent
+/// keys in Python plugin code.
+pub const CONVERT_TO_DICT: &CStr = cr#"
+import json
+class NoneDict(dict):
+    """ dict subclass that returns a value of None for missing keys instead
+        of raising a KeyError. Note: doesn't add item to dictionary.
+    """
+    def __missing__(self, key):
+        return None
+
+
+def converter(decoded_dict):
+    """ Convert any None values in decoded dict into empty NoneDict's. """
+    return {k: NoneDict() if v is None else v for k,v in decoded_dict.items()}
+
+def convert(records):
+    return json.loads(records, object_hook=converter)
+"#;
+
+/// Configuration contract for loading a Python class from a script file.
+pub trait PythonClassConfig: Serialize + for<'a> Deserialize<'a> {
+    /// Return the Python script file path (relative to the simulator base path).
+    fn file(&self) -> &String;
+
+    /// Return the Python class name to instantiate from the script.
+    fn class_name(&self) -> &String;
+}
+
+/// Configuration contract for loading a Python function from a script file.
+pub trait PythonFunctionConfig: Serialize + for<'a> Deserialize<'a> {
+    /// Return the Python script file path (relative to the simulator base path).
+    fn file(&self) -> &String;
+
+    /// Return the Python function name to call from the script.
+    fn function_name(&self) -> &String;
+}
+
+/// Holds the source code of a Python script as a C-compatible string.
+pub struct PythonScriptConfig(pub CString);
+
+impl PythonScriptConfig {
+    /// Build a script wrapper from raw Python source code.
+    pub fn new(script: String) -> Self {
+        PythonScriptConfig(CString::new(script).unwrap())
+    }
+
+    /// Get the underlying C-compatible script content.
+    pub fn script(&self) -> &CString {
+        &self.0
+    }
+
+    /// Execute the `main` function of the embedded Python script.
+    ///
+    /// The call runs in an attached Python context, ensures virtual-environment
+    /// paths are available, and converts Python errors to [`SimusaError`].
+    pub fn call<ReturnType, Args>(&mut self, args: Args) -> SimusaResult<ReturnType>
+    where
+        ReturnType: PyClass + for<'a, 'py> FromPyObject<'a, 'py> + Debug,
+        Args: for<'a> PyCallArgs<'a>,
+    {
+        let res = Python::attach(|py| -> PyResult<ReturnType> {
+            ensure_venv_pyo3(py)?;
+
+            let script = PyModule::from_code(py, &self.0, c_str!(""), c_str!(""))?;
+            let function: Py<PyAny> = script.getattr("main")?.into();
+
+            let ret = function.call(py, args, None)?;
+            ret.extract(py).map_err(|_| {
+                PyErr::new::<pyo3::exceptions::PyException, _>(
+                    "Error during the call of Python script",
+                )
+            })
+        });
+
+        res.map_err(|err| SimusaError::new(SimusaErrorTypes::PythonError, err.to_string()))
+    }
+}
+
+/// Load and instantiate a Python class from a script file.
+///
+/// The class constructor is called with `(config_dict, initial_time)`, where
+/// `config_dict` is generated from the serialized Rust config.
+///
+/// # Arguments
+/// * `config` - Plugin-specific configuration providing file and class names.
+/// * `global_config` - Simulator configuration used to resolve the script path.
+/// * `initial_time` - Initial simulation time passed to the Python constructor.
+/// * `log_info` - Component label used in logs and error messages.
+pub fn load_class_from_python_script<T: PythonClassConfig>(
+    config: &T,
+    global_config: &SimulatorConfig,
+    initial_time: f32,
+    log_info: &str,
+    context: &Context,
+) -> SimusaResult<Py<PyAny>> {
+    let json_config = serde_json::to_string(&config)
+        .unwrap_or_else(|_| format!("Error during converting Python {} config to json", log_info));
+
+    let script_path = global_config.base_path.as_ref().join(config.file());
+    let python_script = match fs::read_to_string(script_path.clone()) {
+        Err(e) => {
+            return Err(SimusaError::new(
+                SimusaErrorTypes::ConfigError,
+                format!(
+                    "Python {log_info} script not found ({}): {}",
+                    script_path.to_str().unwrap(),
+                    e
+                ),
+            ));
+        }
+        Ok(s) => CString::new(s).unwrap(),
+    };
+    let res = Python::attach(|py| -> PyResult<Py<PyAny>> {
+        ensure_venv_pyo3(py)?;
+
+        let script = PyModule::from_code(py, CONVERT_TO_DICT, c_str!(""), c_str!(""))?;
+        let convert_fn: Py<PyAny> = script.getattr("convert")?.into();
+        let config_dict = convert_fn.call(py, (json_config,), None)?;
+
+        let script = PyModule::from_code(py, &python_script, c_str!(""), c_str!(""))?;
+        let class: Py<PyAny> = script.getattr(config.class_name().as_str())?.into();
+        info!(context, "Load {log_info} class {} ...", config.class_name());
+
+        let res = class.call(py, (config_dict, initial_time), None);
+        let instance = match res {
+            Err(err) => {
+                err.display(py);
+                return Err(err);
+            }
+            Ok(instance) => instance,
+        };
+        Ok(instance)
+    });
+
+    res.map_err(|err| SimusaError::new(SimusaErrorTypes::PythonError, err.to_string()))
+}
+
+macro_rules! call_py_method {
+    (
+        $instance:expr,
+        $method_name:expr,
+        $result_type:ty,
+        $( $args:expr ),*
+    ) => {
+    Python::attach(|py| -> $result_type {
+        match $instance.bind(py).call_method(
+            $method_name,
+            ( $( $args ),* ),
+            None,
+        ) {
+            Err(e) => {
+                e.display(py);
+                panic!("Error while calling '{}' method of {:?}.", $method_name, stringify!($instance));
+            }
+            Ok(r) => r
+                .extract()
+                .expect(&format!("Error during the call of Python implementation of '{}'", $method_name)),
+        }
+    })
+    }
+}
+pub(crate) use call_py_method;
+
+macro_rules! call_py_method_void {
+    (
+        $instance:expr,
+        $method_name:expr,
+        $( $args:expr ),*
+    ) => {
+    Python::attach(|py| {
+        if let Err(res) = $instance.bind(py).call_method(
+            $method_name,
+            ( $( $args ),* ),
+            None,
+        ) {
+            res.display(py);
+            panic!("Error while calling '{}' method of {:?}.", $method_name, stringify!($instance));
+        }
+    })
+    }
+}
+
+pub(crate) use call_py_method_void;

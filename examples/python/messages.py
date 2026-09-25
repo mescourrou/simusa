@@ -1,11 +1,11 @@
 #!/bin/env python3
 
-import simba
+import simusa
 import json
 import time
 from typing import List, Dict
 
-class StateEstimator(simba.StateEstimator):
+class StateEstimator(simusa.StateEstimator):
     def __init__(self, config: dict, initial_time: float):
         self.last_time = initial_time
         self.period = config["period"]
@@ -17,11 +17,11 @@ class StateEstimator(simba.StateEstimator):
 
         self._state = 0
 
-    def post_init(self, node: simba.Node) -> None:
+    def post_init(self, node: simusa.Node) -> None:
         pass
 
-    def state(self) -> simba.WorldState:
-        world_state = simba.WorldState()
+    def state(self) -> simusa.WorldState:
+        world_state = simusa.WorldState()
         world_state.ego.pose.x = 1
         world_state.ego.pose.y = 2
         world_state.ego.pose.theta = 0
@@ -35,20 +35,20 @@ class StateEstimator(simba.StateEstimator):
             "period": self.period,
             "state": self._state})
 
-    def prediction_step(self, node: simba.Node, command: simba.Command, time: float):
+    def prediction_step(self, node: simusa.Node, command: simusa.Command, time: float):
         print(f"Doing prediction step in {node.name()} at time {time}")
         self._state += 1
         self.last_time = time
         if node.name() == "robot1":
             if abs(time - 30) < 0.001:
-                node.send_message("/simba/nodes/robot2/test", simba.MessageTypes.String("Bye Bye"), time, [simba.MessageFlag.Kill])
+                node.send_message("/simusa/nodes/robot2/test", simusa.MessageTypes.String("Bye Bye"), time, [simusa.MessageFlag.Kill])
             elif time < 30:
-                node.send_message("/simba/nodes/robot2/test", simba.MessageTypes.from_goto(simba.GoToMessage((0, 0))), time)
+                node.send_message("/simusa/nodes/robot2/test", simusa.MessageTypes.from_goto(simusa.GoToMessage((0, 0))), time)
         else:
-            node.send_message("/simba/nodes/robot1/test", simba.MessageTypes.String("Hello from robot2"), time)
+            node.send_message("/simusa/nodes/robot1/test", simusa.MessageTypes.String("Hello from robot2"), time)
         node.log_info(f"{node.name()}: Prediction {self._state}")
 
-    def correction_step(self, node: simba.Node, observations: List[simba.Observation], t: float):
+    def correction_step(self, node: simusa.Node, observations: List[simusa.Observation], t: float):
         node.log_info(f"Doing correction step with observations for robot {node.name()}:")
         self._state += 100
         node.log_info(f"{node.name()}: Correction {self._state}")
@@ -59,7 +59,7 @@ class StateEstimator(simba.StateEstimator):
         print(f"Returning next time step from python: {next_time}")
         return next_time
     
-    def pre_loop_hook(self, node: simba.Node, time: float):
+    def pre_loop_hook(self, node: simusa.Node, time: float):
         if self.client is None:
             node.make_channel("test")
             self.client = node.subscribe(["test"])
@@ -67,9 +67,9 @@ class StateEstimator(simba.StateEstimator):
         msg = self.client.try_receive(time)
         while msg is not None:
             match msg[1].message:
-                case simba.MessageTypes.String(s):
+                case simusa.MessageTypes.String(s):
                     v = f"String({s})"
-                case simba.MessageTypes.GoTo(g):
+                case simusa.MessageTypes.GoTo(g):
                     v = f"GoTo({g})"
 
             messages.append((msg[0], msg[1].msg_from, v, msg[1].timestamp))
@@ -77,7 +77,7 @@ class StateEstimator(simba.StateEstimator):
         node.log_info(f"Received messages: {messages}")
 
 
-class SimulatorAPI(simba.PluginAPI):
+class SimulatorAPI(simusa.PluginAPI):
     def get_state_estimator(self, config, global_config, initial_time: float):
         config = json.loads(config)
         print(f"Config received by python: {type(config)} {config}")
@@ -87,7 +87,7 @@ def main():
 
     simulator_api = SimulatorAPI()
 
-    simulator = simba.Simulator.from_config(
+    simulator = simusa.Simulator.from_config(
             "config/config_state_estimator.yaml", simulator_api
         )
     simulator.run()

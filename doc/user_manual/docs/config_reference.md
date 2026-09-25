@@ -6,11 +6,11 @@
     - Need best practices? → [Tips & Tricks](config_tips.md)
     - Quick field lookup? → [Auto-generated Docs](config_documentation.md)
 
-Welcome to the comprehensive SiMBA configuration reference. This page organizes configuration topics by component. Each topic has a dedicated page with detailed explanations, examples, and troubleshooting.
+Welcome to the comprehensive SiMuSA configuration reference. This page organizes configuration topics by component. Each topic has a dedicated page with detailed explanations, examples, and troubleshooting.
 
-## How SiMBA Works
+## How SiMuSA Works
 
-SiMBA is a time-stepped simulator. Each robot/computation unit has multiple components that work together: navigation, control, physics simulation, state estimation, and sensors.
+SiMuSA is a time-stepped simulator. Each robot/computation unit has multiple components that work together: navigation, control, physics simulation, state estimation, and sensors.
 
 Your configuration file controls each of these components for every robot and computation unit.
 
@@ -38,7 +38,7 @@ Your configuration file controls each of these components for every robot and co
 - [Network Configuration](config/network.md) - Communication ranges and delays
   - How robots communicate with each other
 
-Without configuration specified, SiMBA uses default settings for each component.
+Without configuration specified, SiMuSA uses default settings for each component.
 
 ### Advanced Topics
 
@@ -142,7 +142,7 @@ For each use case, refer to the specific component documentation:
 
 ## Related Documentation
 
-- **[Rust API Documentation](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simba/)** - Complete technical API reference
+- **[Rust API Documentation](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/)** - Complete technical API reference
 - **[Getting Started](config_getting_started.md)** - Beginner-friendly introduction
 - **[Tips & Tricks](config_tips.md)** - Best practices and troubleshooting
 - **Example Configurations** - Working real-world examples in the `config_example/` directory

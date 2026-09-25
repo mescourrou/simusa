@@ -17,7 +17,7 @@ robots:
   - name: "robot1"
     navigator: 
       type: TrajectoryFollower
-      trajectory_path: "paths/path1.yaml"
+      trajectory: !include "paths/path1.yaml"
       target_speed: 0.5
       forward_distance: 0.2
     controller: 
@@ -33,7 +33,7 @@ robots:
   # - name: "robot2"
   #   navigator:
   #     type: TrajectoryFollower
-  #     trajectory_path: "paths/path1.yaml"
+  #     trajectory: !include "paths/path1.yaml"
   #     target_speed: 0.5
   #     forward_distance: 0.2
   #   controller: 

@@ -1,0 +1,455 @@
+//! Scenario runtime engine.
+//!
+//! This module evaluates scenario events configured through
+//! [`ScenarioConfig`], including time-based and
+//! state-based triggers, and executes corresponding actions during simulation.
+
+use std::{
+    collections::{BTreeSet, HashMap},
+    str::FromStr,
+    sync::{Arc, Mutex},
+};
+
+use regex::Regex;
+use simusa_com::{
+    pub_sub::{BrokerTrait, Client, PathKey},
+    time_ordered_data::TimeOrderedData,
+};
+
+use crate::{
+    config::NumberConfig,
+    constants::TIME_ROUND,
+    context::Context,
+    errors::SimusaResult,
+    info, internal,
+    logger::InternalLog,
+    networking::{self, message_types::MessageTypes, network::Envelope},
+    scenario::config::{
+        AreaEventTriggerConfig, EventConfig, EventRecord, EventTriggerConfig, EventTypeConfig,
+        ProximityEventTriggerConfig, ScenarioConfig, SpawnEventConfig, TimeEventTriggerConfig,
+    },
+    simulator::{RunningParameters, Simulator, SimulatorConfig, SimusaBroker},
+    utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
+    warning,
+};
+
+use crate::networking::network::MessageFlag;
+
+pub mod config;
+
+/// Runtime scenario manager handling trigger evaluation and event execution.
+pub struct Scenario {
+    time_events: TimeOrderedData<(usize, Event)>,
+    other_events: Mutex<Vec<Event>>,
+    last_executed_time: f32,
+    broker: SharedRwLock<SimusaBroker>,
+    client: Client<Envelope>,
+}
+
+impl Scenario {
+    const CHANNEL_NAME: &'static str = "scenario";
+
+    /// Builds a runtime [`Scenario`] from [`ScenarioConfig`].
+    pub fn from_config(
+        config: &ScenarioConfig,
+        global_config: &SimulatorConfig,
+        va_factory: &Arc<DeterministRandomVariableFactory>,
+        broker: &SharedRwLock<SimusaBroker>,
+    ) -> Self {
+        let (time_events_vec, other_events): (Vec<EventConfig>, Vec<EventConfig>) = config
+            .events
+            .clone()
+            .into_iter()
+            .partition(|e| matches!(e.trigger, EventTriggerConfig::Time(_)));
+        let mut time_events = TimeOrderedData::new(TIME_ROUND);
+        for event in &time_events_vec {
+            let ts: Vec<f32> = match &event.trigger {
+                EventTriggerConfig::Time(t) => {
+                    let occurences = match &t.occurences {
+                        NumberConfig::Num(n) => *n as usize,
+                        NumberConfig::Rand(rv_config) => {
+                            va_factory.make_variable(rv_config.clone()).generate(0.)[0] as usize
+                        }
+                    };
+                    match &t.time {
+                        NumberConfig::Num(n) => {
+                            if occurences == 0 {
+                                (0..(global_config.max_time / n).ceil() as usize)
+                                    .map(|i| n * (i as f32 + 1.))
+                                    .collect()
+                            } else {
+                                (0..occurences).map(|i| n * (i as f32 + 1.)).collect()
+                            }
+                        }
+                        NumberConfig::Rand(rv_config) => {
+                            let rv = va_factory.make_variable(rv_config.clone());
+                            (0..occurences)
+                                .flat_map(|i| rv.generate(i as f32))
+                                .collect()
+                        }
+                    }
+                }
+                _ => unreachable!(),
+            };
+            for (occurence, t) in ts.iter().enumerate() {
+                time_events.insert(*t, (occurence, Event::from_config(event)), false);
+            }
+        }
+        let channel_key = PathKey::from_str(networking::channels::INTERNAL)
+            .unwrap()
+            .join_str(Self::CHANNEL_NAME);
+        broker.write().unwrap().add_channel(channel_key.clone());
+        Self {
+            time_events,
+            other_events: Mutex::new(other_events.iter().map(Event::from_config).collect()),
+            last_executed_time: 0.,
+            broker: broker.clone(),
+            client: broker
+                .write()
+                .unwrap()
+                .subscribe_to(&channel_key, "scenario".to_string(), 0.)
+                .unwrap(),
+        }
+    }
+
+    pub(crate) fn execute_scenario(
+        &mut self,
+        simulator: &mut Simulator,
+        node_states: &HashMap<String, Option<[f32; 2]>>,
+        running_parameters: &mut RunningParameters,
+        context: &Context,
+    ) -> SimusaResult<()> {
+        let context = context.new_callstack_level("execute_scenario");
+        let time = context.get_time().unwrap();
+        internal!(context, InternalLog::Scenario, "Check scenario");
+        // Time events
+        for (_, event) in self
+            .time_events
+            .iter_from_time(self.last_executed_time)
+            .take_while(|(t, _)| *t <= time)
+        {
+            self.execute_event(
+                &event.1,
+                simulator,
+                &[event.0.to_string()],
+                &EventTriggerConfig::Time(TimeEventTriggerConfig {
+                    time: NumberConfig::Num(time),
+                    occurences: NumberConfig::Num(event.0 as f32),
+                }),
+                running_parameters,
+                &context,
+            )?;
+        }
+        // Other events
+        let other_events = self.other_events.lock().unwrap();
+        for event in other_events.iter() {
+            match &event.trigger {
+                EventTriggerConfig::Proximity(proximity_config) => {
+                    let triggering_nodes = self.proximity_trigger(
+                        &event.triggering_nodes,
+                        proximity_config,
+                        simulator,
+                        time,
+                        node_states,
+                        &context,
+                    );
+                    for nodes in triggering_nodes {
+                        self.execute_event(
+                            event,
+                            simulator,
+                            &nodes,
+                            &EventTriggerConfig::Proximity(proximity_config.clone()),
+                            running_parameters,
+                            &context,
+                        )?;
+                    }
+                }
+                EventTriggerConfig::Area(area_config) => {
+                    let triggering_nodes = self.area_trigger(
+                        &event.triggering_nodes,
+                        area_config,
+                        simulator,
+                        node_states,
+                        &context,
+                    );
+                    for nodes in triggering_nodes {
+                        self.execute_event(
+                            event,
+                            simulator,
+                            &nodes,
+                            &EventTriggerConfig::Area(area_config.clone()),
+                            running_parameters,
+                            &context,
+                        )?;
+                    }
+                }
+                EventTriggerConfig::Time(_) => unreachable!(),
+            }
+        }
+        self.last_executed_time = time + TIME_ROUND;
+        Ok(())
+    }
+
+    fn replace_variables(template_string: &str, variables: &[String]) -> String {
+        let mut result_string = template_string.to_owned();
+        for (i, var) in variables.iter().enumerate() {
+            let var_tag = format!("${}", i);
+            result_string = result_string.replace(&var_tag, &var.to_string());
+        }
+        result_string
+    }
+
+    fn execute_event(
+        &self,
+        event: &Event,
+        simulator: &mut Simulator,
+        trigger_variables: &[String],
+        trigger: &EventTriggerConfig,
+        running_parameters: &mut RunningParameters,
+        context: &Context,
+    ) -> SimusaResult<()> {
+        let context = context.new_callstack_level("execute_event");
+        let time = context.get_time().unwrap();
+        let mut event_executed = None;
+        match &event.event_type {
+            EventTypeConfig::Kill(name) => {
+                use simusa_com::pub_sub::PathKey;
+
+                use crate::networking;
+
+                let name = Self::replace_variables(name, trigger_variables);
+                info!(
+                    context,
+                    "Executing Kill event for node `{}` triggered by {}", name, trigger,
+                );
+                let command_key = PathKey::from_str(networking::channels::internal::COMMAND)
+                    .unwrap()
+                    .join_str(name.as_str());
+                if !self.broker.write().unwrap().channel_exists(&command_key) {
+                    warning!(
+                        context,
+                        "Ignoring error while sending Kill message to node `{}`: this node seems to not exist",
+                        name
+                    );
+                } else {
+                    let tmp_client = self.broker.write().unwrap().subscribe_to(
+                        &command_key,
+                        "scenario".to_string(),
+                        0.,
+                    );
+                    tmp_client.unwrap().send(
+                        Envelope {
+                            from: "scenario".to_string(),
+                            message: MessageTypes::default(),
+                            message_flags: vec![MessageFlag::Kill],
+                            timestamp: time,
+                        },
+                        time,
+                    );
+                    event_executed = Some(EventRecord {
+                        trigger: trigger.clone(),
+                        event: EventTypeConfig::Kill(name),
+                    });
+                }
+            }
+            EventTypeConfig::Spawn(spawn_config) => {
+                let model_name =
+                    Self::replace_variables(&spawn_config.model_name, trigger_variables);
+                let node_name = Self::replace_variables(&spawn_config.node_name, trigger_variables);
+                info!(
+                    context,
+                    "Executing Spawn event for node `{}` of model `{}` triggered by {}",
+                    node_name,
+                    model_name,
+                    trigger
+                );
+
+                if let Err(e) = simulator.spawn_node_from_name(
+                    &model_name,
+                    &node_name,
+                    running_parameters,
+                    time,
+                    &context,
+                ) {
+                    warning!(
+                        context,
+                        "Ignoring error while sending Spawn message for node `{}`: {}",
+                        node_name,
+                        e.detailed_error()
+                    );
+                } else {
+                    event_executed = Some(EventRecord {
+                        trigger: trigger.clone(),
+                        event: EventTypeConfig::Spawn(SpawnEventConfig {
+                            model_name,
+                            node_name,
+                        }),
+                    });
+                }
+            }
+        }
+        if let Some(event_executed) = event_executed {
+            self.client.send(
+                Envelope {
+                    from: "scenario".to_string(),
+                    message: event_executed.clone().into(),
+                    timestamp: time,
+                    ..Default::default()
+                },
+                time,
+            );
+        }
+        Ok(())
+    }
+
+    /// Returns the next scheduled time-triggered event, if any.
+    pub fn next_event_time(&self) -> Option<f32> {
+        self.time_events.min_time().map(|(a, _)| a)
+    }
+
+    fn area_trigger(
+        &self,
+        triggering_nodes_filter: &[Regex],
+        area_config: &AreaEventTriggerConfig,
+        _simulator: &mut Simulator,
+        node_states: &HashMap<String, Option<[f32; 2]>>,
+        context: &Context,
+    ) -> Vec<Vec<String>> {
+        let context = context.new_callstack_level("area_trigger");
+        let mut triggering_nodes = Vec::new();
+
+        for (node_name, state) in node_states.iter() {
+            if !triggering_nodes_filter.is_empty()
+                && !triggering_nodes_filter
+                    .iter()
+                    .any(|re| re.is_match(node_name))
+            {
+                continue;
+            }
+            if state.is_none() {
+                continue;
+            }
+            let state = state.unwrap();
+            match area_config {
+                AreaEventTriggerConfig::Rect(rect_config) => {
+                    let inside = state[0] >= rect_config.bottom_left.0
+                        && state[0] <= rect_config.top_right.0
+                        && state[1] >= rect_config.bottom_left.1
+                        && state[1] <= rect_config.top_right.1;
+                    if inside == rect_config.inside {
+                        internal!(
+                            context,
+                            InternalLog::Scenario,
+                            "Node `{}` triggered an Area event",
+                            node_name
+                        );
+                        triggering_nodes.push(vec![node_name.clone()]);
+                    }
+                }
+                AreaEventTriggerConfig::Circle(circle_config) => {
+                    let distance_squared = (state[0] - circle_config.center.0).powi(2)
+                        + (state[1] - circle_config.center.1).powi(2);
+                    let inside = distance_squared <= circle_config.radius.powi(2);
+                    if inside == circle_config.inside {
+                        triggering_nodes.push(vec![node_name.clone()]);
+                    }
+                }
+            }
+        }
+        triggering_nodes
+    }
+
+    fn proximity_trigger(
+        &self,
+        triggering_nodes_filter: &[Regex],
+        proximity_config: &ProximityEventTriggerConfig,
+        _simulator: &mut Simulator,
+        time: f32,
+        node_states: &HashMap<String, Option<[f32; 2]>>,
+        context: &Context,
+    ) -> Vec<Vec<String>> {
+        let context = context.new_callstack_level("proximity_trigger");
+        let mut triggering_nodes = BTreeSet::new();
+
+        let distance_threshold_squared = proximity_config.distance.powi(2);
+        for (node1_name, node1_pos) in node_states {
+            if !triggering_nodes_filter.is_empty()
+                && !triggering_nodes_filter
+                    .iter()
+                    .any(|re| re.is_match(node1_name))
+            {
+                continue;
+            }
+            let node1_pos = match node1_pos {
+                Some(pos) => pos,
+                None => continue,
+            };
+            for (node2_name, node2_pos) in node_states {
+                if node1_name >= node2_name {
+                    continue;
+                }
+                if !triggering_nodes_filter.is_empty()
+                    && !triggering_nodes_filter
+                        .iter()
+                        .any(|re| re.is_match(node2_name))
+                {
+                    continue;
+                }
+                let node2_pos = match node2_pos {
+                    Some(pos) => pos,
+                    None => continue,
+                };
+                if let Some(target_name) = &proximity_config.protected_target
+                    && target_name != node2_name
+                    && target_name != node1_name
+                {
+                    continue;
+                }
+
+                let distance_squared =
+                    (node1_pos[0] - node2_pos[0]).powi(2) + (node1_pos[1] - node2_pos[1]).powi(2);
+                let inside = distance_squared <= distance_threshold_squared;
+                if inside == proximity_config.inside {
+                    internal!(
+                        context,
+                        InternalLog::Scenario,
+                        "Nodes `{}` and `{}` triggered a Proximity event at time {}",
+                        node1_name,
+                        node2_name,
+                        time
+                    );
+                    triggering_nodes.insert(node1_name.clone());
+                    triggering_nodes.insert(node2_name.clone());
+                }
+            }
+        }
+        triggering_nodes.into_iter().map(|n| vec![n]).collect()
+    }
+}
+
+/// Runtime event representation with compiled trigger filters.
+#[derive(Debug, Clone)]
+pub struct Event {
+    /// Compiled regex filters for nodes allowed to trigger this event.
+    pub triggering_nodes: Vec<Regex>,
+    /// Trigger condition definition.
+    pub trigger: EventTriggerConfig,
+    /// Action executed when the trigger is satisfied.
+    pub event_type: EventTypeConfig,
+}
+
+impl Event {
+    /// Builds a runtime [`Event`] from [`EventConfig`].
+    pub fn from_config(config: &EventConfig) -> Self {
+        let triggering_nodes = config
+            .triggering_nodes
+            .iter()
+            .map(|pattern| Regex::new(pattern).unwrap())
+            .collect();
+        Self {
+            triggering_nodes,
+            trigger: config.trigger.clone(),
+            event_type: config.event_type.clone(),
+        }
+    }
+}

@@ -1,4 +1,4 @@
-use simba::simulator::Simulator;
+use simusa::simulator::Simulator;
 use std::path::Path;
 
 fn main() {

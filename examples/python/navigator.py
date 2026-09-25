@@ -1,11 +1,11 @@
 #!/bin/env python3
 
-import simba
+import simusa
 import json
 import numpy as np
 import math
 
-class Navigator(simba.Navigator):
+class Navigator(simusa.Navigator):
     def __init__(self, config: dict, initial_time: float):
         if "radius" in config:
             self.radius = config["radius"]
@@ -16,15 +16,15 @@ class Navigator(simba.Navigator):
         else:
             self.velocity = 10
     
-    def post_init(self, node: simba.Node) -> None:
+    def post_init(self, node: simusa.Node) -> None:
         pass
 
     def record(self) -> str:
         print("This is record from python!")
         return json.dumps({})
 
-    def compute_error(self, node: simba.Node, world_state: simba.WorldState) -> simba.ControllerError:
-        error = simba.ControllerError()
+    def compute_error(self, node: simusa.Node, world_state: simusa.WorldState) -> simusa.ControllerError:
+        error = simusa.ControllerError()
         v = world_state.ego.velocity.x
         x = world_state.ego.pose.x
         y = world_state.ego.pose.y
@@ -39,13 +39,13 @@ class Navigator(simba.Navigator):
         error.velocity = self.velocity - v
         return error
 
-    def pre_loop_hook(self, node: simba.Node, time: float):
+    def pre_loop_hook(self, node: simusa.Node, time: float):
         pass
     
     def next_time_step(self):
         return None
 
-class SimulatorAPI(simba.PluginAPI):
+class SimulatorAPI(simusa.PluginAPI):
     def get_navigator(self, config: dict, global_config: dict, initial_time: float):
         config = json.loads(config)
         print(f"Config received by python: {type(config)} {config}")
@@ -55,7 +55,7 @@ def main():
 
     simulator_api = SimulatorAPI()
 
-    simulator = simba.Simulator.from_config(
+    simulator = simusa.Simulator.from_config(
         "config/config_navigator.yaml", simulator_api
     )
     simulator.run()

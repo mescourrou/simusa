@@ -42,10 +42,10 @@ impl MyWonderfulController {
 impl Controller for MyWonderfulController {
     fn make_command(
         &mut self,
-        _robot: &mut simba::node::Node,
-        _error: &simba::controllers::ControllerError,
+        _robot: &mut simusa::node::Node,
+        _error: &simusa::controllers::ControllerError,
         _time: f32,
-        _context: &simba::context::Context,
+        _context: &simusa::context::Context,
     ) -> Command {
         Command::Unicycle(UnicycleCommand {
             left_wheel_speed: 0.,
@@ -55,9 +55,9 @@ impl Controller for MyWonderfulController {
 
     fn pre_loop_hook(
         &mut self,
-        _node: &mut simba::node::Node,
+        _node: &mut simusa::node::Node,
         _time: f32,
-        _context: &simba::context::Context,
+        _context: &simusa::context::Context,
     ) {
     }
 }

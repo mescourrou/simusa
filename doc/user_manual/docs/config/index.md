@@ -1,6 +1,6 @@
 # Configuration Components
 
-This section contains detailed documentation for each configurable component of SiMBA robots and computation units.
+This section contains detailed documentation for each configurable component of SiMuSA robots and computation units.
 
 ## Robot Components
 

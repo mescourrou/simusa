@@ -1,30 +1,30 @@
 #[allow(unused_variables)]
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
-use simba::context::Context;
-use simba::controllers::external_controller::ExternalControllerRecord;
-use simba::controllers::{Controller, ControllerError, ControllerRecord};
-use simba::errors::SimbaResult;
-use simba::info;
-use simba::navigators::external_navigator::ExternalNavigatorRecord;
-use simba::navigators::{Navigator, NavigatorRecord};
-use simba::networking::network::Network;
-use simba::node::Node;
-use simba::physics::external_physics::ExternalPhysicsRecord;
-use simba::physics::robot_models::unicycle::UnicycleCommand;
-use simba::physics::robot_models::Command;
-use simba::physics::{Physics, PhysicsRecord};
-use simba::plugin_api::PluginAPI;
-use simba::recordable::Recordable;
-use simba::sensors::external_sensor::{ExternalObservation, ExternalSensorRecord};
-use simba::sensors::{Observation, Sensor, SensorObservation, SensorRecord};
-use simba::simulator::{Simulator, SimulatorConfig};
-use simba::state_estimators::external_estimator::ExternalEstimatorRecord;
-use simba::state_estimators::{
+use simusa::context::Context;
+use simusa::controllers::external_controller::ExternalControllerRecord;
+use simusa::controllers::{Controller, ControllerError, ControllerRecord};
+use simusa::errors::SimusaResult;
+use simusa::info;
+use simusa::navigators::external_navigator::ExternalNavigatorRecord;
+use simusa::navigators::{Navigator, NavigatorRecord};
+use simusa::networking::network::Network;
+use simusa::node::Node;
+use simusa::physics::external_physics::ExternalPhysicsRecord;
+use simusa::physics::robot_models::unicycle::UnicycleCommand;
+use simusa::physics::robot_models::Command;
+use simusa::physics::{Physics, PhysicsRecord};
+use simusa::plugin_api::PluginAPI;
+use simusa::recordable::Recordable;
+use simusa::sensors::external_sensor::{ExternalObservation, ExternalSensorRecord};
+use simusa::sensors::{Observation, Sensor, SensorObservation, SensorRecord};
+use simusa::simulator::{Simulator, SimulatorConfig};
+use simusa::state_estimators::external_estimator::ExternalEstimatorRecord;
+use simusa::state_estimators::{
     State, StateEstimator, StateEstimatorRecord, StateRecord, WorldState,
 };
-use simba::utils::determinist_random_variable::DeterministRandomVariableFactory;
-use simba::utils::SharedRwLock;
+use simusa::utils::determinist_random_variable::DeterministRandomVariableFactory;
+use simusa::utils::SharedRwLock;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -50,8 +50,8 @@ impl MyWonderfulController {
 impl Controller for MyWonderfulController {
     fn make_command(
         &mut self,
-        _robot: &mut simba::node::Node,
-        _error: &simba::controllers::ControllerError,
+        _robot: &mut simusa::node::Node,
+        _error: &simusa::controllers::ControllerError,
         _time: f32,
         _context: &Context,
     ) -> Command {
@@ -61,7 +61,7 @@ impl Controller for MyWonderfulController {
         })
     }
 
-    fn pre_loop_hook(&mut self, _node: &mut simba::node::Node, _time: f32, _context: &Context) {}
+    fn pre_loop_hook(&mut self, _node: &mut simusa::node::Node, _time: f32, _context: &Context) {}
 }
 
 impl Recordable<ControllerRecord> for MyWonderfulController {
@@ -94,7 +94,7 @@ impl MyWonderfulNavigator {
 impl Navigator for MyWonderfulNavigator {
     fn compute_error(
         &mut self,
-        _robot: &mut simba::node::Node,
+        _robot: &mut simusa::node::Node,
         _state: WorldState,
         _context: &Context,
     ) -> ControllerError {
@@ -106,7 +106,7 @@ impl Navigator for MyWonderfulNavigator {
         }
     }
 
-    fn pre_loop_hook(&mut self, _node: &mut simba::node::Node, _time: f32, _context: &Context) {}
+    fn pre_loop_hook(&mut self, _node: &mut simusa::node::Node, _time: f32, _context: &Context) {}
 }
 
 impl Recordable<NavigatorRecord> for MyWonderfulNavigator {
@@ -194,7 +194,7 @@ impl MyWonderfulStateEstimator {
 impl StateEstimator for MyWonderfulStateEstimator {
     fn prediction_step(
         &mut self,
-        _robot: &mut simba::node::Node,
+        _robot: &mut simusa::node::Node,
         _command: Option<Command>,
         time: f32,
         _context: &Context,
@@ -204,7 +204,7 @@ impl StateEstimator for MyWonderfulStateEstimator {
 
     fn correction_step(
         &mut self,
-        _robot: &mut simba::node::Node,
+        _robot: &mut simusa::node::Node,
         _observations: &[Observation],
         _time: f32,
         _context: &Context,
@@ -219,7 +219,7 @@ impl StateEstimator for MyWonderfulStateEstimator {
         WorldState::new()
     }
 
-    fn pre_loop_hook(&mut self, _node: &mut simba::node::Node, _time: f32, _context: &Context) {}
+    fn pre_loop_hook(&mut self, _node: &mut simusa::node::Node, _time: f32, _context: &Context) {}
 }
 
 impl Recordable<StateEstimatorRecord> for MyWonderfulStateEstimator {
@@ -270,7 +270,7 @@ impl Sensor for MyWonderfulSensor {
         node: &mut Node,
         _initial_time: f32,
         context: &Context,
-    ) -> SimbaResult<()> {
+    ) -> SimusaResult<()> {
         info!(
             context,
             "Initializing MyWonderfulSensor for node {}",

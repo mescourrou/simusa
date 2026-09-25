@@ -1,11 +1,11 @@
 #!/bin/env python3
 
-import simba
+import simusa
 import json
 import numpy as np
 import math
 
-class Physics(simba.Physics):
+class Physics(simusa.Physics):
     def __init__(self, config: dict, initial_time: float):
         self.last_time = initial_time
         self.wheel_distance = 0.25,
@@ -17,7 +17,7 @@ class Physics(simba.Physics):
         if "initial_state" in config:
             self.curr_state = np.array(config["initial_state"])
 
-    def post_init(self, node: simba.Node) -> None:
+    def post_init(self, node: simusa.Node) -> None:
         pass
 
     def record(self) -> str:
@@ -53,13 +53,13 @@ class Physics(simba.Physics):
             self.curr_state[2] += 2*np.pi
         
         
-    def apply_command(self, command: simba.Command, time: float):
+    def apply_command(self, command: simusa.Command, time: float):
         unicycle_command = command.as_unicycle_command()
         self.current_command[0] = unicycle_command.left_wheel_speed
         self.current_command[1] = unicycle_command.right_wheel_speed
         
     def state(self, time: float): 
-        state = simba.State()
+        state = simusa.State()
         state.pose.x = self.curr_state[0]
         state.pose.y = self.curr_state[1]
         state.pose.theta = self.curr_state[2]
@@ -69,7 +69,7 @@ class Physics(simba.Physics):
     def next_time_step(self):
         return None
 
-class SimulatorAPI(simba.PluginAPI):
+class SimulatorAPI(simusa.PluginAPI):
     def get_physics(self, config: dict, global_config: dict, initial_time: float):
         config = json.loads(config)
         return Physics(config, initial_time)
@@ -78,7 +78,7 @@ def main():
 
     simulator_api = SimulatorAPI()
 
-    simulator = simba.Simulator.from_config(
+    simulator = simusa.Simulator.from_config(
         "config/config_physics.yaml", simulator_api
     )
     simulator.run()
