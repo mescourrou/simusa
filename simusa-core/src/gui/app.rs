@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeSet,
     path::Path,
     sync::{Arc, Mutex},
     time::{self, Duration},
@@ -9,15 +9,28 @@ use egui::{Align2, Color32, Id, Pos2, Rect, Response, Sense, Shape, Vec2};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AUTHORS, VERSION, api::async_api::{AsyncApi, AsyncApiLoadConfigRequest, AsyncApiRunRequest, AsyncApiRunner}, constants::{TIME_ROUND, TIME_ROUND_DECIMALS}, context::Context, error, errors::{SimusaError, SimusaErrorTypes}, gui::{
-        Drawable, UIComponent, drawables::{DrawableManager, popup::Popup}, panels::{broker::BrokerPanel, drawable_selector::DrawableSelectorPanel, logs::LogsPanel, virtual_nodes::VirtualNodesPanel},
-    }, info, node::node_factory::RecordType, plugin_api::PluginAPI, recordable::Recordable, simulator::{Record, SimusaBroker, Simulator, SimulatorConfig}, utils::{SharedMutex, SharedRoLock, maths::round_precision, numbers::OrderedF32},
+    AUTHORS, VERSION,
+    api::async_api::{AsyncApi, AsyncApiLoadConfigRequest, AsyncApiRunRequest, AsyncApiRunner},
+    constants::{TIME_ROUND, TIME_ROUND_DECIMALS},
+    context::Context,
+    error,
+    errors::{SimusaError, SimusaErrorTypes},
+    gui::{
+        UIComponent,
+        drawables::{DrawableManager, popup::Popup},
+        panels::{
+            broker::BrokerPanel, drawable_selector::DrawableSelectorPanel, logs::LogsPanel,
+            virtual_nodes::VirtualNodesPanel,
+        },
+    },
+    info,
+    node::node_factory::RecordType,
+    plugin_api::PluginAPI,
+    simulator::{Record, Simulator, SimulatorConfig, SimusaBroker},
+    utils::{SharedMutex, SharedRoLock, maths::round_precision, numbers::OrderedF32},
 };
 
-use super::{
-    configurator::Configurator,
-    drawables::{self},
-};
+use super::configurator::Configurator;
 
 pub struct PainterInfo {
     pub top_left: Pos2,
@@ -391,17 +404,10 @@ impl SimusaApp {
         )
     }
 
-    fn react(
-        &mut self,
-        ui: &mut egui::Ui,
-        ctx: &egui::Context,
-        viewport: Rect,
-        response: &Response,
-    ) {
+    fn react(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, response: &Response) {
         self.drawable_manager.react(
             ui,
             ctx,
-            viewport,
             response,
             &self.p.painter_info,
             self.drawing_scale,
@@ -416,7 +422,12 @@ impl SimusaApp {
                 .virtual_nodes_panel
                 .add_record(rec.name.clone(), time, *rec.clone());
         }
-        self.drawable_manager.add_record(time, &record, &self.p.config, &self.p.context.as_ref().unwrap());
+        self.drawable_manager.add_record(
+            time,
+            &record,
+            &self.p.config,
+            self.p.context.as_ref().unwrap(),
+        );
         if time > self.p.current_max_time {
             self.p.current_max_time = time;
         }
@@ -547,7 +558,6 @@ impl eframe::App for SimusaApp {
                                 if let Some(cfg) = &self.p.config.as_ref().unwrap().results && let Some(path) = &cfg.result_path {
                                     self.result_path = self.p.config.as_ref().unwrap().base_path.join(Path::new(&path)).to_str().unwrap().to_string();
                                 }
-                                
                                 self.drawable_manager.init_drawables(self.p.config.as_ref().unwrap(), &self.p.plugin_api, &self.p.server, self.p.context.as_ref().unwrap());
                             }
                         }
@@ -803,8 +813,12 @@ impl eframe::App for SimusaApp {
                         }
                     }
                     if self.enabled_views.drawable_selector {
-                        self.p.drawable_selector_panel
-                            .draw(ui, ctx, "drawable_selector_panel", &mut self.drawable_manager);
+                        self.p.drawable_selector_panel.draw(
+                            ui,
+                            ctx,
+                            "drawable_selector_panel",
+                            &mut self.drawable_manager,
+                        );
                     }
                 });
                 // Allow resizing the side panel by dragging
@@ -896,7 +910,7 @@ impl eframe::App for SimusaApp {
 
                     self.p.painter_info.set_shift(response.rect.left_top());
 
-                    self.react(ui, ctx, viewport, &response);
+                    self.react(ui, ctx, &response);
                 });
         });
 

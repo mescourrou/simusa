@@ -18,8 +18,19 @@ use config_checker::*;
 use nalgebra::{Vector2, Vector3};
 use simusa_macros::config_derives;
 
+#[cfg(feature = "gui")]
+use crate::simulator::SimulatorConfig;
 use crate::{
-    context::Context, environment::{map::{Map, MapConfig}, oriented_landmark::OrientedLandmark}, errors::SimusaResult, internal, logger::InternalLog, node::NodeMetaData, utils::{
+    context::Context,
+    environment::{
+        map::{Map, MapConfig},
+        oriented_landmark::OrientedLandmark,
+    },
+    errors::SimusaResult,
+    internal,
+    logger::InternalLog,
+    node::NodeMetaData,
+    utils::{
         SharedRoLock, SharedRwLock,
         determinist_random_variable::DeterministRandomVariableFactory,
         geometry::{
@@ -28,8 +39,6 @@ use crate::{
         },
     },
 };
-#[cfg(feature = "gui")]
-use crate::{gui::utils::path_finder, simulator::SimulatorConfig};
 
 pub mod map;
 pub mod oriented_landmark;
@@ -43,7 +52,7 @@ pub mod oriented_landmark;
 #[derive(Default)]
 pub struct EnvironmentConfig {
     /// Optional map of the environment.
-    /// 
+    ///
     /// To use an external file, use the !include tag.
     pub map: MapConfig,
 }
@@ -59,14 +68,21 @@ impl crate::gui::UIComponent for EnvironmentConfig {
         _current_node_name: Option<&String>,
         _unique_id: &str,
     ) {
-        ui.horizontal(|ui| {
+        ui.vertical(|ui| {
             ui.label("Map: ");
-            self.map.show_mut(ui, _ctx, _buffer_stack, global_config, _current_node_name, _unique_id);
+            self.map.show_mut(
+                ui,
+                _ctx,
+                _buffer_stack,
+                global_config,
+                _current_node_name,
+                _unique_id,
+            );
         });
     }
 
     fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
-        ui.horizontal(|ui| {
+        ui.vertical(|ui| {
             ui.label("Map: ");
             self.map.show(ui, _ctx, _unique_id);
         });

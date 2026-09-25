@@ -19,19 +19,15 @@ pub struct ExponentialRandomVariableConfig {
 }
 
 impl Check for ExponentialRandomVariableConfig {
-    fn do_check(&self) -> Result<(), Vec<String>> {
-        let mut errors = Vec::new();
+    fn do_check(&self) -> CheckResult {
+        let mut ret = CheckResult::new();
         if self.lambda.is_empty() {
-            errors.push("Lambda vector cannot be empty.".to_string());
+            ret.add_error("Lambda vector cannot be empty.".to_string());
         }
         if self.lambda.iter().any(|p| *p < 0.) {
-            errors.push("Lambdas must be non-negative.".to_string());
+            ret.add_error("Lambdas must be non-negative.".to_string());
         }
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
+        ret
     }
 }
 

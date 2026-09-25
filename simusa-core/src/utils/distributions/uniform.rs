@@ -22,16 +22,16 @@ pub struct UniformRandomVariableConfig {
 }
 
 impl Check for UniformRandomVariableConfig {
-    fn do_check(&self) -> Result<(), Vec<String>> {
-        let mut errors = Vec::new();
+    fn do_check(&self) -> CheckResult {
+        let mut ret = CheckResult::new();
         if self.min.is_empty() {
-            errors.push("Min vector cannot be empty.".to_string());
+            ret.add_error("Min vector cannot be empty.".to_string());
         }
         if self.max.is_empty() {
-            errors.push("Max vector cannot be empty.".to_string());
+            ret.add_error("Max vector cannot be empty.".to_string());
         }
         if self.min.len() != self.max.len() {
-            errors.push(format!(
+            ret.add_error(format!(
                 "Min and max vectors should have the same length. Got {} min values and {} max values.",
                 self.min.len(),
                 self.max.len()
@@ -39,17 +39,13 @@ impl Check for UniformRandomVariableConfig {
         }
         for (min, max) in zip(&self.min, &self.max) {
             if min > max {
-                errors.push(format!(
+                ret.add_error(format!(
                     "Min value {} is greater than max value {}.",
                     min, max
                 ));
             }
         }
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
+        ret
     }
 }
 

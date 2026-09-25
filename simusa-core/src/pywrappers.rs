@@ -49,7 +49,7 @@ use crate::{
         gnss_sensor::GNSSObservation, oriented_landmark_sensor::OrientedLandmarkObservation,
         robot_sensor::OrientedRobotObservation, speed_sensor::SpeedObservation,
     },
-    simulator::{AsyncSimulator, SimusaBrokerMultiClient, Simulator},
+    simulator::{AsyncSimulator, Simulator, SimusaBrokerMultiClient},
     state_estimators::{State, WorldState, pybinds::StateEstimatorWrapper},
     utils::{frame::Frame, occupancy_grid::OccupancyGrid},
     warning,

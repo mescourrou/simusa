@@ -255,7 +255,12 @@ impl Node {
     ///
     /// Then, the node state is saved.
     #[cfg(not(feature = "monothreaded"))]
-    fn run_time_step(&mut self, time: f32, time_cv: &TimeCv, context: &Context) -> SimusaResult<()> {
+    fn run_time_step(
+        &mut self,
+        time: f32,
+        time_cv: &TimeCv,
+        context: &Context,
+    ) -> SimusaResult<()> {
         use crate::info;
 
         let context = context.new_callstack_level("run_time_step");
@@ -897,7 +902,7 @@ impl Node {
             as Option<Arc<dyn RoLock<HashMap<String, SharedRoLock<NodeMetaData>>>>>
     }
 
-    /// Mark this node as [`NodeState::Zombie`]. The kill is done by [`Self::kill`].
+    /// Mark this node as [`NodeState::Zombie`]. The kill is done later.
     pub fn pre_kill(&mut self) {
         self.node_meta_data.write().unwrap().state = NodeState::Zombie;
     }

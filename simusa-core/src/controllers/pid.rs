@@ -140,18 +140,17 @@ impl PIDConfig {
 }
 
 impl Check for PIDConfig {
-    fn do_check(&self) -> Result<(), Vec<String>> {
-        let mut errs = Vec::new();
+    fn do_check(&self) -> CheckResult {
+        let mut ret = CheckResult::new();
         if self.robot_model.is_none() {
-            warning!(
-                Context::default(),
-                "No model given to PID controller, will use physics' one or default"
+            ret.add_warning(
+                "No model given to PID controller, will use physics' one or default".to_string(),
             );
-            return Ok(());
+            return ret;
         }
         let canonical_config = Self::default_from_model(self.robot_model.as_ref().unwrap());
         if canonical_config.proportional_gains.len() != self.proportional_gains.len() {
-            errs.push(format!(
+            ret.add_error(format!(
                 "Length of proportional gains mismatch ({} vs {} expected for {} model)",
                 self.proportional_gains.len(),
                 canonical_config.proportional_gains.len(),
@@ -159,7 +158,7 @@ impl Check for PIDConfig {
             ));
         }
         if canonical_config.integral_gains.len() != self.integral_gains.len() {
-            errs.push(format!(
+            ret.add_error(format!(
                 "Length of integral gains mismatch ({} vs {} expected for {} model)",
                 self.integral_gains.len(),
                 canonical_config.integral_gains.len(),
@@ -167,14 +166,14 @@ impl Check for PIDConfig {
             ));
         }
         if canonical_config.derivative_gains.len() != self.derivative_gains.len() {
-            errs.push(format!(
+            ret.add_error(format!(
                 "Length of derivative gains mismatch ({} vs {} expected for {} model)",
                 self.derivative_gains.len(),
                 canonical_config.derivative_gains.len(),
                 self.robot_model.as_ref().unwrap()
             ));
         }
-        if !errs.is_empty() { Err(errs) } else { Ok(()) }
+        ret
     }
 }
 
@@ -354,6 +353,17 @@ impl UIComponent for PIDConfig {
         egui::CollapsingHeader::new("PID")
             .id_salt(format!("pid-{}", unique_id))
             .show(ui, |ui| {
+                if self.robot_model.is_none() {
+                    if ui.button("Add model").clicked() {
+                        self.robot_model = Some(RobotModelConfig::default());
+                        *self = Self::default_from_model(self.robot_model.as_ref().unwrap());
+                    }
+                    return;
+                } else if ui.button("Remove model").clicked() {
+                    self.robot_model = None;
+                    *self = Self::default();
+                    return;
+                }
                 let previous_model = self.robot_model.as_ref().unwrap().to_string();
                 self.robot_model.as_mut().unwrap().show_mut(
                     ui,
@@ -399,26 +409,45 @@ impl UIComponent for PIDConfig {
         egui::CollapsingHeader::new("PID")
             .id_salt(format!("pid-{}", unique_id))
             .show(ui, |ui| {
-                self.robot_model.as_ref().unwrap().show(ui, ctx, unique_id);
+                if let Some(robot_model) = &self.robot_model {
+                    robot_model.show(ui, ctx, unique_id);
+                    let label_order = match self.robot_model.as_ref().unwrap() {
+                        RobotModelConfig::Holonomic(_) => {
+                            vec!["Longitudinal", "Lateral", "Angular"]
+                        }
+                        RobotModelConfig::Unicycle(_) => vec!["Longitudinal", "Angular"],
+                    };
+                    for (i, label) in label_order.iter().enumerate() {
+                        ui.horizontal(|ui| {
+                            ui.label(format!("{} - P: {}", *label, self.proportional_gains[i]));
+                        });
 
-                let label_order = match self.robot_model.as_ref().unwrap() {
-                    RobotModelConfig::Holonomic(_) => vec!["Longitudinal", "Lateral", "Angular"],
-                    RobotModelConfig::Unicycle(_) => vec!["Longitudinal", "Angular"],
+                        ui.horizontal(|ui| {
+                            ui.label(format!("{} - I: {}", *label, self.integral_gains[i]));
+                        });
+
+                        ui.horizontal(|ui| {
+                            ui.label(format!("{} - D: {}", *label, self.derivative_gains[i]));
+                        });
+                    }
+                } else {
+                    ui.label("No robot model set");
+                    for (i, gain) in self.proportional_gains.iter().enumerate() {
+                        ui.horizontal(|ui| {
+                            ui.label(format!("P[{}]: {}", i, gain));
+                        });
+                    }
+                    for (i, gain) in self.integral_gains.iter().enumerate() {
+                        ui.horizontal(|ui| {
+                            ui.label(format!("I[{}]: {}", i, gain));
+                        });
+                    }
+                    for (i, gain) in self.derivative_gains.iter().enumerate() {
+                        ui.horizontal(|ui| {
+                            ui.label(format!("D[{}]: {}", i, gain));
+                        });
+                    }
                 };
-
-                for (i, label) in label_order.iter().enumerate() {
-                    ui.horizontal(|ui| {
-                        ui.label(format!("{} - P: {}", *label, self.proportional_gains[i]));
-                    });
-
-                    ui.horizontal(|ui| {
-                        ui.label(format!("{} - I: {}", *label, self.integral_gains[i]));
-                    });
-
-                    ui.horizontal(|ui| {
-                        ui.label(format!("{} - D: {}", *label, self.derivative_gains[i]));
-                    });
-                }
             });
     }
 }
@@ -518,7 +547,7 @@ impl PID {
             }) = physics_config
             {
                 config_clone.robot_model = Some(model.clone());
-                if config_clone.do_check().is_err() {
+                if !config_clone.do_check().is_ok() {
                     config_clone = PIDConfig::default_from_model(model);
                     warning!(
                         context,

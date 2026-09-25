@@ -159,10 +159,11 @@ pub struct LoggerConfig {
     pub log_level: LogLevel,
 
     /// List of log targets to which log messages will be sent.
-    /// Each target can be configured with different logging mechanisms (e.g., console, file, custom).
+    /// Each target can be configured with different logging mechanisms (only file for now).
     ///
-    /// Default is a single console logger [`LoggerTypeConfig::Console`]. If the configuration is
-    /// changed, the console logger is lost.
+    /// The logs will always be sent to the console, even if this list is empty.
+    /// Additional target can be added at runtime using
+    /// [`Context::add_write_target`](crate::context::Context::add_write_target).
     pub outputs: Vec<LoggerTypeConfig>,
 }
 
@@ -172,7 +173,7 @@ impl Default for LoggerConfig {
             included_nodes: Vec::new(),
             excluded_nodes: Vec::new(),
             log_level: LogLevel::Info,
-            outputs: vec![LoggerTypeConfig::Console],
+            outputs: Vec::new(),
         }
     }
 }
@@ -287,8 +288,6 @@ pub trait Logger: Debug + Send + Sync {
 /// Configuration for different types of log targets, allowing users to specify where log messages should be sent (e.g., console, file, etc.) when configuring the logger.
 #[config_derives(tag_content)]
 pub enum LoggerTypeConfig {
-    /// Output log messages to the console (standard output and standard error).
-    Console,
     /// Write log messages to a file at a specified path. The `value` field should contain the file path where log messages will be written.
     File(String),
 }

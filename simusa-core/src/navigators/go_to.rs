@@ -84,18 +84,18 @@ pub struct GoToConfig {
 }
 
 impl Check for GoToConfig {
-    fn do_check(&self) -> Result<(), Vec<String>> {
-        let mut errs = Vec::new();
+    fn do_check(&self) -> CheckResult {
+        let mut ret = CheckResult::new();
         if self.target_speed < 0. {
-            errs.push("Target speed should be positive".to_string());
+            ret.add_error("Target speed should be positive".to_string());
         }
         if self.stop_distance < 0. {
-            errs.push("Stop distance should be positive".to_string());
+            ret.add_error("Stop distance should be positive".to_string());
         }
         if self.stop_ramp_coefficient < 0. {
-            errs.push("Stop ramp coefficient should be positive".to_string());
+            ret.add_error("Stop ramp coefficient should be positive".to_string());
         }
-        if errs.is_empty() { Ok(()) } else { Err(errs) }
+        ret
     }
 }
 
@@ -130,7 +130,7 @@ impl UIComponent for GoToConfig {
                     ui.label("Target point: ".to_string());
                     let possible_values = vec!["None", "Some"];
                     let buffer_key = format!("go-to-target-point-option-{unique_id}");
-                    if !buffer_key.contains(&buffer_key) {
+                    if !buffer_stack.contains_key(&buffer_key) {
                         buffer_stack.insert(buffer_key.clone(), possible_values[0].to_string());
                     }
                     let value = buffer_stack.get_mut(&buffer_key).unwrap();

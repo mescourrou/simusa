@@ -61,10 +61,10 @@ pub struct ClutterFaultConfig<SV: EnumVariables> {
 }
 
 impl<SV: EnumVariables> Check for ClutterFaultConfig<SV> {
-    fn do_check(&self) -> Result<(), Vec<String>> {
-        let mut errors = Vec::new();
+    fn do_check(&self) -> CheckResult {
+        let mut ret = CheckResult::new();
         if self.apparition.dim() != 1 {
-            errors.push(format!(
+            ret.add_error(format!(
                 "Apparition probability should be of length 1, got {}",
                 self.apparition.dim()
             ));
@@ -73,16 +73,12 @@ impl<SV: EnumVariables> Check for ClutterFaultConfig<SV> {
             && self.distributions.iter().map(|d| d.dim()).sum::<usize>()
                 != self.variable_order.len()
         {
-            errors.push(format!("If variable order is given, its length should match the total distribution dimension. Got total distribution dimension {} and variable order length {}.",
+            ret.add_error(format!("If variable order is given, its length should match the total distribution dimension. Got total distribution dimension {} and variable order length {}.",
                 self.distributions.iter().map(|d| d.dim()).sum::<usize>(),
                 self.variable_order.len()
             ));
         }
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
+        ret
     }
 }
 

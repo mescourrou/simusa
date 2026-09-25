@@ -32,7 +32,6 @@ List of parameters:
 			- `type`: Environment  
 			- `type`: EnvironmentDetailed  
 	`outputs`: [LoggerTypeConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/logger/enum.LoggerTypeConfig.html), List, Enum
-		- `type`: Console  
 		- `type`: File => String
 `results`: [ResultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/simulator/results/struct.ResultConfig.html), Optional
 	`result_path`: String, Optional
@@ -53,7 +52,9 @@ List of parameters:
 	`name`: String
 	`navigator`: [NavigatorConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/navigators/mod/enum.NavigatorConfig.html), Enum
 		- `type`: TrajectoryFollower => [TrajectoryFollowerConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/navigators/trajectory_follower/struct.TrajectoryFollowerConfig.html)
-			`trajectory_path`: String
+			`trajectory`: [TrajectoryConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/navigators/trajectory/struct.TrajectoryConfig.html)
+				`point_list`: Float, List, List
+				`do_loop`: Boolean
 			`forward_distance`: Float
 			`target_speed`: Float
 			`stop_distance`: Float
@@ -317,6 +318,15 @@ List of parameters:
 				`node_name`: String
 			- `type`: Kill => String
 `environment`: [EnvironmentConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/environment/mod/struct.EnvironmentConfig.html)
-	`map_path`: String, Optional
+	`map`: [MapConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/environment/map/struct.MapConfig.html)
+		`landmarks`: [OrientedLandmarkConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/environment/oriented_landmark/struct.OrientedLandmarkConfig.html), List
+			`id`: Integer
+			`labels`: String, List
+			`x`: Float
+			`y`: Float
+			`theta`: Float
+			`height`: Float
+			`width`: Float
+		`random`: RandomMap, List
 `optimization`: [OptimizationConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/simulator/simulator_config/struct.OptimizationConfig.html)
 	`threads`: usize

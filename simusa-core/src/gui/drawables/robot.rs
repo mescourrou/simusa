@@ -3,7 +3,11 @@ use nalgebra::Vector3;
 use simusa_com::time_ordered_data::TimeOrderedData;
 
 use crate::{
-    constants::TIME_ROUND, gui::{Drawable, UIComponent, app::PainterInfo, drawables}, node::node_factory::{RecordType, RobotConfig, RobotRecord}, sensors::{SensorConfig, SensorObservationRecord}, simulator::SimulatorConfig,
+    constants::TIME_ROUND,
+    gui::{Drawable, UIComponent, app::PainterInfo, drawables},
+    node::node_factory::{RobotConfig, RobotRecord},
+    sensors::{SensorConfig, SensorObservationRecord},
+    simulator::SimulatorConfig,
 };
 
 use super::observations::{OrientedLandmarkObservation, OrientedRobotObservation};
@@ -105,9 +109,9 @@ impl Drawable for Robot {
                 if !painter_info.is_inside(&position) {
                     return Err(position);
                 }
-    
+
                 let position = position * scale;
-    
+
                 let position = center + position;
                 let arrow_tip = position
                     + Vec2 {

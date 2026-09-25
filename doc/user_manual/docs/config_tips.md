@@ -24,14 +24,14 @@ This guide provides best practices, common patterns, and troubleshooting advice 
 Two robots that coordinate through communication:
 
 ```yaml
-version: 1.8.0
+version: 1.9.0
 max_time: 30.0
 
 robots:
   - name: robot1
     navigator:
       type: TrajectoryFollower
-      trajectory_path: paths/robot1_path.yaml
+      trajectory: !include paths/robot1_path.yaml
       forward_distance: 0.2
       target_speed: 0.5
       stop_distance: 0.2
@@ -71,7 +71,7 @@ robots:
   - name: robot2
     navigator:
       type: TrajectoryFollower
-      trajectory_path: paths/robot2_path.yaml
+      trajectory: !include paths/robot2_path.yaml
       forward_distance: 0.2
       target_speed: 0.5
       stop_distance: 0.2
@@ -113,15 +113,15 @@ robots:
 Configure realistic sensor noise and faults at startup:
 
 ```yaml
-version: 1.8.0
+version: 1.9.0
 max_time: 20.0
 environment:
-  map_path: maps/landmarks.yaml
+  map: !include maps/landmarks.yaml
 robots:
   - name: robot1
     navigator:
       type: TrajectoryFollower
-      trajectory_path: paths/robot_path.yaml
+      trajectory: !include paths/robot_path.yaml
     controller:
       type: PID
     physics:
@@ -189,10 +189,10 @@ robots:
 One computation unit receives sensor data from all robots and performs centralized state estimation:
 
 ```yaml
-version: 1.8.0
+version: 1.9.0
 max_time: 20.0
 environment:
-  map_path: maps/landmarks.yaml
+  map: !include maps/landmarks.yaml
 robots:
   - name: robot1
     sensor_manager:
@@ -265,14 +265,14 @@ computation_units:
 Specify the correct version matching your simulator to get a warning when using different major versions:
 
 ```yaml
-version: 1.8.0  # Match your installed SiMuSA version
+version: 1.9.0  # Match your installed SiMuSA version
 ```
 
 Check with: `simusa-cmd --version`
 
 ### 2. File Path Organization
 
-Use relative paths and organize consistently:
+Use relative paths and organize consistently with `!include` keyword:
 
 ```
 config/
@@ -289,9 +289,9 @@ config/
 In configuration:
 ```yaml
 navigator:
-  trajectory_path: paths/robot1_path.yaml  # Relative to config file
+  trajectory: !include paths/robot1_path.yaml  # Relative to config file
 environment:
-  map_path: maps/landmarks.yaml
+  map: !include maps/landmarks.yaml
 ```
 
 ### 3. Use Schema Validation
@@ -300,7 +300,7 @@ Enable auto-completion in your editor:
 
 ```yaml
 # yaml-language-server: $schema=../config.schema.json
-version: 1.8.0
+version: 1.9.0
 ```
 
 This provides:
@@ -466,25 +466,6 @@ navigator:
   type: GoTo  # or TrajectoryFollower, Python, External
 ```
 
-### Issue: "File not found" for trajectory/map
-
-**Cause**: Incorrect relative path or file doesn't exist
-
-**Solution**:
-- Use relative paths from config file location
-- Verify file exists
-- Check spelling
-
-```yaml
-# If config is in config/my_sim.yaml
-navigator:
-  trajectory_path: paths/path.yaml  # Looks for config/paths/path.yaml
-  
-# NOT
-navigator:
-  trajectory_path: /absolute/path/path.yaml  # Avoid absolute paths
-```
-
 ### Issue: Robot doesn't move
 
 **Possible causes**:
@@ -595,7 +576,7 @@ physics:
 ### For Detailed Analysis
 
 ```yaml
-version: 1.8.0
+version: 1.9.0
 max_time: 10.0  # Shorter simulation
 
 log:
@@ -697,6 +678,8 @@ navigator:
   target_point: [10.0, 0.0]
   target_speed: TARGET_SPEED  # Replaced by script
 ```
+
+For more complex sub-config change, use `!include [file]` keyword.
 
 ### Result Analysis Scripts
 Use custom Python scripts for post-simulation analysis:

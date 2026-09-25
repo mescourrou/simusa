@@ -23,8 +23,8 @@ use std::collections::BTreeMap;
 use std::time;
 
 use crate::{
-    context::Context, errors::SimusaResult, info, time_analysis::time_analysis_config::AnalysisUnit,
-    utils::SharedMutex,
+    context::Context, errors::SimusaResult, info,
+    time_analysis::time_analysis_config::AnalysisUnit, utils::SharedMutex,
 };
 
 /// Node for the time analysis. It represents a block of code to analyse,

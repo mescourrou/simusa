@@ -1,22 +1,26 @@
 use egui::{Color32, Rect, Shape, Stroke, Vec2};
+use simusa_com::time_ordered_data::TimeOrderedData;
 
 use crate::{
-    context::Context, environment::map::MapRecord, gui::{Drawable, app::PainterInfo}, node::node_factory::RecordType, simulator::SimulatorConfig,
+    constants::TIME_ROUND,
+    context::Context,
+    environment::map::MapRecord,
+    gui::{Drawable, app::PainterInfo},
+    simulator::SimulatorConfig,
 };
 
 pub struct Map {
     color: Color32,
-    current_map: MapRecord,
+    maps: TimeOrderedData<MapRecord>,
     arrow_len: f32,
 }
 
 impl Default for Map {
     fn default() -> Self {
+        let maps = TimeOrderedData::new(TIME_ROUND);
         Self {
             color: Color32::RED,
-            current_map: MapRecord {
-                landmarks: Vec::new(),
-            },
+            maps,
             arrow_len: 0.2,
         }
     }
@@ -26,20 +30,30 @@ impl Map {
     /// Initialize the map drawable from environment and simulator configuration.
     ///
     /// ## Arguments
+    /// * `initial_map` - Optional initial map record to populate the drawable before the simulation starts.
+    ///   If `None`, the map will be empty until a record is added.
     /// * `sim_config` - Simulator configuration used to resolve the map path.
     /// * `context` - Shared simulation context used for initialization logs.
-    pub fn init(current_map: MapRecord, _sim_config: &SimulatorConfig, _context: &Context) -> Self {
+    pub fn init(
+        initial_map: Option<MapRecord>,
+        _sim_config: &SimulatorConfig,
+        _context: &Context,
+    ) -> Self {
+        let mut maps = TimeOrderedData::new(TIME_ROUND);
+        if let Some(map) = initial_map {
+            maps.insert(0., map, true);
+        }
         Self {
             color: Color32::RED,
             arrow_len: 0.2,
-            current_map,
+            maps,
         }
     }
 }
 
 impl Drawable for Map {
     fn add_map_record(&mut self, time: f32, record: MapRecord) {
-        self.current_map = record;
+        self.maps.insert(time, record, true);
     }
 
     /// Build the set of map shapes for rendering in the current viewport.
@@ -49,11 +63,15 @@ impl Drawable for Map {
         _viewport: &Rect,
         painter_info: &PainterInfo,
         scale: f32,
-        _time: f32,
+        time: f32,
     ) -> Result<Vec<Shape>, Vec2> {
         let mut shapes = Vec::new();
         let center = painter_info.zero(scale);
-        for landmark in self.current_map.landmarks.iter() {
+        let map = match self.maps.get_data_beq_time(time) {
+            Some(m) => m.1,
+            None => return Ok(shapes),
+        };
+        for landmark in map.landmarks.iter() {
             let position = Vec2::new(landmark.x, landmark.y);
             if !painter_info.is_inside(&position) {
                 return Err(position);

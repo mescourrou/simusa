@@ -116,14 +116,64 @@ pub type OrientedLandmarkRecord = OrientedLandmarkConfig;
 
 #[cfg(feature = "gui")]
 impl UIComponent for OrientedLandmarkRecord {
-    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
-        egui::CollapsingHeader::new(format!("Landmark Id {}", self.id)).show(ui, |ui| {
-            ui.vertical(|ui| {
-                ui.label(format!("Labels: {}", self.labels.join(", ")));
-                ui.label(format!("Pose: {}, {}, {}", self.x, self.y, self.theta));
-                ui.label(format!("Height: {}", self.height));
-                ui.label(format!("Width: {}", self.width));
+    fn show_mut(
+        &mut self,
+        ui: &mut egui::Ui,
+        _ctx: &egui::Context,
+        _buffer_stack: &mut std::collections::BTreeMap<String, String>,
+        _global_config: &crate::simulator::SimulatorConfig,
+        _current_node_name: Option<&String>,
+        _unique_id: &str,
+    ) {
+        ui.vertical(|ui| {
+            ui.add(
+                egui::DragValue::new(&mut self.id)
+                    .prefix("Id: ")
+                    .speed(1)
+                    .fixed_decimals(0),
+            );
+            ui.horizontal(|ui| {
+                ui.label("Labels:");
+                let mut labels_str = self.labels.join(", ");
+                if ui
+                    .text_edit_singleline(&mut labels_str)
+                    .on_hover_text("Comma-separated labels")
+                    .changed()
+                {
+                    self.labels = labels_str
+                        .split(',')
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                }
             });
+            ui.add(egui::DragValue::new(&mut self.x).prefix("X: ").speed(0.1));
+            ui.add(egui::DragValue::new(&mut self.y).prefix("Y: ").speed(0.1));
+            ui.add(
+                egui::DragValue::new(&mut self.theta)
+                    .prefix("Theta: ")
+                    .speed(0.1),
+            );
+            ui.add(
+                egui::DragValue::new(&mut self.height)
+                    .prefix("Height: ")
+                    .speed(0.1),
+            );
+            ui.add(
+                egui::DragValue::new(&mut self.width)
+                    .prefix("Width: ")
+                    .speed(0.1),
+            );
+        });
+    }
+
+    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
+        ui.vertical(|ui| {
+            ui.label(format!("Id: {}", self.id));
+            ui.label(format!("Labels: {}", self.labels.join(", ")));
+            ui.label(format!("Pose: {}, {}, {}", self.x, self.y, self.theta));
+            ui.label(format!("Height: {}", self.height));
+            ui.label(format!("Width: {}", self.width));
         });
     }
 }

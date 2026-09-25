@@ -16,16 +16,12 @@ pub struct FixedRandomVariableConfig {
 }
 
 impl Check for FixedRandomVariableConfig {
-    fn do_check(&self) -> Result<(), Vec<String>> {
-        let mut errors = Vec::new();
+    fn do_check(&self) -> CheckResult {
+        let mut ret = CheckResult::new();
         if self.values.is_empty() {
-            errors.push("Values vector cannot be empty.".to_string());
+            ret.add_error("Values vector cannot be empty.".to_string());
         }
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
+        ret
     }
 }
 

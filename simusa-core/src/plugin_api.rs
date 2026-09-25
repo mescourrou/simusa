@@ -212,10 +212,7 @@ pub trait PluginAPI: Send + Sync {
     /// at each step of the simulation to update the drawable with the new record.
     /// The GUI will then call [`Drawable::draw`](crate::gui::Drawable::draw) and [`Drawable::react`](crate::gui::Drawable::react) function at each frame to draw the drawable and react to click.
     #[cfg(feature = "gui")]
-    fn get_drawables(
-        &self,
-        global_config: &SimulatorConfig,
-    ) -> Vec<Box<dyn crate::gui::Drawable>> {
+    fn get_drawables(&self, global_config: &SimulatorConfig) -> Vec<Box<dyn crate::gui::Drawable>> {
         Vec::new()
     }
 

@@ -1,0 +1,5626 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SimulatorConfig",
+  "description": "Scenario configuration for the simulator.\nThe Simulator configuration is the root of the scenario configuration.\n\n# Example\n\n```yaml\nversion: 1.9.0\nmax_time: 10.0\nlog:\n  log_level:\n    type: Info\nresults: null\ntime_analysis:\n  exporter:\n    type: TraceEventExporter\n  output_path: time_performance # .json or .csv will be appended\n  analysis_unit: s\nrandom_seed: null # Different seed each run\nenvironment:\n  map: null\nrobots:\n  - name: robot1\n    navigator:\n      type: GoTo\n      target_point: null\n      target_speed: 0.5\n      stop_distance: 0.2\n      stop_ramp_coefficient: 0.5\n    controller:\n      type: PID\n      robot_model:\n        type: Unicycle\n        wheel_distance: 0.25\n      proportional_gains: [1.0, 1.0]\n      derivative_gains: [0.0, 0.1]\n      integral_gains: [0.0, 0.0]\n    physics:\n      type: Internal\n      model:\n        type: Unicycle\n        wheel_distance: 0.25\n      initial_state:\n        pose: [0.0, 0.0, 0.0]\n        velocity: [0.0, 0.0]\n    state_estimator:\n      type: Perfect\n      prediction_activation:\n        perdiod: {type: Num, value: 0.1}\n      targets:\n        - self\n    sensor_manager:\n      sensors: []\n    network:\n      range: 0.0 # unlimited range\n      reception_delay: 0.0\ncomputation_units: []\nscenario:\n  events: []\n```",
+  "type": "object",
+  "properties": {
+    "base_path": {
+      "description": "Auto-computed base directory used to resolve relative paths in the configuration.",
+      "type": "string",
+      "default": "."
+    },
+    "computation_units": {
+      "description": "List of computation units to run, with their specific configuration.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ComputationUnitConfig"
+      }
+    },
+    "environment": {
+      "description": "Global environment settings (maps).",
+      "$ref": "#/$defs/EnvironmentConfig",
+      "default": {
+        "map": {
+          "landmarks": [],
+          "random": []
+        }
+      }
+    },
+    "log": {
+      "description": "Logging configuration.",
+      "$ref": "#/$defs/LoggerConfig",
+      "default": {
+        "excluded_nodes": [],
+        "included_nodes": [],
+        "log_level": {
+          "type": "Info"
+        },
+        "outputs": []
+      }
+    },
+    "max_time": {
+      "description": "Maximum simulated time before stopping the run.",
+      "type": "number",
+      "format": "float",
+      "default": 60.0
+    },
+    "optimization": {
+      "description": "Optimization settings (parallelization, etc.).",
+      "$ref": "#/$defs/OptimizationConfig",
+      "default": {
+        "threads": 0
+      }
+    },
+    "random_seed": {
+      "description": "Optional deterministic random seed for the simulation. If not provided, a different seed will be used at each run.",
+      "type": [
+        "number",
+        "null"
+      ],
+      "format": "float",
+      "default": null
+    },
+    "results": {
+      "description": "Result-export configuration.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ResultConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "robots": {
+      "description": "List of the robots to run, with their specific configuration.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/RobotConfig"
+      }
+    },
+    "scenario": {
+      "description": "Scenario settings (occuring events).",
+      "$ref": "#/$defs/ScenarioConfig",
+      "default": {
+        "events": []
+      }
+    },
+    "time_analysis": {
+      "description": "Time-analysis/profiling configuration.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TimeAnalysisConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": {
+        "analysis_unit": "ms",
+        "exporter": {
+          "type": "TraceEventExporter"
+        },
+        "output_path": "time_performance"
+      }
+    },
+    "version": {
+      "description": "Version of the simulator used by the configuration. Produces a warning the the major version (second number)\nis different from the current one.",
+      "type": "string",
+      "default": "1.9.0"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "AnalysisUnit": {
+      "description": "Unit for the time analysis results, to make a more readable report.",
+      "oneOf": [
+        {
+          "description": "Documentation\n\n\nSerialization values(s) for this variable: `s`, `seconds`",
+          "type": "string",
+          "const": "s"
+        },
+        {
+          "description": "Serialization values(s) for this variable: `ms`, `milliseconds`",
+          "type": "string",
+          "const": "ms"
+        },
+        {
+          "description": "Serialization values(s) for this variable: `us`, `µs`, `microseconds`",
+          "type": "string",
+          "const": "us"
+        },
+        {
+          "description": "Serialization values(s) for this variable: `ns`, `nanoseconds`",
+          "type": "string",
+          "const": "ns"
+        }
+      ]
+    },
+    "AreaEventTriggerConfig": {
+      "description": "Area-based trigger configuration.\n\nDefault value: [`AreaEventTriggerConfig::Rect`] with [`RectAreaEventTriggerConfig::default`].",
+      "oneOf": [
+        {
+          "description": "Axis-aligned rectangle trigger area.",
+          "type": "object",
+          "properties": {
+            "bottom_left": {
+              "description": "Bottom-left corner of the rectangle.",
+              "type": "array",
+              "default": [
+                0.0,
+                0.0
+              ],
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number",
+                  "format": "float"
+                },
+                {
+                  "type": "number",
+                  "format": "float"
+                }
+              ]
+            },
+            "inside": {
+              "description": "If `true`, trigger when inside the rectangle; otherwise when outside.",
+              "type": "boolean",
+              "default": true
+            },
+            "top_right": {
+              "description": "Top-right corner of the rectangle.",
+              "type": "array",
+              "default": [
+                1.0,
+                1.0
+              ],
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number",
+                  "format": "float"
+                },
+                {
+                  "type": "number",
+                  "format": "float"
+                }
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "Rect"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Circular trigger area.",
+          "type": "object",
+          "properties": {
+            "center": {
+              "description": "Center of the circle.",
+              "type": "array",
+              "default": [
+                0.0,
+                0.0
+              ],
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number",
+                  "format": "float"
+                },
+                {
+                  "type": "number",
+                  "format": "float"
+                }
+              ]
+            },
+            "inside": {
+              "description": "If `true`, trigger when inside the circle; otherwise when outside.",
+              "type": "boolean",
+              "default": true
+            },
+            "radius": {
+              "description": "Radius of the circle.",
+              "type": "number",
+              "format": "float",
+              "default": 1.0
+            },
+            "type": {
+              "type": "string",
+              "const": "Circle"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "BenchStateEstimatorConfig": {
+      "description": "Allow to run a list of [`StateEstimator`] outside of the simulation control loop.",
+      "type": "object",
+      "properties": {
+        "config": {
+          "description": "Underlying estimator configuration.",
+          "$ref": "#/$defs/StateEstimatorConfig",
+          "default": {
+            "prediction_activation": {
+              "offset": null,
+              "period": {
+                "type": "Num",
+                "value": 0.10000000149011612
+              },
+              "table": null
+            },
+            "targets": [
+              "self"
+            ],
+            "type": "Perfect"
+          }
+        },
+        "name": {
+          "description": "Human-readable estimator name to identify the estimator in the simulation results.",
+          "type": "string",
+          "default": "bench_state_estimator"
+        }
+      },
+      "additionalProperties": false
+    },
+    "BernouilliRandomVariableConfig": {
+      "description": "Configuration for a Bernoulli random variable.",
+      "type": "object",
+      "properties": {
+        "probability": {
+          "description": "Success probabilities for each Bernoulli output component.",
+          "type": "array",
+          "default": [
+            1.0
+          ],
+          "items": {
+            "type": "number",
+            "format": "float"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ComputationUnitConfig": {
+      "description": "Configuration of the [`NodeType::ComputationUnit`].\n\nTo get observations from other nodes, specify the `send_to` option of [`ManagedSensorConfig`](crate::sensors::sensor_manager::ManagedSensorConfig).\n\nDefault values:\n- `name`: `\"NoName\"`\n- `network`: [`NetworkConfig::default`]\n- `state_estimators`: empty vector\n- `labels`: empty vector\n\n# Example\n```yaml\ncomputation_units:\n- name: Central Unit\n  state_estimators:\n  - name: central_perfect\n    config:\n      type: Perfect\n      prediction_activation:\n        period: {type: Num, value: 0.1}\n      targets:\n      - robot1\n      - robot2\n```",
+      "type": "object",
+      "properties": {
+        "labels": {
+          "description": "Free-form labels attached to the node metadata.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "description": "Name of the unit.",
+          "type": "string",
+          "default": "NoName"
+        },
+        "network": {
+          "description": "[`Network`] configuration.",
+          "$ref": "#/$defs/NetworkConfig",
+          "default": {
+            "range": 0.0,
+            "reception_delay": 0.0
+          }
+        },
+        "state_estimators": {
+          "description": "[`StateEstimator`](crate::state_estimators::StateEstimator)s",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/BenchStateEstimatorConfig"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ControllerConfig": {
+      "description": "Enumerates the strategies configurations.",
+      "oneOf": [
+        {
+          "description": "Configuration for [`PID`](pid::PIDConfig).",
+          "type": "object",
+          "properties": {
+            "derivative_gains": {
+              "description": "Derivative gains (`Kd`) ordered by model convention.\n\nDefault for unicycle: `[0., 0.1]` (longitudinal, angular).\n\nDefault for holonomic: `[0., 0., 0.1]` (longitudinal, lateral, angular).",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            },
+            "integral_gains": {
+              "description": "Integral gains (`Ki`) ordered by model convention.\n\nDefault for unicycle: `[0., 0.]` (longitudinal, angular).\n\nDefault for holonomic: `[0., 0., 0.]` (longitudinal, lateral, angular).",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            },
+            "proportional_gains": {
+              "description": "Proportional gains (`Kp`) ordered by model convention.\n\nDefault for unicycle: `[1., 1.]` (longitudinal, angular).\n\nDefault for holonomic: `[1., 1., 1.]` (longitudinal, lateral, angular).",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            },
+            "robot_model": {
+              "description": "Robot model used to interpret gain vector sizes and ordering.\n\nDefault: `None`.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/RobotModelConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "type": {
+              "type": "string",
+              "const": "PID"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Configuration for [`ExternalController`](external_controller::ExternalControllerConfig).",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "External"
+            }
+          },
+          "$ref": "#/$defs/ExternalControllerConfig",
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Configuration for [`PythonController`](python_controller::PythonControllerConfig).",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Python"
+            }
+          },
+          "$ref": "#/$defs/PythonControllerConfig",
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "DisplacementSensorFaultModelConfig": {
+      "description": "Configuration enum selecting displacement fault model strategies.\n\nDefault value: [`DisplacementSensorFaultModelConfig::AdditivePreDisplacement`] with\n[`AdditiveFaultConfig::default`].",
+      "oneOf": [
+        {
+          "description": "Additive fault applied in the frame of the robot before displacement.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Bernoulli trigger deciding whether the additive fault is applied.",
+              "$ref": "#/$defs/BernouilliRandomVariableConfig",
+              "default": {
+                "probability": [
+                  1.0
+                ]
+              }
+            },
+            "distributions": {
+              "description": "Random distributions used to sample additive perturbations.",
+              "type": "array",
+              "default": [
+                {
+                  "covariance": [
+                    1.0
+                  ],
+                  "mean": [
+                    0.0
+                  ],
+                  "type": "Normal"
+                }
+              ],
+              "items": {
+                "$ref": "#/$defs/RandomVariableTypeConfig"
+              }
+            },
+            "proportional_factor": {
+              "description": "Optional multiplicative factor applied to the proportional value.",
+              "type": [
+                "number",
+                "null"
+              ],
+              "format": "float",
+              "default": null
+            },
+            "proportional_to": {
+              "description": "Optional variable used as a proportional scaling source.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DisplacementSensorVariablesProp"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "AdditivePreDisplacement"
+            },
+            "variable_order": {
+              "description": "Ordered list of target variables receiving sampled perturbations.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/DisplacementSensorVariablesFaults"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Additive fault applied in the frame of the robot after displacement.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Bernoulli trigger deciding whether the additive fault is applied.",
+              "$ref": "#/$defs/BernouilliRandomVariableConfig",
+              "default": {
+                "probability": [
+                  1.0
+                ]
+              }
+            },
+            "distributions": {
+              "description": "Random distributions used to sample additive perturbations.",
+              "type": "array",
+              "default": [
+                {
+                  "covariance": [
+                    1.0
+                  ],
+                  "mean": [
+                    0.0
+                  ],
+                  "type": "Normal"
+                }
+              ],
+              "items": {
+                "$ref": "#/$defs/RandomVariableTypeConfig"
+              }
+            },
+            "proportional_factor": {
+              "description": "Optional multiplicative factor applied to the proportional value.",
+              "type": [
+                "number",
+                "null"
+              ],
+              "format": "float",
+              "default": null
+            },
+            "proportional_to": {
+              "description": "Optional variable used as a proportional scaling source.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DisplacementSensorVariablesProp"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "AdditivePostDisplacement"
+            },
+            "variable_order": {
+              "description": "Ordered list of target variables receiving sampled perturbations.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/DisplacementSensorVariablesFaults"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Python-implemented custom fault model.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Python"
+            }
+          },
+          "$ref": "#/$defs/PythonFaultModelConfig",
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Plugin-provided external fault model.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "External"
+            }
+          },
+          "$ref": "#/$defs/ExternalFaultConfig",
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "DisplacementSensorFilterConfig": {
+      "description": "Configuration enum selecting displacement sensor filtering strategies\nfor DisplacementSensor observations.\n\nWhen multiple filters are applied to a sensor, all must agree to keep the observation.\n\nDefault value: [`DisplacementSensorFilterConfig::Range`] with [`RangeFilterConfig::default`].",
+      "oneOf": [
+        {
+          "description": "Range-based filtering on enumerated variables: excludes observations where numeric values fall outside specified bounds.",
+          "type": "object",
+          "properties": {
+            "inside": {
+              "description": "Whether matching values should stay inside (`true`) or outside (`false`) ranges.",
+              "type": "boolean",
+              "default": true
+            },
+            "max_range": {
+              "description": "Inclusive upper bounds associated with `variables`.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            },
+            "min_range": {
+              "description": "Inclusive lower bounds associated with `variables`.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Range"
+            },
+            "variables": {
+              "description": "Ordered list of variables to test.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/DisplacementSensorVariablesFilter"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Python-based custom filtering: delegates exclusion logic to user-defined Python methods.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Python"
+            }
+          },
+          "$ref": "#/$defs/PythonFilterConfig",
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "External"
+            }
+          },
+          "$ref": "#/$defs/ExternalFilterConfig",
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "DisplacementSensorVariablesFaults": {
+      "description": "Authorized variables in faults",
+      "oneOf": [
+        {
+          "description": "Displacement following X axis in the frame of the robot before displacement\n\n\nSerialization values(s) for this variable: `x`, `dx`",
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "description": "Displacement following Y axis in the frame of the robot before displacement\n\n\nSerialization values(s) for this variable: `y`, `dy`",
+          "type": "string",
+          "const": "y"
+        },
+        {
+          "description": "Rotation of the robot during the displacement\n\n\nSerialization values(s) for this variable: `rotation`, `r`",
+          "type": "string",
+          "const": "rotation"
+        },
+        {
+          "description": "Euclidean norm of the displacement (sqrt(x^2 + y^2))\n\n\nSerialization values(s) for this variable: `translation`, `t`",
+          "type": "string",
+          "const": "translation"
+        }
+      ]
+    },
+    "DisplacementSensorVariablesFilter": {
+      "description": "Authorized viaribles in filters",
+      "oneOf": [
+        {
+          "description": "Displacement following X axis in the frame of the robot before displacement\n\n\nSerialization values(s) for this variable: `x`, `dx`",
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "description": "Displacement following Y axis in the frame of the robot before displacement\n\n\nSerialization values(s) for this variable: `y`, `dy`",
+          "type": "string",
+          "const": "y"
+        },
+        {
+          "description": "Rotation of the robot during the displacement\n\n\nSerialization values(s) for this variable: `rotation`, `r`",
+          "type": "string",
+          "const": "rotation"
+        },
+        {
+          "description": "Euclidean norm of the displacement (sqrt(x^2 + y^2))\n\n\nSerialization values(s) for this variable: `translation`, `t`",
+          "type": "string",
+          "const": "translation"
+        },
+        {
+          "description": "Lie distance during the displacement (velocity * time)\n\n\nSerialization values(s) for this variable: `distance`, `d`",
+          "type": "string",
+          "const": "distance"
+        },
+        {
+          "description": "Euclidean norm of the robot linear velocity during the displacement\n\n\nSerialization values(s) for this variable: `self_velocity`",
+          "type": "string",
+          "const": "self_velocity"
+        }
+      ]
+    },
+    "DisplacementSensorVariablesProp": {
+      "description": "Authorized variables for additive fault proportional scaling",
+      "oneOf": [
+        {
+          "description": "Displacement following X axis in the frame of the robot before displacement\n\n\nSerialization values(s) for this variable: `x`, `dx`",
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "description": "Displacement following Y axis in the frame of the robot before displacement\n\n\nSerialization values(s) for this variable: `y`, `dy`",
+          "type": "string",
+          "const": "y"
+        },
+        {
+          "description": "Rotation of the robot during the displacement\n\n\nSerialization values(s) for this variable: `rotation`, `r`",
+          "type": "string",
+          "const": "rotation"
+        },
+        {
+          "description": "Euclidean norm of the displacement (sqrt(x^2 + y^2))\n\n\nSerialization values(s) for this variable: `translation`, `t`",
+          "type": "string",
+          "const": "translation"
+        },
+        {
+          "description": "Lie distance during the displacement (velocity * time)\n\n\nSerialization values(s) for this variable: `distance`, `d`",
+          "type": "string",
+          "const": "distance"
+        },
+        {
+          "description": "Euclidean norm of the robot linear velocity during the displacement\n\n\nSerialization values(s) for this variable: `self_velocity`",
+          "type": "string",
+          "const": "self_velocity"
+        }
+      ]
+    },
+    "EnvironmentConfig": {
+      "description": "Configuration for building an [`Environment`].\n\nThe map contains the map geometry. It is loaded from a file when `map_path` is provided, or initialized as empty otherwise. The map file should be parsable by the [`Map`] struct, which currently supports a simple custom format (see its documentation for details).\n\nThe map path is relative to the simulator config path.",
+      "type": "object",
+      "properties": {
+        "map": {
+          "description": "Optional map of the environment.\n\nTo use an external file, use the !include tag.",
+          "$ref": "#/$defs/MapConfig",
+          "default": {
+            "landmarks": [],
+            "random": []
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "EventConfig": {
+      "description": "Configuration of a single scenario event.\n\nAn event combines a trigger condition ([`EventTriggerConfig`]) and an action\n([`EventTypeConfig`]).\n\nDefault values:\n- `triggering_nodes`: empty vector\n- `trigger`: [`EventTriggerConfig::default`] (time trigger)\n- `event_type`: [`EventTypeConfig::default`] (kill `\"$0\"`)",
+      "type": "object",
+      "properties": {
+        "event_type": {
+          "description": "Action executed when the trigger condition is met.",
+          "$ref": "#/$defs/EventTypeConfig",
+          "default": {
+            "type": "Kill",
+            "value": "$0"
+          }
+        },
+        "trigger": {
+          "description": "Trigger condition for the event.",
+          "$ref": "#/$defs/EventTriggerConfig",
+          "default": {
+            "type": "Time",
+            "value": {
+              "occurences": {
+                "type": "Num",
+                "value": 1.0
+              },
+              "time": {
+                "type": "Num",
+                "value": 0.0
+              }
+            }
+          }
+        },
+        "triggering_nodes": {
+          "description": "Names of the nodes that can trigger this event. If empty, any node can trigger it.\nRegexp patterns are supported.\nOnly applied to non-time triggers.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "EventTriggerConfig": {
+      "description": "Trigger condition for scenario events.\n\nDefault value: [`EventTriggerConfig::Time`] with [`TimeEventTriggerConfig::default`].",
+      "oneOf": [
+        {
+          "description": "Time-based trigger.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Time"
+            },
+            "value": {
+              "$ref": "#/$defs/TimeEventTriggerConfig"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "description": "Distance-based trigger relative to another target.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Proximity"
+            },
+            "value": {
+              "$ref": "#/$defs/ProximityEventTriggerConfig"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "description": "Geometric-area trigger.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Area"
+            },
+            "value": {
+              "$ref": "#/$defs/AreaEventTriggerConfig"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        }
+      ]
+    },
+    "EventTypeConfig": {
+      "description": "Defines the type of event to execute.\n\nThe name provided in the variants refers to the name of the nodes or use $0 notation for\ndynamic referencing (e.g., the robot that triggered the event is $0).",
+      "oneOf": [
+        {
+          "description": "Spawns a new node according to [`SpawnEventConfig`].",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Spawn"
+            },
+            "value": {
+              "$ref": "#/$defs/SpawnEventConfig"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "description": "Kills a node by name.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Kill"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        }
+      ]
+    },
+    "ExternalControllerConfig": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "ExternalEstimatorConfig": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "ExternalFaultConfig": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "ExternalFilterConfig": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "ExternalNavigatorConfig": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "ExternalPhysicsConfig": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "ExternalSensorConfig": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "FrameConfig": {
+      "description": "Configuration for a 2D frame, including position and orientation.",
+      "type": "object",
+      "properties": {
+        "theta": {
+          "description": "The orientation of the frame in radians.\nDefault is `0.0` (facing along the positive x-axis).",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
+        },
+        "x": {
+          "description": "The x-coordinate of the frame's position.\nDefault is `0.0`.",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
+        },
+        "y": {
+          "description": "The y-coordinate of the frame's position.\nDefault is `0.0`.",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "GNSSSensorFaultModelConfig": {
+      "description": "Configuration enum selecting GNSS fault model strategies.\n\nDefault value: [`GNSSSensorFaultModelConfig::Additive`] with\n[`AdditiveFaultConfig::default`].",
+      "oneOf": [
+        {
+          "description": "Additive fault model in robot-centered coordinates.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Bernoulli trigger deciding whether the additive fault is applied.",
+              "$ref": "#/$defs/BernouilliRandomVariableConfig",
+              "default": {
+                "probability": [
+                  1.0
+                ]
+              }
+            },
+            "distributions": {
+              "description": "Random distributions used to sample additive perturbations.",
+              "type": "array",
+              "default": [
+                {
+                  "covariance": [
+                    1.0
+                  ],
+                  "mean": [
+                    0.0
+                  ],
+                  "type": "Normal"
+                }
+              ],
+              "items": {
+                "$ref": "#/$defs/RandomVariableTypeConfig"
+              }
+            },
+            "proportional_factor": {
+              "description": "Optional multiplicative factor applied to the proportional value.",
+              "type": [
+                "number",
+                "null"
+              ],
+              "format": "float",
+              "default": null
+            },
+            "proportional_to": {
+              "description": "Optional variable used as a proportional scaling source.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/GNSSSensorVariables"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "Additive"
+            },
+            "variable_order": {
+              "description": "Ordered list of target variables receiving sampled perturbations.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/GNSSSensorVariablesFaults"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Clutter fault model.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Random variable used to sample the number of clutter observations. Should be one-dimensional and return non-negative integer values.",
+              "$ref": "#/$defs/RandomVariableTypeConfig",
+              "default": {
+                "lambda": [
+                  10.0
+                ],
+                "type": "Poisson"
+              }
+            },
+            "distributions": {
+              "description": "Random-variable list used to sample clutter observation values.",
+              "type": "array",
+              "default": [
+                {
+                  "max": [
+                    10.0,
+                    10.0
+                  ],
+                  "min": [
+                    -10.0,
+                    -10.0
+                  ],
+                  "type": "Uniform"
+                }
+              ],
+              "items": {
+                "$ref": "#/$defs/RandomVariableTypeConfig"
+              }
+            },
+            "observation_id": {
+              "description": "Identifier assigned to generated clutter observations.",
+              "type": "string",
+              "default": "clutter"
+            },
+            "type": {
+              "type": "string",
+              "const": "Clutter"
+            },
+            "variable_order": {
+              "description": "Optional explicit mapping order from sampled dimensions to variables.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/GNSSSensorVariablesFaults"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Misdetection fault model.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Bernoulli distribution used to decide whether an observation is detected.\n\nThis must be one-dimensional for this model.",
+              "$ref": "#/$defs/BernouilliRandomVariableConfig",
+              "default": {
+                "probability": [
+                  0.10000000149011612
+                ]
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Misdetection"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Plugin-provided external fault model.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "External"
+            }
+          },
+          "$ref": "#/$defs/ExternalFaultConfig",
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Python-implemented fault model.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Python"
+            }
+          },
+          "$ref": "#/$defs/PythonFaultModelConfig",
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "GNSSSensorFilterConfig": {
+      "description": "Configuration enum selecting GNSS sensor filtering strategies\nfor GNSSSensor observations.\n\nWhen multiple filters are applied to a sensor, all must agree to keep the observation.\n\nDefault value: [`GNSSSensorFilterConfig::Range`] with [`RangeFilterConfig::default`].",
+      "oneOf": [
+        {
+          "description": "Range-based filtering on enumerated variables: excludes observations where numeric values fall outside specified bounds.",
+          "type": "object",
+          "properties": {
+            "inside": {
+              "description": "Whether matching values should stay inside (`true`) or outside (`false`) ranges.",
+              "type": "boolean",
+              "default": true
+            },
+            "max_range": {
+              "description": "Inclusive upper bounds associated with `variables`.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            },
+            "min_range": {
+              "description": "Inclusive lower bounds associated with `variables`.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Range"
+            },
+            "variables": {
+              "description": "Ordered list of variables to test.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/GNSSSensorVariablesFilter"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Python-based custom filtering: delegates exclusion logic to user-defined Python methods.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Python"
+            }
+          },
+          "$ref": "#/$defs/PythonFilterConfig",
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "External"
+            }
+          },
+          "$ref": "#/$defs/ExternalFilterConfig",
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "GNSSSensorVariables": {
+      "description": "Variables used by GNSS observations, filters, and fault models.",
+      "oneOf": [
+        {
+          "description": "Global X position.\n\n\nSerialization values(s) for this variable: `x`, `position_x`",
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "description": "Global Y position.\n\n\nSerialization values(s) for this variable: `y`, `position_y`",
+          "type": "string",
+          "const": "y"
+        },
+        {
+          "description": "Global orientation (yaw angle).\n\n\nSerialization values(s) for this variable: `orientation`, `z`",
+          "type": "string",
+          "const": "orientation"
+        },
+        {
+          "description": "Distance to the origin (sqrt(x^2 + y^2)).\n\n\nSerialization values(s) for this variable: `r`, `distance`",
+          "type": "string",
+          "const": "r"
+        },
+        {
+          "description": "Angle to the x-axis (atan2(y, x)).\n\n\nSerialization values(s) for this variable: `theta`, `angle`",
+          "type": "string",
+          "const": "theta"
+        },
+        {
+          "description": "Global velocity in the x direction (in the global frame).\n\n\nSerialization values(s) for this variable: `velocity_x`, `vx`",
+          "type": "string",
+          "const": "velocity_x"
+        },
+        {
+          "description": "Global velocity in the y direction (in the global frame).\n\n\nSerialization values(s) for this variable: `velocity_y`, `vy`",
+          "type": "string",
+          "const": "velocity_y"
+        },
+        {
+          "description": "Self-velocity norm.\n\n\nSerialization values(s) for this variable: `self_velocity`",
+          "type": "string",
+          "const": "self_velocity"
+        }
+      ]
+    },
+    "GNSSSensorVariablesFaults": {
+      "description": "Variables modified by GNSS fault models.",
+      "oneOf": [
+        {
+          "description": "Global X position.\n\n\nSerialization values(s) for this variable: `x`, `position_x`",
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "description": "Global Y position.\n\n\nSerialization values(s) for this variable: `y`, `position_y`",
+          "type": "string",
+          "const": "y"
+        },
+        {
+          "description": "Global orientation (yaw angle).\n\n\nSerialization values(s) for this variable: `orientation`, `z`",
+          "type": "string",
+          "const": "orientation"
+        },
+        {
+          "description": "Distance to the origin (sqrt(x^2 + y^2)).\n\n\nSerialization values(s) for this variable: `r`, `distance`",
+          "type": "string",
+          "const": "r"
+        },
+        {
+          "description": "Angle to the x-axis (atan2(y, x)).\n\n\nSerialization values(s) for this variable: `theta`, `angle`",
+          "type": "string",
+          "const": "theta"
+        },
+        {
+          "description": "Global velocity in the x direction (in the global frame).\n\n\nSerialization values(s) for this variable: `velocity_x`, `vx`",
+          "type": "string",
+          "const": "velocity_x"
+        },
+        {
+          "description": "Global velocity in the y direction (in the global frame).\n\n\nSerialization values(s) for this variable: `velocity_y`, `vy`",
+          "type": "string",
+          "const": "velocity_y"
+        }
+      ]
+    },
+    "GNSSSensorVariablesFilter": {
+      "description": "Variables accepted by GNSS filters.",
+      "oneOf": [
+        {
+          "description": "Global X position.\n\n\nSerialization values(s) for this variable: `x`, `position_x`",
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "description": "Global Y position.\n\n\nSerialization values(s) for this variable: `y`, `position_y`",
+          "type": "string",
+          "const": "y"
+        },
+        {
+          "description": "Global orientation (yaw angle).\n\n\nSerialization values(s) for this variable: `orientation`, `z`",
+          "type": "string",
+          "const": "orientation"
+        },
+        {
+          "description": "Distance to the origin (sqrt(x^2 + y^2)).\n\n\nSerialization values(s) for this variable: `r`, `distance`",
+          "type": "string",
+          "const": "r"
+        },
+        {
+          "description": "Angle to the x-axis (atan2(y, x)).\n\n\nSerialization values(s) for this variable: `theta`, `angle`",
+          "type": "string",
+          "const": "theta"
+        },
+        {
+          "description": "Global velocity in the x direction (in the global frame).\n\n\nSerialization values(s) for this variable: `velocity_x`, `vx`",
+          "type": "string",
+          "const": "velocity_x"
+        },
+        {
+          "description": "Global velocity in the y direction (in the global frame).\n\n\nSerialization values(s) for this variable: `velocity_y`, `vy`",
+          "type": "string",
+          "const": "velocity_y"
+        },
+        {
+          "description": "Self-velocity norm.\n\n\nSerialization values(s) for this variable: `self_velocity`",
+          "type": "string",
+          "const": "self_velocity"
+        }
+      ]
+    },
+    "InternalLog": {
+      "description": "Internal debug categories used when [`LogLevel::Internal`] is selected.",
+      "oneOf": [
+        {
+          "description": "Enable all internal categories.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "All"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Network message lifecycle logs.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "NetworkMessages"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Detailed network message logs.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "NetworkMessagesDetailed"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Setup phase summary logs.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "SetupSteps"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Detailed setup phase logs.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "SetupStepsDetailed"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Sensor manager summary logs.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "SensorManager"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Detailed sensor manager logs.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "SensorManagerDetailed"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Node execution summary logs.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "NodeRunning"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Detailed node execution logs.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "NodeRunningDetailed"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Detailed node synchronization logs.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "NodeSyncDetailed"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "API bridge logs (Python and PluginAPI).",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "API"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Detailed navigator computation logs.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "NavigatorDetailed"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Scenario loading and update logs.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Scenario"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Environment summary logs.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Environment"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Detailed environment logs.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "EnvironmentDetailed"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "LogLevel": {
+      "description": "Global logging level configuration.",
+      "oneOf": [
+        {
+          "description": "Disable all logs.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Off"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Enable only error logs.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Error"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Enable warning and error logs.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Warn"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Enable info, warning, and error logs.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Info"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Enable debug, info, warning, and error logs.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Debug"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Enable debug logs with additional internal category filtering.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Internal"
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/InternalLog"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        }
+      ]
+    },
+    "LoggerConfig": {
+      "description": "Logger configuration applied at simulator startup.",
+      "type": "object",
+      "properties": {
+        "excluded_nodes": {
+          "description": "List of node names to exclude from logs.\n\nEmpty by default, meaning no exclusion filter.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "included_nodes": {
+          "description": "List of node names to include exclusively in logs.\n\nEmpty by default, meaning no inclusion filter.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "log_level": {
+          "description": "Selected global log level.\n\nDefault: [`LogLevel::Info`].",
+          "$ref": "#/$defs/LogLevel",
+          "default": {
+            "type": "Info"
+          }
+        },
+        "outputs": {
+          "description": "List of log targets to which log messages will be sent.\nEach target can be configured with different logging mechanisms (only file for now).\n\nThe logs will always be sent to the console, even if this list is empty.\nAdditional target can be added at runtime using\n[`Context::add_write_target`](crate::context::Context::add_write_target).",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/LoggerTypeConfig"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "LoggerTypeConfig": {
+      "description": "Configuration for different types of log targets, allowing users to specify where log messages should be sent (e.g., console, file, etc.) when configuring the logger.",
+      "oneOf": [
+        {
+          "description": "Write log messages to a file at a specified path. The `value` field should contain the file path where log messages will be written.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "File"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        }
+      ]
+    },
+    "ManagedSensorConfig": {
+      "description": "Configuration of one managed sensor entry.\n\nIt defines the sensor instance, optional destination nodes for forwarded observations,\nand whether the sensor is event-triggered. Observation that are sent to other nodes are also\navailable locally in the node's sensor manager, so they can be used by the node's state estimator.\n\nDefault values:\n- `name`: `\"some_sensor\"`\n- `send_to`: empty vector\n- `triggered`: `false`, setting it to `true` ignore the activation times of the sensor and wait for [`SensorTriggerMessage`] to produce observations.\n- `config`: [`SensorConfig::Speed`] with [`SpeedSensorConfig::default`]",
+      "type": "object",
+      "properties": {
+        "config": {
+          "description": "Concrete sensor configuration.",
+          "$ref": "#/$defs/SensorConfig",
+          "default": {
+            "activation_time": {
+              "offset": null,
+              "period": {
+                "type": "Num",
+                "value": 0.10000000149011612
+              },
+              "table": null
+            },
+            "faults": [],
+            "filters": [],
+            "frame": {
+              "theta": 0.0,
+              "x": 0.0,
+              "y": 0.0
+            },
+            "type": "Speed"
+          }
+        },
+        "name": {
+          "description": "Name used to identify this sensor in records and trigger channels.",
+          "type": "string",
+          "default": "some_sensor"
+        },
+        "send_to": {
+          "description": "Destination node names receiving forwarded observations from this sensor.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "triggered": {
+          "description": "Whether this sensor produces observations only when explicitly triggered.",
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "MapConfig": {
+      "description": "Map containing multiple [`OrientedLandmark`] and possibility for random generation.\n\n# Config Example\n```yaml\nlandmarks:\n  - id: 1\n    x: 3\n    y: 2\n    theta: 0.7854\n    width: 2.8284\n    height: 0\n  - id: 2\n    x: 5.5\n    y: 7\n    theta: 1.5708\n    width: 3\n    height: 1\nrandom:\n  - number:\n      type: Num\n      value: 5\n    distributions:\n      - type: Uniform  \n        min: [0, 0, -3.1416]\n        max: [10, 10, 3.1416]\n    variable_order: [x, y, theta]\n```",
+      "type": "object",
+      "properties": {
+        "landmarks": {
+          "description": "Landmarks contained in the map.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/OrientedLandmarkConfig"
+          }
+        },
+        "random": {
+          "description": "Random generation parameters.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/RandomMap"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "MapVariables": {
+      "description": "Variables of the [`RandomMap`].",
+      "oneOf": [
+        {
+          "description": "X position of the landmark\n\n\nSerialization values(s) for this variable: `x`",
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "description": "Y position of the landmark\n\n\nSerialization values(s) for this variable: `y`",
+          "type": "string",
+          "const": "y"
+        },
+        {
+          "description": "Orientation of the landmark\n\n\nSerialization values(s) for this variable: `theta`, `orientation`",
+          "type": "string",
+          "const": "theta"
+        },
+        {
+          "description": "Height of the landmark\n\n\nSerialization values(s) for this variable: `height`, `h`",
+          "type": "string",
+          "const": "height"
+        },
+        {
+          "description": "Width of the landmark\n\n\nSerialization values(s) for this variable: `width`, `w`",
+          "type": "string",
+          "const": "width"
+        }
+      ]
+    },
+    "NavigatorConfig": {
+      "description": "Enumerate the configuration of the different strategies.\n\nThe navigator computes control errors from a target behavior.",
+      "oneOf": [
+        {
+          "description": "Configuration for [`trajectory_follower::TrajectoryFollower`].",
+          "type": "object",
+          "properties": {
+            "forward_distance": {
+              "description": "Forward projection distance used during map matching, in meters.\n\nDefault: `1.0`.",
+              "type": "number",
+              "format": "float",
+              "default": 1.0
+            },
+            "stop_distance": {
+              "description": "Distance threshold to force stop near the trajectory end, in meters.\n\nDefault: `0.2`.",
+              "type": "number",
+              "format": "float",
+              "default": 0.20000000298023224
+            },
+            "stop_ramp_coefficient": {
+              "description": "Ramp coefficient applied to remaining distance when reducing speed near the end.\n\nDefault: `0.5`, meaning that the target speed will be reduced to 0.5 times the remaining distance when\nthe robot is within `stop_distance` of the end of the trajectory.",
+              "type": "number",
+              "format": "float",
+              "default": 0.5
+            },
+            "target_speed": {
+              "description": "Target linear speed in m/s.\n\nDefault: `0.5`.",
+              "type": "number",
+              "format": "float",
+              "default": 0.5
+            },
+            "trajectory": {
+              "description": "Path to follow.\n\nTo use an external file, use !include path/to/file.yaml. The path is relative to the path of the configuration file.",
+              "$ref": "#/$defs/TrajectoryConfig",
+              "default": {
+                "do_loop": true,
+                "point_list": []
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "TrajectoryFollower"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Configuration for [`external_navigator::ExternalNavigator`].",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "External"
+            }
+          },
+          "$ref": "#/$defs/ExternalNavigatorConfig",
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Configuration for [`python_navigator::PythonNavigator`].",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Python"
+            }
+          },
+          "$ref": "#/$defs/PythonNavigatorConfig",
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Configuration for [`go_to::GoTo`].",
+          "type": "object",
+          "properties": {
+            "stop_distance": {
+              "description": "Distance threshold to force stop near the target point, in meters.\n\nDefault: `0.2`.",
+              "type": "number",
+              "format": "float",
+              "default": 0.20000000298023224
+            },
+            "stop_ramp_coefficient": {
+              "description": "Ramp coefficient applied to remaining distance when reducing speed near the target.\n\nDefault: `0.5`.",
+              "type": "number",
+              "format": "float",
+              "default": 0.5
+            },
+            "target_point": {
+              "description": "Initial target point in world coordinates `[x, y]`.\n\nDefault: `None`.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "default": null,
+              "items": {
+                "type": "number",
+                "format": "float"
+              },
+              "maxItems": 2,
+              "minItems": 2
+            },
+            "target_speed": {
+              "description": "Target linear speed in m/s.\n\nDefault: `0.5`.",
+              "type": "number",
+              "format": "float",
+              "default": 0.5
+            },
+            "type": {
+              "type": "string",
+              "const": "GoTo"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "NetworkConfig": {
+      "description": "Configuration for the [`Network`].",
+      "type": "object",
+      "properties": {
+        "range": {
+          "description": "Maximum communication range in meters.\n\nUse `0.0` to disable range filtering (default: `0.0`).",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
+        },
+        "reception_delay": {
+          "description": "Fixed additional delay applied when receiving messages.\n\nUse `0.0` for no additional delay (default: `0.0`).",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "NumberConfig": {
+      "description": "Numeric configuration value.\n\nThis enum is typically used in higher-level `*Config` structures when a field can be either a\nfixed number or a random variable.\n\nDefault: [`NumberConfig::Num`] with `0.0`.",
+      "oneOf": [
+        {
+          "description": "Deterministic numeric value.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Num"
+            },
+            "value": {
+              "type": "number",
+              "format": "float"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "description": "Random variable description to sample numeric values from.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Rand"
+            },
+            "value": {
+              "$ref": "#/$defs/RandomVariableTypeConfig"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        }
+      ]
+    },
+    "OptimizationConfig": {
+      "description": "Configuration for the simulator optimization settings.\n\nThese settings can speedup the simulation or not depending on the scenario and the hardware.",
+      "type": "object",
+      "properties": {
+        "threads": {
+          "description": "Number of threads to use to run the simulation.\n- If `0`, creates as many threads as there are nodes (+ the main thread).\n- If `1`, runs the simulation in a single thread (no parallelization), which disable synchronization\n  overhead but can be slower for heavy algorithms running on multiple nodes.\n- If `n > 1`, creates a pool of `n` threads to run the simulation.\n\n`0`, `1` and `n > 1` have different running mecanisms:\n- With `0`, each node is run in a separate thread, and there are synchronization points where threads wait for each other.\n- With `1`, all nodes are run sequentially in the main thread, the synchronization is done sequentially and there is no overhead.\n- With `n > 1`, node steps are distributed in a pool of `n` threads, and the synchronization is done outside of the pool.\n\nWith the `monothreaded` Rust feature, only `1` (no parallelization) is supported (other values are ignored with a warning).",
+          "type": "integer",
+          "format": "uint",
+          "default": 0,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "OrientedLandmarkConfig": {
+      "description": "Landmark entry loaded from map data.",
+      "type": "object",
+      "properties": {
+        "height": {
+          "description": "Height of the landmark used for obstruction checks.\n\nUse `0.0` for fully transparent landmarks. Default is `1.0` for non-transparent landmarks.",
+          "type": "number",
+          "format": "float",
+          "default": 1.0
+        },
+        "id": {
+          "description": "Unique landmark identifier.",
+          "type": "integer",
+          "format": "int32",
+          "default": 0
+        },
+        "labels": {
+          "description": "Optional semantic labels associated with this landmark.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "theta": {
+          "description": "Landmark orientation in radians.",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
+        },
+        "width": {
+          "description": "Landmark width, in meters.\n\nCan be `0.0` for point-like landmarks.",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
+        },
+        "x": {
+          "description": "Landmark x position.",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
+        },
+        "y": {
+          "description": "Landmark y position.",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "OrientedLandmarkSensorFaultModelConfig": {
+      "description": "Configuration enum selecting oriented-landmark fault model strategies.\n\nDefault value: [`OrientedLandmarkSensorFaultModelConfig::AdditiveRobotCentered`] with\n[`AdditiveFaultConfig::default`].",
+      "oneOf": [
+        {
+          "description": "Additive fault model in robot-centered coordinates.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Bernoulli trigger deciding whether the additive fault is applied.",
+              "$ref": "#/$defs/BernouilliRandomVariableConfig",
+              "default": {
+                "probability": [
+                  1.0
+                ]
+              }
+            },
+            "distributions": {
+              "description": "Random distributions used to sample additive perturbations.",
+              "type": "array",
+              "default": [
+                {
+                  "covariance": [
+                    1.0
+                  ],
+                  "mean": [
+                    0.0
+                  ],
+                  "type": "Normal"
+                }
+              ],
+              "items": {
+                "$ref": "#/$defs/RandomVariableTypeConfig"
+              }
+            },
+            "proportional_factor": {
+              "description": "Optional multiplicative factor applied to the proportional value.",
+              "type": [
+                "number",
+                "null"
+              ],
+              "format": "float",
+              "default": null
+            },
+            "proportional_to": {
+              "description": "Optional variable used as a proportional scaling source.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/OrientedLandmarkSensorVariables"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "AdditiveRobotCentered"
+            },
+            "variable_order": {
+              "description": "Ordered list of target variables receiving sampled perturbations.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/OrientedLandmarkSensorVariablesFaults"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Additive fault model in observation-centered coordinates.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Bernoulli trigger deciding whether the additive fault is applied.",
+              "$ref": "#/$defs/BernouilliRandomVariableConfig",
+              "default": {
+                "probability": [
+                  1.0
+                ]
+              }
+            },
+            "distributions": {
+              "description": "Random distributions used to sample additive perturbations.",
+              "type": "array",
+              "default": [
+                {
+                  "covariance": [
+                    1.0
+                  ],
+                  "mean": [
+                    0.0
+                  ],
+                  "type": "Normal"
+                }
+              ],
+              "items": {
+                "$ref": "#/$defs/RandomVariableTypeConfig"
+              }
+            },
+            "proportional_factor": {
+              "description": "Optional multiplicative factor applied to the proportional value.",
+              "type": [
+                "number",
+                "null"
+              ],
+              "format": "float",
+              "default": null
+            },
+            "proportional_to": {
+              "description": "Optional variable used as a proportional scaling source.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/OrientedLandmarkSensorVariables"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "AdditiveObservationCentered"
+            },
+            "variable_order": {
+              "description": "Ordered list of target variables receiving sampled perturbations.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/OrientedLandmarkSensorVariablesFaults"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Clutter fault model.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Random variable used to sample the number of clutter observations. Should be one-dimensional and return non-negative integer values.",
+              "$ref": "#/$defs/RandomVariableTypeConfig",
+              "default": {
+                "lambda": [
+                  10.0
+                ],
+                "type": "Poisson"
+              }
+            },
+            "distributions": {
+              "description": "Random-variable list used to sample clutter observation values.",
+              "type": "array",
+              "default": [
+                {
+                  "max": [
+                    10.0,
+                    10.0
+                  ],
+                  "min": [
+                    -10.0,
+                    -10.0
+                  ],
+                  "type": "Uniform"
+                }
+              ],
+              "items": {
+                "$ref": "#/$defs/RandomVariableTypeConfig"
+              }
+            },
+            "observation_id": {
+              "description": "Identifier assigned to generated clutter observations.",
+              "type": "string",
+              "default": "clutter"
+            },
+            "type": {
+              "type": "string",
+              "const": "Clutter"
+            },
+            "variable_order": {
+              "description": "Optional explicit mapping order from sampled dimensions to variables.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/OrientedLandmarkSensorVariablesFaults"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Misdetection fault model.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Bernoulli distribution used to decide whether an observation is detected.\n\nThis must be one-dimensional for this model.",
+              "$ref": "#/$defs/BernouilliRandomVariableConfig",
+              "default": {
+                "probability": [
+                  0.10000000149011612
+                ]
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Misdetection"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Misassociation fault model.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Bernoulli variable controlling whether misassociation is triggered.",
+              "$ref": "#/$defs/BernouilliRandomVariableConfig",
+              "default": {
+                "probability": [
+                  0.10000000149011612
+                ]
+              }
+            },
+            "distribution": {
+              "description": "Random variable used to sample the candidate index.",
+              "$ref": "#/$defs/RandomVariableTypeConfig",
+              "default": {
+                "max": [
+                  10.0
+                ],
+                "min": [
+                  0.0
+                ],
+                "type": "Uniform"
+              }
+            },
+            "sort": {
+              "description": "Strategy used to order candidate labels before sampling.",
+              "$ref": "#/$defs/Sort",
+              "default": {
+                "type": "Random"
+              }
+            },
+            "source": {
+              "description": "Source from which candidate labels are collected.",
+              "$ref": "#/$defs/Source",
+              "default": {
+                "type": "Robots"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Misassociation"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Plugin-provided external fault model.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "External"
+            }
+          },
+          "$ref": "#/$defs/ExternalFaultConfig",
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Python-implemented fault model.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Python"
+            }
+          },
+          "$ref": "#/$defs/PythonFaultModelConfig",
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "OrientedLandmarkSensorFilterConfig": {
+      "description": "Configuration enum selecting among multiple sensor observation filtering strategies for oriented-landmark sensors.\n\nThis enum provides a unified interface for declaring sensor filters with different decision logic.\nEach variant wraps the configuration for a specific filter type.\nWhen multiple filters are applied to a sensor, all must agree to keep the observation.\n\nDefault value: [`OrientedLandmarkSensorFilterConfig::Range`] with [`RangeFilterConfig::default`].\n\n# Config example:\n```yaml\nfilters:\n  - type: Range\n    variables: [r, theta]\n    max_range: [100, 1.57]\n    min_range: [1., -1.57]\n    inside: true\n```",
+      "oneOf": [
+        {
+          "description": "Range-based filtering on enumerated variables: excludes observations where numeric values fall outside specified bounds.",
+          "type": "object",
+          "properties": {
+            "inside": {
+              "description": "Whether matching values should stay inside (`true`) or outside (`false`) ranges.",
+              "type": "boolean",
+              "default": true
+            },
+            "max_range": {
+              "description": "Inclusive upper bounds associated with `variables`.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            },
+            "min_range": {
+              "description": "Inclusive lower bounds associated with `variables`.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Range"
+            },
+            "variables": {
+              "description": "Ordered list of variables to test.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/OrientedLandmarkSensorVariablesFilter"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "String pattern filtering on observed object unique id (name for nodes, id for landmarks): excludes observations matching configured regexp patterns.",
+          "type": "object",
+          "properties": {
+            "accepted": {
+              "description": "Strings to accept. Can be regexp patterns.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "string"
+              }
+            },
+            "priority_accept": {
+              "description": "How to manage intersection between accepted and rejected sets.\nIf true, when a string is in the accepted and rejected sets, it is accepted.",
+              "type": "boolean",
+              "default": true
+            },
+            "rejected": {
+              "description": "Strings to reject. Can be regexp patterns.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "string"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Id"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "String pattern filtering on observed object labels: excludes observations matching configured regexp patterns.",
+          "type": "object",
+          "properties": {
+            "accepted": {
+              "description": "Strings to accept. Can be regexp patterns.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "string"
+              }
+            },
+            "priority_accept": {
+              "description": "How to manage intersection between accepted and rejected sets.\nIf true, when a string is in the accepted and rejected sets, it is accepted.",
+              "type": "boolean",
+              "default": true
+            },
+            "rejected": {
+              "description": "Strings to reject. Can be regexp patterns.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "string"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Label"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Python-based custom filtering: delegates exclusion logic to user-defined Python methods.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Python"
+            }
+          },
+          "$ref": "#/$defs/PythonFilterConfig",
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "External"
+            }
+          },
+          "$ref": "#/$defs/ExternalFilterConfig",
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "OrientedLandmarkSensorVariables": {
+      "description": "Variables used by oriented-landmark observations, filters, and fault models.",
+      "oneOf": [
+        {
+          "description": "Relative X coordinate.\n\n\nSerialization values(s) for this variable: `x`",
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "description": "Relative Y coordinate.\n\n\nSerialization values(s) for this variable: `y`",
+          "type": "string",
+          "const": "y"
+        },
+        {
+          "description": "Relative orientation of the landmark with respect to the robot.\n\n\nSerialization values(s) for this variable: `orientation`",
+          "type": "string",
+          "const": "orientation"
+        },
+        {
+          "description": "Relative distance to the landmark.\n\n\nSerialization values(s) for this variable: `r`, `range`, `d`, `distance`",
+          "type": "string",
+          "const": "r"
+        },
+        {
+          "description": "Relative bearing of the landmark.\n\n\nSerialization values(s) for this variable: `theta`, `bearing`",
+          "type": "string",
+          "const": "theta"
+        },
+        {
+          "description": "Width of the landmark.\n\n\nSerialization values(s) for this variable: `width`",
+          "type": "string",
+          "const": "width"
+        },
+        {
+          "description": "Absolute height of the landmark.\n\n\nSerialization values(s) for this variable: `height`",
+          "type": "string",
+          "const": "height"
+        },
+        {
+          "description": "Absolute observer linear velocity\n\n\nSerialization values(s) for this variable: `self_velocity`",
+          "type": "string",
+          "const": "self_velocity"
+        }
+      ]
+    },
+    "OrientedLandmarkSensorVariablesFaults": {
+      "description": "Variables modified by fault models.",
+      "oneOf": [
+        {
+          "description": "Relative X coordinate.\n\n\nSerialization values(s) for this variable: `x`",
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "description": "Relative Y coordinate.\n\n\nSerialization values(s) for this variable: `y`",
+          "type": "string",
+          "const": "y"
+        },
+        {
+          "description": "Relative orientation of the landmark with respect to the robot.\n\n\nSerialization values(s) for this variable: `orientation`",
+          "type": "string",
+          "const": "orientation"
+        },
+        {
+          "description": "Relative distance to the landmark.\n\n\nSerialization values(s) for this variable: `r`, `range`, `d`, `distance`",
+          "type": "string",
+          "const": "r"
+        },
+        {
+          "description": "Relative bearing of the landmark.\n\n\nSerialization values(s) for this variable: `theta`, `bearing`",
+          "type": "string",
+          "const": "theta"
+        },
+        {
+          "description": "Width of the landmark.\n\n\nSerialization values(s) for this variable: `width`",
+          "type": "string",
+          "const": "width"
+        },
+        {
+          "description": "Absolute height of the landmark.\n\n\nSerialization values(s) for this variable: `height`",
+          "type": "string",
+          "const": "height"
+        }
+      ]
+    },
+    "OrientedLandmarkSensorVariablesFilter": {
+      "description": "Variables accepted by sensor filters.",
+      "oneOf": [
+        {
+          "description": "Relative X coordinate.\n\n\nSerialization values(s) for this variable: `x`",
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "description": "Relative Y coordinate.\n\n\nSerialization values(s) for this variable: `y`",
+          "type": "string",
+          "const": "y"
+        },
+        {
+          "description": "Relative orientation of the landmark with respect to the robot.\n\n\nSerialization values(s) for this variable: `orientation`",
+          "type": "string",
+          "const": "orientation"
+        },
+        {
+          "description": "Relative distance to the landmark.\n\n\nSerialization values(s) for this variable: `r`, `range`, `d`, `distance`",
+          "type": "string",
+          "const": "r"
+        },
+        {
+          "description": "Relative bearing of the landmark.\n\n\nSerialization values(s) for this variable: `theta`, `bearing`",
+          "type": "string",
+          "const": "theta"
+        },
+        {
+          "description": "Width of the landmark.\n\n\nSerialization values(s) for this variable: `width`",
+          "type": "string",
+          "const": "width"
+        },
+        {
+          "description": "Absolute height of the landmark.\n\n\nSerialization values(s) for this variable: `height`",
+          "type": "string",
+          "const": "height"
+        },
+        {
+          "description": "Absolute observer linear velocity\n\n\nSerialization values(s) for this variable: `self_velocity`",
+          "type": "string",
+          "const": "self_velocity"
+        }
+      ]
+    },
+    "PeriodicityConfig": {
+      "description": "Configuration of a periodic trigger.\n\nIt defines a period (fixed or random), an optional offset, and an optional\nintra-period activation table.",
+      "type": "object",
+      "properties": {
+        "offset": {
+          "description": "Initial offset before the first activation.\n\nIf `None`, the offset defaults to the sampled period value.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NumberConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "period": {
+          "description": "Main period duration between activations.",
+          "$ref": "#/$defs/NumberConfig",
+          "default": {
+            "type": "Num",
+            "value": 1.0
+          }
+        },
+        "table": {
+          "description": "Optional list of activation times inside each period.\n\nValues are interpreted as offsets within one period. Values should be positive and within the period duration. If not empty, activations are scheduled according to this table.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "default": null,
+          "items": {
+            "type": "number",
+            "format": "float"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "PhysicsConfig": {
+      "description": "Enumeration of the different physic implementations.",
+      "oneOf": [
+        {
+          "description": "Built-in Rust internal physics implementation.",
+          "type": "object",
+          "properties": {
+            "faults": {
+              "description": "Physics fault model configurations applied after each update.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/PhysicsFaultModelConfig"
+              }
+            },
+            "initial_state": {
+              "description": "Starting state.",
+              "$ref": "#/$defs/StateConfig",
+              "default": {
+                "pose": [
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                "random": [],
+                "variable_order": [],
+                "velocity": [
+                  0.0,
+                  0.0
+                ]
+              }
+            },
+            "model": {
+              "description": "Robot kinematic model configuration.",
+              "$ref": "#/$defs/RobotModelConfig",
+              "default": {
+                "type": "Unicycle",
+                "wheel_distance": 0.25
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Internal"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "External plugin-provided physics implementation.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "External"
+            }
+          },
+          "$ref": "#/$defs/ExternalPhysicsConfig",
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Python-backed physics implementation.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Python"
+            }
+          },
+          "$ref": "#/$defs/PythonPhysicsConfig",
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "PhysicsFaultModelConfig": {
+      "description": "Configuration enum for physics fault models.\n\nDefault value (generated by `#[config_derives]`):\n[`PhysicsFaultModelConfig::AdditiveRobotCentered`] with\n[`AdditiveRobotCenteredPhysicsFaultConfig::default`].",
+      "oneOf": [
+        {
+          "description": "Additive physics fault model in robot-centered coordinates.",
+          "type": "object",
+          "properties": {
+            "distributions": {
+              "description": "Random distributions used to sample additive perturbations.",
+              "type": "array",
+              "default": [
+                {
+                  "covariance": [
+                    1.0
+                  ],
+                  "mean": [
+                    0.0
+                  ],
+                  "type": "Normal"
+                }
+              ],
+              "items": {
+                "$ref": "#/$defs/RandomVariableTypeConfig"
+              }
+            },
+            "proportional_factor": {
+              "description": "Multiplicative factor applied to the proportional variable value.",
+              "type": [
+                "number",
+                "null"
+              ],
+              "format": "float",
+              "default": 1.0
+            },
+            "proportional_to": {
+              "description": "If some, the faults will be proportional to the robot velocity times this factor.\nIf none, the faults will be independant of the robot velocity.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PhysicsVariables"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "velocity"
+            },
+            "type": {
+              "type": "string",
+              "const": "AdditiveRobotCentered"
+            },
+            "variable_order": {
+              "description": "Optional explicit mapping from sampled dimensions to physics variables.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/PhysicsVariables"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "PhysicsVariables": {
+      "description": "Variables used by the AdditiveRobotCentered physics fault model.",
+      "oneOf": [
+        {
+          "description": "X coordinate of the robot pose.\n\n\nSerialization values(s) for this variable: `x`",
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "description": "Y coordinate of the robot pose.\n\n\nSerialization values(s) for this variable: `y`",
+          "type": "string",
+          "const": "y"
+        },
+        {
+          "description": "Orientation of the robot pose.\n\n\nSerialization values(s) for this variable: `orientation`, `z`",
+          "type": "string",
+          "const": "orientation"
+        },
+        {
+          "description": "Norm of the robot linear velocity.\n\n\nSerialization values(s) for this variable: `velocity`, `v`",
+          "type": "string",
+          "const": "velocity"
+        },
+        {
+          "description": "Longitudinal velocity.\n\n\nSerialization values(s) for this variable: `velocity_x`, `vx`",
+          "type": "string",
+          "const": "velocity_x"
+        },
+        {
+          "description": "Lateral velocity.\n\n\nSerialization values(s) for this variable: `velocity_y`, `vy`",
+          "type": "string",
+          "const": "velocity_y"
+        }
+      ]
+    },
+    "ProfileExporterConfig": {
+      "description": "Configuraition for the profiler exporter. It allows to select the type of exporter to use, and to configure it if needed.",
+      "oneOf": [
+        {
+          "description": "Exporter for the Chrome Trace Event format. It exports the time analysis results in a format compatible with the Chrome Trace Event format, which can be visualized with the Chrome Trace Viewer or Firefox Performance Tools.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "TraceEventExporter"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "ProximityEventTriggerConfig": {
+      "description": "Proximity trigger configuration.\n\nDefault values:\n- `protected_target`: `None`\n- `distance`: `1.0`\n- `inside`: `true`",
+      "type": "object",
+      "properties": {
+        "distance": {
+          "description": "Distance threshold for trigger evaluation.",
+          "type": "number",
+          "format": "float",
+          "default": 1.0
+        },
+        "inside": {
+          "description": "If `true`, trigger when distance is below threshold; otherwise above.",
+          "type": "boolean",
+          "default": true
+        },
+        "protected_target": {
+          "description": "Optional target name to protect from trigger activation.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "PythonControllerConfig": {
+      "type": "object",
+      "additionalProperties": true,
+      "class_name": {
+        "type": "string"
+      },
+      "file": {
+        "type": "string"
+      }
+    },
+    "PythonEstimatorConfig": {
+      "type": "object",
+      "additionalProperties": true,
+      "class_name": {
+        "type": "string"
+      },
+      "file": {
+        "type": "string"
+      }
+    },
+    "PythonFaultModelConfig": {
+      "type": "object",
+      "additionalProperties": true,
+      "class_name": {
+        "type": "string"
+      },
+      "file": {
+        "type": "string"
+      }
+    },
+    "PythonFilterConfig": {
+      "type": "object",
+      "additionalProperties": true,
+      "class_name": {
+        "type": "string"
+      },
+      "file": {
+        "type": "string"
+      }
+    },
+    "PythonNavigatorConfig": {
+      "type": "object",
+      "additionalProperties": true,
+      "class_name": {
+        "type": "string"
+      },
+      "file": {
+        "type": "string"
+      }
+    },
+    "PythonPhysicsConfig": {
+      "type": "object",
+      "additionalProperties": true,
+      "class_name": {
+        "type": "string"
+      },
+      "file": {
+        "type": "string"
+      }
+    },
+    "RandomMap": {
+      "description": "Configuration for generating random landmarks in the map.",
+      "type": "object",
+      "properties": {
+        "distributions": {
+          "description": "List of distributions to generate the landmarks. The order should be consistent\nwith `variable_order`.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/RandomVariableTypeConfig"
+          }
+        },
+        "number": {
+          "description": "Number of landmarks to generate randomly.",
+          "$ref": "#/$defs/NumberConfig",
+          "default": {
+            "type": "Num",
+            "value": 0.0
+          }
+        },
+        "variable_order": {
+          "description": "Ordered list of target variables receiving sampled perturbations.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/MapVariables"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "RandomVariableTypeConfig": {
+      "description": "Configuration of random-variable type and parameters.",
+      "oneOf": [
+        {
+          "description": "No random variable",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "None"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Fixed value",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Fixed"
+            },
+            "values": {
+              "description": "Fixed value to return.",
+              "type": "array",
+              "default": [
+                0.0
+              ],
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Uniform distribution",
+          "type": "object",
+          "properties": {
+            "max": {
+              "description": "Maximum value of the uniform distribution.",
+              "type": "array",
+              "default": [
+                1.0
+              ],
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            },
+            "min": {
+              "description": "Minimum value of the uniform distribution.",
+              "type": "array",
+              "default": [
+                -1.0
+              ],
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Uniform"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Normal distribution",
+          "type": "object",
+          "properties": {
+            "covariance": {
+              "description": "Flattened covariance matrix of the multivariate normal distribution.",
+              "type": "array",
+              "default": [
+                1.0
+              ],
+              "items": {
+                "type": "number",
+                "format": "double"
+              }
+            },
+            "mean": {
+              "description": "Mean of the multivariate normal distribution.",
+              "type": "array",
+              "default": [
+                0.0
+              ],
+              "items": {
+                "type": "number",
+                "format": "double"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Normal"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Poisson distribution.",
+          "type": "object",
+          "properties": {
+            "lambda": {
+              "description": "Lambda parameter(s) of the Poisson distribution. Must be non-negative.",
+              "type": "array",
+              "default": [
+                1.0
+              ],
+              "items": {
+                "type": "number",
+                "format": "double"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Poisson"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Exponential distribution.",
+          "type": "object",
+          "properties": {
+            "lambda": {
+              "description": "Rate parameters (`lambda`) of the exponential distributions.",
+              "type": "array",
+              "default": [
+                1.0
+              ],
+              "items": {
+                "type": "number",
+                "format": "double"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Exponential"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "RayConfig": {
+      "description": "Configuration of scan ray definitions.",
+      "oneOf": [
+        {
+          "description": "Uniform angular distribution over `2*pi` with the given number of rays.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Regular"
+            },
+            "value": {
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "description": "Explicit list of ray angles in degrees.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "DegreeTable"
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "description": "Explicit list of ray angles in radians.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "RadianTable"
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        }
+      ]
+    },
+    "ResultConfig": {
+      "description": "Configuration controlling result persistence and post-processing.",
+      "type": "object",
+      "properties": {
+        "analyse_script": {
+          "description": "Path to the Python analysis script (path from config location).\nThis script should have the following entry point:\n```def analyse(records: list, config: dict, figure_path: str, figure_type: str, additional_param: dict|None)```\nIf this option is `None`, the script is not executed.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "figures_path": {
+          "description": "Optional output directory for generated figures (path from config location).",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "python_params": {
+          "description": "Arbitrary parameters forwarded to the analysis script (additional_param in the script entry point). This can be used to forward any custom configuration to the analysis script without having to add it to the simulator configuration.",
+          "default": null
+        },
+        "result_path": {
+          "description": "Filename to save the results, in JSON format. The directory of this\nfile is used to save the figures if results are computed.\n\nPath from config location.\n\nIf `None`, results are not saved on disk but can still be forwarded to the analysis script.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "save_mode": {
+          "description": "Result save mode.",
+          "$ref": "#/$defs/ResultSaveMode",
+          "default": {
+            "type": "AtTheEnd"
+          }
+        },
+        "show_figures": {
+          "description": "Show the matplotlib figures (call `plt.show()`)",
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "ResultSaveMode": {
+      "description": "Strategy used to save simulation results on disk.",
+      "oneOf": [
+        {
+          "description": "Save once when the simulation ends.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "AtTheEnd"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Save continuously as records are produced.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Continuous"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Save every `N` records.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Batch"
+            },
+            "value": {
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "description": "Save every `period` seconds of simulated time.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Periodic"
+            },
+            "value": {
+              "type": "number",
+              "format": "float"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
+        }
+      ]
+    },
+    "RobotConfig": {
+      "description": "Configuration of the [`NodeType::Robot`].\n\nThis configuration defines the different modules composing the robot, as well as their configuration.\n\nDefault values:\n- `name`: `\"NoName\"`\n- `navigator`: default [`go_to::GoToConfig`]\n- `controller`: default [`pid::PIDConfig`]\n- `physics`: default [`internal_physics::InternalPhysicConfig`]\n- `state_estimator`: default [`perfect_estimator::PerfectEstimatorConfig`]\n- `sensor_manager`: [`SensorManagerConfig::default`]\n- `network`: [`NetworkConfig::default`]\n- `state_estimator_bench`: empty vector\n- `autospawn`: `true`\n- `labels`: empty vector\n\n# Example\n```yaml\nrobots:\n- name: robot2\n  navigator:\n    type: TrajectoryFollower\n    trajectory_path: path.yaml\n    forward_distance: 0.2\n    target_speed: 0.3\n    stop_distance: 0.2\n    stop_ramp_coefficient: 0.5\n  controller:\n    type: PID\n  physics:\n    type: Internal\n    model:\n      type: Unicycle\n      wheel_distance: 0.25\n    initial_state:\n      random:\n        - type: Uniform\n          min:\n          - -5.0\n          - -5.0\n          - -3.1416\n          max:\n          - 5.0\n          - 5.0\n          - 3.1416\n      variable_order: [x, y, orientation]\n    faults: []\n  state_estimator:\n    type: Perfect\n    prediction_activation:\n      period: {type: Num, value: 0.1}\n    targets:\n    - self\n  sensor_manager:\n    sensors:\n    - name: RobotSensor\n      send_to:\n      - Central Unit\n      config:\n        type: Robot\n        detection_distance: 100.0\n        activation_time:\n          period: {type: Num, value: 0.1}\n        faults: []\n        filters:\n          - type: Range\n            variables: [x, y]\n            min_range: [0, -1]\n            max_range: [10, 1]\n  network:\n    range: 10.0\n    reception_delay: 0.1\n  state_estimator_bench: []\n```",
+      "type": "object",
+      "properties": {
+        "autospawn": {
+          "description": "If `true`, node starts in running state when created.",
+          "type": "boolean",
+          "default": true
+        },
+        "controller": {
+          "description": "[`Controller`](crate::controllers::Controller) to use, and its configuration.",
+          "$ref": "#/$defs/ControllerConfig",
+          "default": {
+            "derivative_gains": [],
+            "integral_gains": [],
+            "proportional_gains": [],
+            "robot_model": null,
+            "type": "PID"
+          }
+        },
+        "labels": {
+          "description": "Free-form labels attached to the node metadata.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "description": "Name of the robot. Will be used in the `model_name` field as well.",
+          "type": "string",
+          "default": "NoName"
+        },
+        "navigator": {
+          "description": "[`Navigator`](crate::navigators::Navigator) to use, and its configuration.",
+          "$ref": "#/$defs/NavigatorConfig",
+          "default": {
+            "stop_distance": 0.20000000298023224,
+            "stop_ramp_coefficient": 0.5,
+            "target_point": null,
+            "target_speed": 0.5,
+            "type": "GoTo"
+          }
+        },
+        "network": {
+          "description": "[`Network`] configuration.",
+          "$ref": "#/$defs/NetworkConfig",
+          "default": {
+            "range": 0.0,
+            "reception_delay": 0.0
+          }
+        },
+        "physics": {
+          "description": "[`Physics`](crate::physics::Physics) to use, and its configuration.",
+          "$ref": "#/$defs/PhysicsConfig",
+          "default": {
+            "faults": [],
+            "initial_state": {
+              "pose": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "random": [],
+              "variable_order": [],
+              "velocity": [
+                0.0,
+                0.0
+              ]
+            },
+            "model": {
+              "type": "Unicycle",
+              "wheel_distance": 0.25
+            },
+            "type": "Internal"
+          }
+        },
+        "sensor_manager": {
+          "description": "[`SensorManager`] configuration, which defines the [`Sensor`](crate::sensors::Sensor)s used.",
+          "$ref": "#/$defs/SensorManagerConfig",
+          "default": {
+            "sensors": []
+          }
+        },
+        "state_estimator": {
+          "description": "[`StateEstimator`](crate::state_estimators::StateEstimator) to use, and its configuration.",
+          "$ref": "#/$defs/StateEstimatorConfig",
+          "default": {
+            "prediction_activation": {
+              "offset": null,
+              "period": {
+                "type": "Num",
+                "value": 0.10000000149011612
+              },
+              "table": null
+            },
+            "targets": [
+              "self"
+            ],
+            "type": "Perfect"
+          }
+        },
+        "state_estimator_bench": {
+          "description": "Additional [`StateEstimator`](crate::state_estimators::StateEstimator) to be evaluated but without a feedback\nloop with the [`Navigator`](crate::navigators::Navigator)",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/BenchStateEstimatorConfig"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "RobotModelConfig": {
+      "description": "Configuration enum selecting the robot kinematic model.\n\nPlease note that the robot model is transfered from the Physics configuration to\nother modules (e.g. controller) if it differs or is not provided.\n\nDefault value: [`RobotModelConfig::Unicycle`] with [`UnicycleConfig::default`].",
+      "oneOf": [
+        {
+          "description": "Differential-drive unicycle model configuration.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Unicycle"
+            },
+            "wheel_distance": {
+              "description": "Distance between the two wheels, to compute the angular velocity from the wheel speeds.",
+              "type": "number",
+              "format": "float",
+              "default": 0.25
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Holonomic model configuration.",
+          "type": "object",
+          "properties": {
+            "max_angular_velocity": {
+              "description": "Maximum absolute angular velocity.",
+              "type": "number",
+              "format": "float",
+              "default": 1.0
+            },
+            "max_lateral_velocity": {
+              "description": "Maximum absolute lateral velocity.",
+              "type": "number",
+              "format": "float",
+              "default": 10.0
+            },
+            "max_longitudinal_velocity": {
+              "description": "Maximum absolute longitudinal velocity.",
+              "type": "number",
+              "format": "float",
+              "default": 10.0
+            },
+            "type": {
+              "type": "string",
+              "const": "Holonomic"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "RobotSensorFaultModelConfig": {
+      "description": "Configuration enum selecting robot sensor fault model strategies.\n\nDefault value: [`RobotSensorFaultModelConfig::AdditiveRobotCentered`] with\n[`AdditiveFaultConfig::default`].",
+      "oneOf": [
+        {
+          "description": "Additive fault model in robot-centered coordinates.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Bernoulli trigger deciding whether the additive fault is applied.",
+              "$ref": "#/$defs/BernouilliRandomVariableConfig",
+              "default": {
+                "probability": [
+                  1.0
+                ]
+              }
+            },
+            "distributions": {
+              "description": "Random distributions used to sample additive perturbations.",
+              "type": "array",
+              "default": [
+                {
+                  "covariance": [
+                    1.0
+                  ],
+                  "mean": [
+                    0.0
+                  ],
+                  "type": "Normal"
+                }
+              ],
+              "items": {
+                "$ref": "#/$defs/RandomVariableTypeConfig"
+              }
+            },
+            "proportional_factor": {
+              "description": "Optional multiplicative factor applied to the proportional value.",
+              "type": [
+                "number",
+                "null"
+              ],
+              "format": "float",
+              "default": null
+            },
+            "proportional_to": {
+              "description": "Optional variable used as a proportional scaling source.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/RobotSensorVariables"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "AdditiveRobotCentered"
+            },
+            "variable_order": {
+              "description": "Ordered list of target variables receiving sampled perturbations.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RobotSensorVariablesFaults"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Additive fault model in observation-centered coordinates.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Bernoulli trigger deciding whether the additive fault is applied.",
+              "$ref": "#/$defs/BernouilliRandomVariableConfig",
+              "default": {
+                "probability": [
+                  1.0
+                ]
+              }
+            },
+            "distributions": {
+              "description": "Random distributions used to sample additive perturbations.",
+              "type": "array",
+              "default": [
+                {
+                  "covariance": [
+                    1.0
+                  ],
+                  "mean": [
+                    0.0
+                  ],
+                  "type": "Normal"
+                }
+              ],
+              "items": {
+                "$ref": "#/$defs/RandomVariableTypeConfig"
+              }
+            },
+            "proportional_factor": {
+              "description": "Optional multiplicative factor applied to the proportional value.",
+              "type": [
+                "number",
+                "null"
+              ],
+              "format": "float",
+              "default": null
+            },
+            "proportional_to": {
+              "description": "Optional variable used as a proportional scaling source.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/RobotSensorVariables"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "AdditiveObservationCentered"
+            },
+            "variable_order": {
+              "description": "Ordered list of target variables receiving sampled perturbations.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RobotSensorVariablesFaults"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Clutter fault model.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Random variable used to sample the number of clutter observations. Should be one-dimensional and return non-negative integer values.",
+              "$ref": "#/$defs/RandomVariableTypeConfig",
+              "default": {
+                "lambda": [
+                  10.0
+                ],
+                "type": "Poisson"
+              }
+            },
+            "distributions": {
+              "description": "Random-variable list used to sample clutter observation values.",
+              "type": "array",
+              "default": [
+                {
+                  "max": [
+                    10.0,
+                    10.0
+                  ],
+                  "min": [
+                    -10.0,
+                    -10.0
+                  ],
+                  "type": "Uniform"
+                }
+              ],
+              "items": {
+                "$ref": "#/$defs/RandomVariableTypeConfig"
+              }
+            },
+            "observation_id": {
+              "description": "Identifier assigned to generated clutter observations.",
+              "type": "string",
+              "default": "clutter"
+            },
+            "type": {
+              "type": "string",
+              "const": "Clutter"
+            },
+            "variable_order": {
+              "description": "Optional explicit mapping order from sampled dimensions to variables.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RobotSensorVariablesFaults"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Misdetection fault model.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Bernoulli distribution used to decide whether an observation is detected.\n\nThis must be one-dimensional for this model.",
+              "$ref": "#/$defs/BernouilliRandomVariableConfig",
+              "default": {
+                "probability": [
+                  0.10000000149011612
+                ]
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Misdetection"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Misassociation fault model.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Bernoulli variable controlling whether misassociation is triggered.",
+              "$ref": "#/$defs/BernouilliRandomVariableConfig",
+              "default": {
+                "probability": [
+                  0.10000000149011612
+                ]
+              }
+            },
+            "distribution": {
+              "description": "Random variable used to sample the candidate index.",
+              "$ref": "#/$defs/RandomVariableTypeConfig",
+              "default": {
+                "max": [
+                  10.0
+                ],
+                "min": [
+                  0.0
+                ],
+                "type": "Uniform"
+              }
+            },
+            "sort": {
+              "description": "Strategy used to order candidate labels before sampling.",
+              "$ref": "#/$defs/Sort",
+              "default": {
+                "type": "Random"
+              }
+            },
+            "source": {
+              "description": "Source from which candidate labels are collected.",
+              "$ref": "#/$defs/Source",
+              "default": {
+                "type": "Robots"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Misassociation"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Python-implemented fault model.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Python"
+            }
+          },
+          "$ref": "#/$defs/PythonFaultModelConfig",
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Plugin-provided external fault model.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "External"
+            }
+          },
+          "$ref": "#/$defs/ExternalFaultConfig",
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "RobotSensorFilterConfig": {
+      "description": "Configuration enum selecting among multiple sensor observation filtering strategies for robot sensors.\n\nThis enum provides a unified interface for declaring sensor filters with different decision logic.\nEach variant wraps the configuration for a specific filter type.\nWhen multiple filters are applied to a sensor, all must agree to keep the observation.\n\nDefault value: [`RobotSensorFilterConfig::Range`] with [`RangeFilterConfig::default`].\n\n# Config example:\n```yaml\nfilters:\n  - type: Range\n    variables: [r, theta]\n    max_range: [100, 1.57]\n    min_range: [1., -1.57]\n    inside: true\n```",
+      "oneOf": [
+        {
+          "description": "Range-based filtering on enumerated variables: excludes observations where numeric values fall outside specified bounds.",
+          "type": "object",
+          "properties": {
+            "inside": {
+              "description": "Whether matching values should stay inside (`true`) or outside (`false`) ranges.",
+              "type": "boolean",
+              "default": true
+            },
+            "max_range": {
+              "description": "Inclusive upper bounds associated with `variables`.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            },
+            "min_range": {
+              "description": "Inclusive lower bounds associated with `variables`.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Range"
+            },
+            "variables": {
+              "description": "Ordered list of variables to test.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RobotSensorVariablesFilter"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "String pattern filtering on observed object unique id (name for nodes, id for landmarks): excludes observations matching configured regexp patterns.",
+          "type": "object",
+          "properties": {
+            "accepted": {
+              "description": "Strings to accept. Can be regexp patterns.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "string"
+              }
+            },
+            "priority_accept": {
+              "description": "How to manage intersection between accepted and rejected sets.\nIf true, when a string is in the accepted and rejected sets, it is accepted.",
+              "type": "boolean",
+              "default": true
+            },
+            "rejected": {
+              "description": "Strings to reject. Can be regexp patterns.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "string"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Id"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "String pattern filtering on observed object labels: excludes observations matching configured regexp patterns.",
+          "type": "object",
+          "properties": {
+            "accepted": {
+              "description": "Strings to accept. Can be regexp patterns.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "string"
+              }
+            },
+            "priority_accept": {
+              "description": "How to manage intersection between accepted and rejected sets.\nIf true, when a string is in the accepted and rejected sets, it is accepted.",
+              "type": "boolean",
+              "default": true
+            },
+            "rejected": {
+              "description": "Strings to reject. Can be regexp patterns.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "string"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Label"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Python-based custom filtering: delegates exclusion logic to user-defined Python methods.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Python"
+            }
+          },
+          "$ref": "#/$defs/PythonFilterConfig",
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "External"
+            }
+          },
+          "$ref": "#/$defs/ExternalFilterConfig",
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "RobotSensorVariables": {
+      "description": "Variables used by robot observations, filters, and fault models.",
+      "oneOf": [
+        {
+          "description": "Relative X coordinate.\n\n\nSerialization values(s) for this variable: `x`",
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "description": "Relative Y coordinate.\n\n\nSerialization values(s) for this variable: `y`",
+          "type": "string",
+          "const": "y"
+        },
+        {
+          "description": "Relative orientation (angle) of the observed robot compared to the ego robot.\n\n\nSerialization values(s) for this variable: `orientation`, `z`",
+          "type": "string",
+          "const": "orientation"
+        },
+        {
+          "description": "Relative distance to the observed robot.\n\n\nSerialization values(s) for this variable: `r`, `d`, `distance`",
+          "type": "string",
+          "const": "r"
+        },
+        {
+          "description": "Relative bearing angle to the observed robot.\n\n\nSerialization values(s) for this variable: `theta`, `bearing`",
+          "type": "string",
+          "const": "theta"
+        },
+        {
+          "description": "Velocity of the observator.\n\n\nSerialization values(s) for this variable: `self_velocity`",
+          "type": "string",
+          "const": "self_velocity"
+        },
+        {
+          "description": "Absolute velocity of the observed robot.\n\n\nSerialization values(s) for this variable: `target_velocity`",
+          "type": "string",
+          "const": "target_velocity"
+        }
+      ]
+    },
+    "RobotSensorVariablesFaults": {
+      "description": "Variables used by fault models.",
+      "oneOf": [
+        {
+          "description": "Relative X coordinate.\n\n\nSerialization values(s) for this variable: `x`",
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "description": "Relative Y coordinate.\n\n\nSerialization values(s) for this variable: `y`",
+          "type": "string",
+          "const": "y"
+        },
+        {
+          "description": "Relative orientation (angle) of the observed robot compared to the ego robot.\n\n\nSerialization values(s) for this variable: `orientation`, `z`",
+          "type": "string",
+          "const": "orientation"
+        },
+        {
+          "description": "Relative distance to the observed robot.\n\n\nSerialization values(s) for this variable: `r`, `d`, `distance`",
+          "type": "string",
+          "const": "r"
+        },
+        {
+          "description": "Relative bearing angle to the observed robot.\n\n\nSerialization values(s) for this variable: `theta`, `bearing`",
+          "type": "string",
+          "const": "theta"
+        }
+      ]
+    },
+    "RobotSensorVariablesFilter": {
+      "description": "Variables used by sensor filters.",
+      "oneOf": [
+        {
+          "description": "Relative X coordinate.\n\n\nSerialization values(s) for this variable: `x`",
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "description": "Relative Y coordinate.\n\n\nSerialization values(s) for this variable: `y`",
+          "type": "string",
+          "const": "y"
+        },
+        {
+          "description": "Relative orientation (angle) of the observed robot compared to the ego robot.\n\n\nSerialization values(s) for this variable: `orientation`, `z`",
+          "type": "string",
+          "const": "orientation"
+        },
+        {
+          "description": "Relative distance to the observed robot.\n\n\nSerialization values(s) for this variable: `r`, `d`, `distance`",
+          "type": "string",
+          "const": "r"
+        },
+        {
+          "description": "Relative bearing angle to the observed robot.\n\n\nSerialization values(s) for this variable: `theta`, `bearing`",
+          "type": "string",
+          "const": "theta"
+        },
+        {
+          "description": "Velocity of the observator.\n\n\nSerialization values(s) for this variable: `self_velocity`",
+          "type": "string",
+          "const": "self_velocity"
+        },
+        {
+          "description": "Absolute velocity of the observed robot.\n\n\nSerialization values(s) for this variable: `target_velocity`",
+          "type": "string",
+          "const": "target_velocity"
+        }
+      ]
+    },
+    "ScanSensorFaultModelConfig": {
+      "description": "Configuration enum selecting scan-sensor fault model strategies.\n\nDefault value: [`ScanSensorFaultModelConfig::AdditiveRobotCentered`] with\n[`AdditiveFaultConfig::default`].",
+      "oneOf": [
+        {
+          "description": "Additive fault applied to all point uniformally.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Bernoulli trigger deciding whether the additive fault is applied.",
+              "$ref": "#/$defs/BernouilliRandomVariableConfig",
+              "default": {
+                "probability": [
+                  1.0
+                ]
+              }
+            },
+            "distributions": {
+              "description": "Random distributions used to sample additive perturbations.",
+              "type": "array",
+              "default": [
+                {
+                  "covariance": [
+                    1.0
+                  ],
+                  "mean": [
+                    0.0
+                  ],
+                  "type": "Normal"
+                }
+              ],
+              "items": {
+                "$ref": "#/$defs/RandomVariableTypeConfig"
+              }
+            },
+            "proportional_factor": {
+              "description": "Optional multiplicative factor applied to the proportional value.",
+              "type": [
+                "number",
+                "null"
+              ],
+              "format": "float",
+              "default": null
+            },
+            "proportional_to": {
+              "description": "Optional variable used as a proportional scaling source.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ScanSensorVariablesGlobalProp"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "AdditiveRobotCentered"
+            },
+            "variable_order": {
+              "description": "Ordered list of target variables receiving sampled perturbations.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ScanSensorVariablesGlobalFaults"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Per-point additive fault applied in robot-centered frame.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Bernoulli trigger deciding whether the additive fault is applied.",
+              "$ref": "#/$defs/BernouilliRandomVariableConfig",
+              "default": {
+                "probability": [
+                  1.0
+                ]
+              }
+            },
+            "distributions": {
+              "description": "Random distributions used to sample additive perturbations.",
+              "type": "array",
+              "default": [
+                {
+                  "covariance": [
+                    1.0
+                  ],
+                  "mean": [
+                    0.0
+                  ],
+                  "type": "Normal"
+                }
+              ],
+              "items": {
+                "$ref": "#/$defs/RandomVariableTypeConfig"
+              }
+            },
+            "proportional_factor": {
+              "description": "Optional multiplicative factor applied to the proportional value.",
+              "type": [
+                "number",
+                "null"
+              ],
+              "format": "float",
+              "default": null
+            },
+            "proportional_to": {
+              "description": "Optional variable used as a proportional scaling source.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ScanSensorVariablesPointProp"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "PointAdditiveRobotCentered"
+            },
+            "variable_order": {
+              "description": "Ordered list of target variables receiving sampled perturbations.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ScanSensorVariablesPointFaults"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Per-point additive fault applied in observation-centered frame. Orientation is defined by the angle of the point in the observation, and the additive is rotated accordingly.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Bernoulli trigger deciding whether the additive fault is applied.",
+              "$ref": "#/$defs/BernouilliRandomVariableConfig",
+              "default": {
+                "probability": [
+                  1.0
+                ]
+              }
+            },
+            "distributions": {
+              "description": "Random distributions used to sample additive perturbations.",
+              "type": "array",
+              "default": [
+                {
+                  "covariance": [
+                    1.0
+                  ],
+                  "mean": [
+                    0.0
+                  ],
+                  "type": "Normal"
+                }
+              ],
+              "items": {
+                "$ref": "#/$defs/RandomVariableTypeConfig"
+              }
+            },
+            "proportional_factor": {
+              "description": "Optional multiplicative factor applied to the proportional value.",
+              "type": [
+                "number",
+                "null"
+              ],
+              "format": "float",
+              "default": null
+            },
+            "proportional_to": {
+              "description": "Optional variable used as a proportional scaling source.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ScanSensorVariablesPointProp"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "PointAdditiveObservationCentered"
+            },
+            "variable_order": {
+              "description": "Ordered list of target variables receiving sampled perturbations.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ScanSensorVariablesPointFaults"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Clutter generation fault model.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Random variable used to sample the number of clutter observations. Should be one-dimensional and return non-negative integer values.",
+              "$ref": "#/$defs/RandomVariableTypeConfig",
+              "default": {
+                "lambda": [
+                  10.0
+                ],
+                "type": "Poisson"
+              }
+            },
+            "distributions": {
+              "description": "Random-variable list used to sample clutter observation values.",
+              "type": "array",
+              "default": [
+                {
+                  "max": [
+                    10.0,
+                    10.0
+                  ],
+                  "min": [
+                    -10.0,
+                    -10.0
+                  ],
+                  "type": "Uniform"
+                }
+              ],
+              "items": {
+                "$ref": "#/$defs/RandomVariableTypeConfig"
+              }
+            },
+            "observation_id": {
+              "description": "Identifier assigned to generated clutter observations.",
+              "type": "string",
+              "default": "clutter"
+            },
+            "type": {
+              "type": "string",
+              "const": "Clutter"
+            },
+            "variable_order": {
+              "description": "Optional explicit mapping order from sampled dimensions to variables.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ScanSensorVariablesPointFaults"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Global misdetection fault model.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Bernoulli distribution used to decide whether an observation is detected.\n\nThis must be one-dimensional for this model.",
+              "$ref": "#/$defs/BernouilliRandomVariableConfig",
+              "default": {
+                "probability": [
+                  0.10000000149011612
+                ]
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Misdetection"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Per-point misdetection fault model.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Bernoulli distribution used to decide whether an observation is detected.\n\nThis must be one-dimensional for this model.",
+              "$ref": "#/$defs/BernouilliRandomVariableConfig",
+              "default": {
+                "probability": [
+                  0.10000000149011612
+                ]
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "PointMisdetection"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Python-implemented custom fault model.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Python"
+            }
+          },
+          "$ref": "#/$defs/PythonFaultModelConfig",
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Plugin-provided external fault model.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "External"
+            }
+          },
+          "$ref": "#/$defs/ExternalFaultConfig",
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "ScanSensorFilterConfig": {
+      "description": "Configuration enum selecting among multiple sensor observation filtering strategies for scan sensors.\n\nThis enum provides a unified interface for declaring sensor filters with different decision logic.\nEach variant wraps the configuration for a specific filter type.\nWhen multiple filters are applied to a sensor, all must agree to keep the observation.\n\nDefault value: [`ScanSensorFilterConfig::Range`] with [`RangeFilterConfig::default`].\n\n# Config example:\n```yaml\nfilters:\n  - type: Range\n    variables: [r, theta]\n    max_range: [100, 1.57]\n    min_range: [1., -1.57]\n    inside: true\n```",
+      "oneOf": [
+        {
+          "description": "Range-based filtering on enumerated variables: excludes observations where numeric values fall outside specified bounds.",
+          "type": "object",
+          "properties": {
+            "inside": {
+              "description": "Whether matching values should stay inside (`true`) or outside (`false`) ranges.",
+              "type": "boolean",
+              "default": true
+            },
+            "max_range": {
+              "description": "Inclusive upper bounds associated with `variables`.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            },
+            "min_range": {
+              "description": "Inclusive lower bounds associated with `variables`.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Range"
+            },
+            "variables": {
+              "description": "Ordered list of variables to test.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ScanSensorVariablesFilter"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "String pattern filtering on observed object unique id (name for nodes, id for landmarks): excludes observations matching configured regexp patterns.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Python"
+            }
+          },
+          "$ref": "#/$defs/PythonFilterConfig",
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "External"
+            }
+          },
+          "$ref": "#/$defs/ExternalFilterConfig",
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "ScanSensorVariablesFilter": {
+      "description": "Variables accepted by scan filters.",
+      "oneOf": [
+        {
+          "description": "X position component.\n\n\nSerialization values(s) for this variable: `x`",
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "description": "Y position component.\n\n\nSerialization values(s) for this variable: `y`",
+          "type": "string",
+          "const": "y"
+        },
+        {
+          "description": "Range (radius) in polar coordinates.\n\n\nSerialization values(s) for this variable: `r`, `radius`, `d`, `distance`",
+          "type": "string",
+          "const": "r"
+        },
+        {
+          "description": "Bearing angle in polar coordinates.\n\n\nSerialization values(s) for this variable: `theta`, `bearing`, `angle`",
+          "type": "string",
+          "const": "theta"
+        },
+        {
+          "description": "Relative radial velocity component.\n\n\nSerialization values(s) for this variable: `radial_velocity`, `v`",
+          "type": "string",
+          "const": "radial_velocity"
+        },
+        {
+          "description": "Observer planar speed norm.\n\n\nSerialization values(s) for this variable: `self_velocity`",
+          "type": "string",
+          "const": "self_velocity"
+        }
+      ]
+    },
+    "ScanSensorVariablesGlobalFaults": {
+      "description": "Variables modified by global fault models (fault applied to all points).",
+      "oneOf": [
+        {
+          "description": "X position component.\n\n\nSerialization values(s) for this variable: `x`",
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "description": "Y position component.\n\n\nSerialization values(s) for this variable: `y`",
+          "type": "string",
+          "const": "y"
+        },
+        {
+          "description": "Relative radial velocity component.\n\n\nSerialization values(s) for this variable: `radial_velocity`, `v`",
+          "type": "string",
+          "const": "radial_velocity"
+        },
+        {
+          "description": "Sensor orientation, to rotate the full point cloud.\n\n\nSerialization values(s) for this variable: `orientation`, `z`",
+          "type": "string",
+          "const": "orientation"
+        }
+      ]
+    },
+    "ScanSensorVariablesGlobalProp": {
+      "description": "Variables used as proportional factor in global fault models.",
+      "oneOf": [
+        {
+          "description": "X position component.\n\n\nSerialization values(s) for this variable: `x`",
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "description": "Y position component.\n\n\nSerialization values(s) for this variable: `y`",
+          "type": "string",
+          "const": "y"
+        },
+        {
+          "description": "Sensor orientation, to rotate the full point cloud.\n\n\nSerialization values(s) for this variable: `orientation`, `z`",
+          "type": "string",
+          "const": "orientation"
+        },
+        {
+          "description": "Observer planar speed norm.\n\n\nSerialization values(s) for this variable: `self_velocity`",
+          "type": "string",
+          "const": "self_velocity"
+        }
+      ]
+    },
+    "ScanSensorVariablesPointFaults": {
+      "description": "Variables modified by per-point fault models.",
+      "oneOf": [
+        {
+          "description": "X position component.\n\n\nSerialization values(s) for this variable: `x`",
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "description": "Y position component.\n\n\nSerialization values(s) for this variable: `y`",
+          "type": "string",
+          "const": "y"
+        },
+        {
+          "description": "Range (radius) in polar coordinates.\n\n\nSerialization values(s) for this variable: `r`, `radius`, `d`, `distance`",
+          "type": "string",
+          "const": "r"
+        },
+        {
+          "description": "Bearing angle in polar coordinates.\n\n\nSerialization values(s) for this variable: `theta`, `bearing`, `angle`",
+          "type": "string",
+          "const": "theta"
+        },
+        {
+          "description": "Relative radial velocity component.\n\n\nSerialization values(s) for this variable: `radial_velocity`, `v`",
+          "type": "string",
+          "const": "radial_velocity"
+        }
+      ]
+    },
+    "ScanSensorVariablesPointProp": {
+      "description": "Variables used as proportional factor in per-point fault models.",
+      "oneOf": [
+        {
+          "description": "X position component.\n\n\nSerialization values(s) for this variable: `x`",
+          "type": "string",
+          "const": "x"
+        },
+        {
+          "description": "Y position component.\n\n\nSerialization values(s) for this variable: `y`",
+          "type": "string",
+          "const": "y"
+        },
+        {
+          "description": "Range (radius) in polar coordinates.\n\n\nSerialization values(s) for this variable: `r`, `radius`, `d`, `distance`",
+          "type": "string",
+          "const": "r"
+        },
+        {
+          "description": "Bearing angle in polar coordinates.\n\n\nSerialization values(s) for this variable: `theta`, `bearing`, `angle`",
+          "type": "string",
+          "const": "theta"
+        },
+        {
+          "description": "Relative radial velocity component.\n\n\nSerialization values(s) for this variable: `radial_velocity`, `v`",
+          "type": "string",
+          "const": "radial_velocity"
+        },
+        {
+          "description": "Observer planar speed norm.\n\n\nSerialization values(s) for this variable: `self_velocity`",
+          "type": "string",
+          "const": "self_velocity"
+        }
+      ]
+    },
+    "ScenarioConfig": {
+      "description": "Root scenario configuration.\n\nContains the list of event declarations evaluated by the scenario system.\n\nThe events will be published on the chanel `/simusa/scenario` when they are triggered, with the content of the event record (see [`EventRecord`]).\n\nDefault values:\n- `events`: empty vector",
+      "type": "object",
+      "properties": {
+        "events": {
+          "description": "Event definitions evaluated by the scenario engine.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/EventConfig"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "SensorConfig": {
+      "description": "Enumerates all the possible sensors configurations.\n\nDefault value (from `#[config_derives]` generated implementation):\n[`SensorConfig::OrientedLandmark`]\nwith [`OrientedLandmarkSensorConfig::default`](crate::sensors::oriented_landmark_sensor::OrientedLandmarkSensorConfig::default).",
+      "oneOf": [
+        {
+          "description": "Oriented-landmark sensor configuration.",
+          "type": "object",
+          "properties": {
+            "activation_time": {
+              "description": "Periodicity configuration of the sensor.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PeriodicityConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": {
+                "offset": null,
+                "period": {
+                  "type": "Num",
+                  "value": 0.10000000149011612
+                },
+                "table": null
+              }
+            },
+            "detection_distance": {
+              "description": "Max distance of detection.",
+              "type": "number",
+              "format": "float",
+              "default": 5.0
+            },
+            "faults": {
+              "description": "Fault model configurations applied after filtering.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/OrientedLandmarkSensorFaultModelConfig"
+              }
+            },
+            "filters": {
+              "description": "Filter configurations applied before fault injection.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/OrientedLandmarkSensorFilterConfig"
+              }
+            },
+            "frame": {
+              "description": "Frame of the sensor with respect to the robot frame. The observations will be given in this frame.",
+              "$ref": "#/$defs/FrameConfig",
+              "default": {
+                "theta": 0.0,
+                "x": 0.0,
+                "y": 0.0
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "OrientedLandmark"
+            },
+            "xray": {
+              "description": "If true, will detect all landmarks, even if they are behind obstacles (no raycasting).",
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Speed sensor configuration.",
+          "type": "object",
+          "properties": {
+            "activation_time": {
+              "description": "Periodicity of the sensor.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PeriodicityConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": {
+                "offset": null,
+                "period": {
+                  "type": "Num",
+                  "value": 0.10000000149011612
+                },
+                "table": null
+              }
+            },
+            "faults": {
+              "description": "Fault models applied after filtering.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/SpeedSensorFaultModelConfig"
+              }
+            },
+            "filters": {
+              "description": "Filter chain applied before fault injection.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/SpeedSensorFilterConfig"
+              }
+            },
+            "frame": {
+              "description": "Frame of the sensor, the velocity will be expressed in this frame.",
+              "$ref": "#/$defs/FrameConfig",
+              "default": {
+                "theta": 0.0,
+                "x": 0.0,
+                "y": 0.0
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Speed"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Displacement sensor configuration.",
+          "type": "object",
+          "properties": {
+            "activation_time": {
+              "description": "Observation period of the sensor.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PeriodicityConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": {
+                "offset": null,
+                "period": {
+                  "type": "Num",
+                  "value": 0.10000000149011612
+                },
+                "table": null
+              }
+            },
+            "faults": {
+              "description": "Fault model configurations applied after filtering.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/DisplacementSensorFaultModelConfig"
+              }
+            },
+            "filters": {
+              "description": "Filter configurations applied before fault injection.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/DisplacementSensorFilterConfig"
+              }
+            },
+            "frame": {
+              "description": "Frame configuration for the sensor observations.",
+              "$ref": "#/$defs/FrameConfig",
+              "default": {
+                "theta": 0.0,
+                "x": 0.0,
+                "y": 0.0
+              }
+            },
+            "lie_movement": {
+              "description": "If `true`, use Lie-movement mode (currently not implemented).",
+              "type": "boolean",
+              "default": false
+            },
+            "type": {
+              "type": "string",
+              "const": "Displacement"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "GNSS sensor configuration.",
+          "type": "object",
+          "properties": {
+            "activation_time": {
+              "description": "Observation period of the sensor.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PeriodicityConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": {
+                "offset": null,
+                "period": {
+                  "type": "Num",
+                  "value": 1.0
+                },
+                "table": null
+              }
+            },
+            "faults": {
+              "description": "Fault on the x, y positions, and on the x and y velocities",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/GNSSSensorFaultModelConfig"
+              }
+            },
+            "filters": {
+              "description": "Filter configurations applied before fault injection.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/GNSSSensorFilterConfig"
+              }
+            },
+            "frame": {
+              "description": "Frame configuration for the sensor's pose observations, relative to the node's reference point.",
+              "$ref": "#/$defs/FrameConfig",
+              "default": {
+                "theta": 0.0,
+                "x": 0.0,
+                "y": 0.0
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "GNSS"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Robot sensor configuration.",
+          "type": "object",
+          "properties": {
+            "activation_time": {
+              "description": "Observation period of the sensor.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PeriodicityConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": {
+                "offset": null,
+                "period": {
+                  "type": "Num",
+                  "value": 0.10000000149011612
+                },
+                "table": null
+              }
+            },
+            "detection_distance": {
+              "description": "Max distance of detection.",
+              "type": "number",
+              "format": "float",
+              "default": 5.0
+            },
+            "faults": {
+              "description": "Fault model configurations applied after filtering.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/RobotSensorFaultModelConfig"
+              }
+            },
+            "filters": {
+              "description": "Filter configurations applied before fault injection.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/RobotSensorFilterConfig"
+              }
+            },
+            "frame": {
+              "description": "Frame of the sensor with respect to the robot frame. The observations will be given in this frame.",
+              "$ref": "#/$defs/FrameConfig",
+              "default": {
+                "theta": 0.0,
+                "x": 0.0,
+                "y": 0.0
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Robot"
+            },
+            "xray": {
+              "description": "If `true`, line-of-sight occlusion checks are bypassed.",
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Scan sensor configuration.",
+          "type": "object",
+          "properties": {
+            "activation_time": {
+              "description": "Observation period of the sensor.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PeriodicityConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": {
+                "offset": null,
+                "period": {
+                  "type": "Num",
+                  "value": 0.10000000149011612
+                },
+                "table": null
+              }
+            },
+            "detection_distance": {
+              "description": "Max distance of detection.",
+              "type": "number",
+              "format": "float",
+              "default": 0.0
+            },
+            "faults": {
+              "description": "Fault model configuration list applied after filtering.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/ScanSensorFaultModelConfig"
+              }
+            },
+            "filters": {
+              "description": "Filter configuration list applied before fault injection.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/ScanSensorFilterConfig"
+              }
+            },
+            "frame": {
+              "description": "Frame of the sensor with respect to the robot frame. The observations will be given in this frame.",
+              "$ref": "#/$defs/FrameConfig",
+              "default": {
+                "theta": 0.0,
+                "x": 0.0,
+                "y": 0.0
+              }
+            },
+            "height": {
+              "description": "Height of the sensor: will only detect objects at this height or higher.",
+              "type": "number",
+              "format": "float",
+              "default": 0.0
+            },
+            "rays": {
+              "description": "Ray layout used to define observation directions.",
+              "$ref": "#/$defs/RayConfig",
+              "default": {
+                "type": "Regular",
+                "value": 360
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Scan"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "External sensor configuration.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "External"
+            }
+          },
+          "$ref": "#/$defs/ExternalSensorConfig",
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "SensorManagerConfig": {
+      "description": "Configuration listing all the [`SensorConfig`]s.\n\nDefault values:\n- `sensors`: empty vector",
+      "type": "object",
+      "properties": {
+        "sensors": {
+          "description": "List of managed sensor configurations.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ManagedSensorConfig"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Sort": {
+      "description": "Ordering strategy used to pick replacement labels.\n\nThis controls how candidate labels are arranged before indexing with a sampled value.",
+      "oneOf": [
+        {
+          "description": "Keep the source-provided order of candidates (alphabetically).",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "None"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Shuffle candidates using a deterministic random generator seeded from simulation state.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Random"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Sort candidates by increasing squared distance to the observer position.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Distance"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "Source": {
+      "description": "Source used to build the candidate label list for misassociation.",
+      "oneOf": [
+        {
+          "description": "Use landmark identifiers from the current map.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Map"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Use identifiers of running robots from environment metadata.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Robots"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "SpawnEventConfig": {
+      "description": "Spawn event configuration.\n\nDefault values:\n- `model_name`: `\"default_robot\"`\n- `node_name`: `\"my_new_robot\"`",
+      "type": "object",
+      "properties": {
+        "model_name": {
+          "description": "Name of the model/template used for spawning.",
+          "type": "string",
+          "default": "default_robot"
+        },
+        "node_name": {
+          "description": "Name assigned to the spawned node.",
+          "type": "string",
+          "default": "my_new_robot"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SpeedSensorFaultModelConfig": {
+      "description": "Configuration enum selecting fault models applied to speed observations.\n\nDefault value: [`SpeedSensorFaultModelConfig::Additive`] with\n[`AdditiveFaultConfig::default`].",
+      "oneOf": [
+        {
+          "description": "Additive perturbation fault model.",
+          "type": "object",
+          "properties": {
+            "apparition": {
+              "description": "Bernoulli trigger deciding whether the additive fault is applied.",
+              "$ref": "#/$defs/BernouilliRandomVariableConfig",
+              "default": {
+                "probability": [
+                  1.0
+                ]
+              }
+            },
+            "distributions": {
+              "description": "Random distributions used to sample additive perturbations.",
+              "type": "array",
+              "default": [
+                {
+                  "covariance": [
+                    1.0
+                  ],
+                  "mean": [
+                    0.0
+                  ],
+                  "type": "Normal"
+                }
+              ],
+              "items": {
+                "$ref": "#/$defs/RandomVariableTypeConfig"
+              }
+            },
+            "proportional_factor": {
+              "description": "Optional multiplicative factor applied to the proportional value.",
+              "type": [
+                "number",
+                "null"
+              ],
+              "format": "float",
+              "default": null
+            },
+            "proportional_to": {
+              "description": "Optional variable used as a proportional scaling source.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SpeedSensorVariables"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "Additive"
+            },
+            "variable_order": {
+              "description": "Ordered list of target variables receiving sampled perturbations.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SpeedSensorVariablesFaults"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Python-implemented custom fault model.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Python"
+            }
+          },
+          "$ref": "#/$defs/PythonFaultModelConfig",
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Plugin-provided external fault model.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "External"
+            }
+          },
+          "$ref": "#/$defs/ExternalFaultConfig",
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "SpeedSensorFilterConfig": {
+      "description": "Configuration enum selecting among multiple sensor observation filtering strategies for speed sensors.\n\nThis enum provides a unified interface for declaring sensor filters with different decision logic.\nEach variant wraps the configuration for a specific filter type.\nWhen multiple filters are applied to a sensor, all must agree to keep the observation.\n\nDefault value: [`SpeedSensorFilterConfig::Range`] with [`RangeFilterConfig::default`].\n\n# Config example:\n```yaml\nfilters:\n  - type: Range\n    variables: [r, theta]\n    max_range: [100, 1.57]\n    min_range: [1., -1.57]\n    inside: true\n```",
+      "oneOf": [
+        {
+          "description": "Range-based filtering on enumerated variables: excludes observations where numeric values fall outside specified bounds.",
+          "type": "object",
+          "properties": {
+            "inside": {
+              "description": "Whether matching values should stay inside (`true`) or outside (`false`) ranges.",
+              "type": "boolean",
+              "default": true
+            },
+            "max_range": {
+              "description": "Inclusive upper bounds associated with `variables`.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            },
+            "min_range": {
+              "description": "Inclusive lower bounds associated with `variables`.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Range"
+            },
+            "variables": {
+              "description": "Ordered list of variables to test.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SpeedSensorVariablesFilter"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "String pattern filtering on observed object unique id (name for nodes, id for landmarks): excludes observations matching configured regexp patterns.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Python"
+            }
+          },
+          "$ref": "#/$defs/PythonFilterConfig",
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "External"
+            }
+          },
+          "$ref": "#/$defs/ExternalFilterConfig",
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "SpeedSensorVariables": {
+      "description": "Variables used by speed sensors and related fault models.",
+      "oneOf": [
+        {
+          "description": "Linear velocity component.\n\n\nSerialization values(s) for this variable: `v`, `linear_velocity`, `linear`",
+          "type": "string",
+          "const": "v"
+        },
+        {
+          "description": "Angular velocity component.\n\n\nSerialization values(s) for this variable: `w`, `angular_velocity`, `angular`",
+          "type": "string",
+          "const": "w"
+        },
+        {
+          "description": "Norm of the linear robot velocity.\n\n\nSerialization values(s) for this variable: `self_velocity`",
+          "type": "string",
+          "const": "self_velocity"
+        }
+      ]
+    },
+    "SpeedSensorVariablesFaults": {
+      "description": "Variables that additive speed faults can modify.",
+      "oneOf": [
+        {
+          "description": "Linear velocity component.\n\n\nSerialization values(s) for this variable: `v`, `linear_velocity`, `linear`",
+          "type": "string",
+          "const": "v"
+        },
+        {
+          "description": "Angular velocity component.\n\n\nSerialization values(s) for this variable: `w`, `angular_velocity`, `angular`",
+          "type": "string",
+          "const": "w"
+        }
+      ]
+    },
+    "SpeedSensorVariablesFilter": {
+      "description": "Variables that can be used by filters.",
+      "oneOf": [
+        {
+          "description": "Linear velocity component.\n\n\nSerialization values(s) for this variable: `v`, `linear_velocity`, `linear`",
+          "type": "string",
+          "const": "v"
+        },
+        {
+          "description": "Angular velocity component.\n\n\nSerialization values(s) for this variable: `w`, `angular_velocity`, `angular`",
+          "type": "string",
+          "const": "w"
+        },
+        {
+          "description": "Norm of the linear robot velocity.\n\n\nSerialization values(s) for this variable: `self_velocity`",
+          "type": "string",
+          "const": "self_velocity"
+        }
+      ]
+    },
+    "StateConfig": {
+      "description": "Configuration for [`State`] in order to load a state from the configuration.\n\nThe pose should contain 3 elements.\nTODO: Make a config validation scheme.",
+      "type": "object",
+      "properties": {
+        "pose": {
+          "description": "Position and orientation of the robot",
+          "type": "array",
+          "default": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "items": {
+            "type": "number",
+            "format": "float"
+          }
+        },
+        "random": {
+          "description": "Random initialization of the state. If `pose` is not null, random values are added to the pose and velocity according to `variable_order`.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/RandomVariableTypeConfig"
+          }
+        },
+        "variable_order": {
+          "description": "Ordered list mapping sampled random values to state variables.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "velocity": {
+          "description": "Linear velocity",
+          "type": "array",
+          "default": [
+            0.0,
+            0.0
+          ],
+          "items": {
+            "type": "number",
+            "format": "float"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "StateEstimatorConfig": {
+      "description": "List the possible configs, to be selected in the global config.\n\nTo select the [`StateEstimatorConfig::Perfect`], the yaml config should be:\n```YAML\nstate_estimator:\n  type: Perfect\n  prediction_activation:\n    period: {type: Num, value: 0.1}\n```",
+      "oneOf": [
+        {
+          "description": "Built-in perfect state estimator.",
+          "type": "object",
+          "properties": {
+            "prediction_activation": {
+              "description": "Prediction period.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PeriodicityConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": {
+                "offset": null,
+                "period": {
+                  "type": "Num",
+                  "value": 0.10000000149011612
+                },
+                "table": null
+              }
+            },
+            "targets": {
+              "description": "List of targets for the perfect estimator (other nodes).\n\n\"self\" can be used to include the ego state in the estimation. It is included by default but\nif the `targets` field is specified, it must be included explicitly to be part of the estimation.",
+              "type": "array",
+              "default": [
+                "self"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Perfect"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "External state estimator provided through plugin API.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "External"
+            }
+          },
+          "$ref": "#/$defs/ExternalEstimatorConfig",
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Python-backed state estimator.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Python"
+            }
+          },
+          "$ref": "#/$defs/PythonEstimatorConfig",
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "TimeAnalysisConfig": {
+      "description": "Configuration for the time analysis. It allows to select the exporter to use, the output path, and the analysis unit.",
+      "type": "object",
+      "properties": {
+        "analysis_unit": {
+          "description": "Unit for the time analysis results, to make a more readable report.",
+          "$ref": "#/$defs/AnalysisUnit",
+          "default": "ms"
+        },
+        "exporter": {
+          "description": "Exporter to use for the time analysis results export.",
+          "$ref": "#/$defs/ProfileExporterConfig",
+          "default": {
+            "type": "TraceEventExporter"
+          }
+        },
+        "output_path": {
+          "description": "Output path for the time analysis results. Do not add extensions, as they are added by the exporter: `.json` (for [`ProfileExporterConfig::TraceEventExporter`]) and `.report.csv`.\nThe path is relative to the config path",
+          "type": "string",
+          "default": "time_performance"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TimeEventTriggerConfig": {
+      "description": "Time-based event trigger configuration.\n\nDefault values:\n- `time`: `NumberConfig::Num(0.0)`\n- `occurences`: `NumberConfig::Num(1.0)`",
+      "type": "object",
+      "properties": {
+        "occurences": {
+          "description": "Four cases:\n- if `time` is a fixed number, it turns into a period and `occurences` is how many times the event will be triggered. Use 0 for infinite.\n- if `time` is a random variable, `occurences` is how many samples will be drawn from it to schedule the event\n- if `time` is a random variable with multiple dimensions, `occurences` is the number of repetitions of the full set of samples:\n  if `time` draws N samples, and `occurences` is M, then M*N event times will be scheduled",
+          "$ref": "#/$defs/NumberConfig",
+          "default": {
+            "type": "Num",
+            "value": 1.0
+          }
+        },
+        "time": {
+          "description": "Time specification used to schedule events.",
+          "$ref": "#/$defs/NumberConfig",
+          "default": {
+            "type": "Num",
+            "value": 0.0
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "TrajectoryConfig": {
+      "description": "Config of the [`Trajectory`].\n\nThis configuration takes a list of points and a boolean for looping (return to first point after the last one).\nPoints are 1- or 2-dimensional. Any extra dimension is ignored, and missing dimensions are filled with 0.",
+      "type": "object",
+      "properties": {
+        "do_loop": {
+          "description": "Closing the loop or not.",
+          "type": "boolean",
+          "default": true
+        },
+        "point_list": {
+          "description": "Ordered list of the points to follow.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "float"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

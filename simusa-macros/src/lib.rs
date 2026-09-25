@@ -134,73 +134,75 @@ pub fn derive_enum_to_string(item: TokenStream) -> TokenStream {
             for variant in variants {
                 let id = &variant.ident;
                 let id_str = id.to_string();
+                match_impl.extend(quote! {
+                    #struct_identifier::#id { .. } => #id_str.to_string(),
+                });
+                // match &variant.fields {
+                //     syn::Fields::Named(fields) => {
+                //         // Named fields: Variant { field1, field2, ... }
+                //         let field_names: Vec<_> = fields
+                //             .named
+                //             .iter()
+                //             .filter_map(|f| f.ident.as_ref())
+                //             .collect();
 
-                match &variant.fields {
-                    syn::Fields::Named(fields) => {
-                        // Named fields: Variant { field1, field2, ... }
-                        let field_names: Vec<_> = fields
-                            .named
-                            .iter()
-                            .filter_map(|f| f.ident.as_ref())
-                            .collect();
+                //         if field_names.is_empty() {
+                //             match_impl.extend(quote! {
+                //                 #struct_identifier::#id { .. } => #id_str.to_string(),
+                //             });
+                //         } else {
+                //             let debug_format = field_names
+                //                 .iter()
+                //                 .map(|fname| format!("{}: {{:?}}", fname))
+                //                 .collect::<Vec<_>>()
+                //                 .join(", ");
+                //             let format_str = format!("{} {{ {} }}", id_str, debug_format);
 
-                        if field_names.is_empty() {
-                            match_impl.extend(quote! {
-                                #struct_identifier::#id { .. } => #id_str.to_string(),
-                            });
-                        } else {
-                            let debug_format = field_names
-                                .iter()
-                                .map(|fname| format!("{}: {{:?}}", fname))
-                                .collect::<Vec<_>>()
-                                .join(", ");
-                            let format_str = format!("{} {{ {} }}", id_str, debug_format);
+                //             match_impl.extend(quote! {
+                //                 #struct_identifier::#id { #(#field_names),* } => {
+                //                     format!(#format_str, #(#field_names),*)
+                //                 },
+                //             });
+                //         }
+                //     }
+                //     syn::Fields::Unnamed(fields) => {
+                //         // Unnamed fields: Variant(field1, field2, ...)
+                //         let field_count = fields.unnamed.len();
 
-                            match_impl.extend(quote! {
-                                #struct_identifier::#id { #(#field_names),* } => {
-                                    format!(#format_str, #(#field_names),*)
-                                },
-                            });
-                        }
-                    }
-                    syn::Fields::Unnamed(fields) => {
-                        // Unnamed fields: Variant(field1, field2, ...)
-                        let field_count = fields.unnamed.len();
+                //         if field_count == 1 {
+                //             // Single field: format as "Variant(value)"
+                //             match_impl.extend(quote! {
+                //                 #struct_identifier::#id(inner) => {
+                //                     format!("{}({:?})", #id_str, inner)
+                //                 },
+                //             });
+                //         } else {
+                //             // Multiple fields: format as "Variant(val1, val2, ...)"
+                //             let field_indices: Vec<_> = (0..field_count)
+                //                 .map(|i| {
+                //                     syn::Ident::new(
+                //                         &format!("field{}", i),
+                //                         proc_macro2::Span::call_site(),
+                //                     )
+                //                 })
+                //                 .collect();
+                //             let debug_placeholders = vec!["{:?}"; field_count].join(", ");
+                //             let format_str = format!("{}({})", id_str, debug_placeholders);
 
-                        if field_count == 1 {
-                            // Single field: format as "Variant(value)"
-                            match_impl.extend(quote! {
-                                #struct_identifier::#id(inner) => {
-                                    format!("{}({:?})", #id_str, inner)
-                                },
-                            });
-                        } else {
-                            // Multiple fields: format as "Variant(val1, val2, ...)"
-                            let field_indices: Vec<_> = (0..field_count)
-                                .map(|i| {
-                                    syn::Ident::new(
-                                        &format!("field{}", i),
-                                        proc_macro2::Span::call_site(),
-                                    )
-                                })
-                                .collect();
-                            let debug_placeholders = vec!["{:?}"; field_count].join(", ");
-                            let format_str = format!("{}({})", id_str, debug_placeholders);
-
-                            match_impl.extend(quote! {
-                                #struct_identifier::#id(#(#field_indices),*) => {
-                                    format!(#format_str, #(#field_indices),*)
-                                },
-                            });
-                        }
-                    }
-                    syn::Fields::Unit => {
-                        // Unit variant: Variant
-                        match_impl.extend(quote! {
-                            #struct_identifier::#id => #id_str.to_string(),
-                        });
-                    }
-                }
+                //             match_impl.extend(quote! {
+                //                 #struct_identifier::#id(#(#field_indices),*) => {
+                //                     format!(#format_str, #(#field_indices),*)
+                //                 },
+                //             });
+                //         }
+                //     }
+                //     syn::Fields::Unit => {
+                //         // Unit variant: Variant
+                //         match_impl.extend(quote! {
+                //             #struct_identifier::#id => #id_str.to_string(),
+                //         });
+                //     }
+                // }
             }
         }
         Data::Struct(_) => {

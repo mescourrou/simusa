@@ -258,19 +258,15 @@ pub struct RobotSensorConfig {
 }
 
 impl Check for RobotSensorConfig {
-    fn do_check(&self) -> Result<(), Vec<String>> {
-        let mut errors = Vec::new();
+    fn do_check(&self) -> CheckResult {
+        let mut ret = CheckResult::new();
         if self.detection_distance < 0. {
-            errors.push(format!(
+            ret.add_error(format!(
                 "Detection distance should be positive, got {}",
                 self.detection_distance
             ));
         }
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
+        ret
     }
 }
 

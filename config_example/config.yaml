@@ -1,12 +1,11 @@
 # yaml-language-server: $schema=../config.schema.json
-version: 1.8.1
+version: 1.9.0
 log:
   included_nodes: []
   excluded_nodes: []
   log_level:
     type: Info
   outputs:
-    - type: Console
     - type: File
       value: "simulator.log"
 results:

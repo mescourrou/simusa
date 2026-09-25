@@ -4,9 +4,17 @@ use std::{
 };
 
 use crate::{
-    constants::TIME_ROUND, context::Context, logger::LogLevel, navigators::{
-        NavigatorConfig, go_to::GoToConfig, trajectory::TrajectoryConfig, trajectory_follower::TrajectoryFollowerConfig,
-    }, networking::network::Network, node::node_factory::{RecordType, RobotConfig}, plugin_api::PluginAPI, sensors::{
+    constants::TIME_ROUND,
+    context::Context,
+    logger::LogLevel,
+    navigators::{
+        NavigatorConfig, go_to::GoToConfig, trajectory::TrajectoryConfig,
+        trajectory_follower::TrajectoryFollowerConfig,
+    },
+    networking::network::Network,
+    node::node_factory::{RecordType, RobotConfig},
+    plugin_api::PluginAPI,
+    sensors::{
         SensorConfig,
         robot_sensor::RobotSensorConfig,
         sensor_manager::{ManagedSensorConfig, SensorManagerConfig},

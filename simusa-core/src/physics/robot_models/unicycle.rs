@@ -55,19 +55,15 @@ pub struct UnicycleConfig {
 }
 
 impl Check for UnicycleConfig {
-    fn do_check(&self) -> Result<(), Vec<String>> {
-        let mut errors = Vec::new();
+    fn do_check(&self) -> CheckResult {
+        let mut ret = CheckResult::new();
         if self.wheel_distance < 0. {
-            errors.push(format!(
+            ret.add_error(format!(
                 "Wheel distance should be positive, got {}",
                 self.wheel_distance
             ));
         }
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
+        ret
     }
 }
 

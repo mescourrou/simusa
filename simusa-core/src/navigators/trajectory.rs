@@ -50,8 +50,7 @@ impl UIComponent for TrajectoryConfig {
         _global_config: &crate::simulator::SimulatorConfig,
         _current_node_name: Option<&String>,
         _unique_id: &str,
-    )
-    {
+    ) {
         ui.vertical(|ui| {
             ui.horizontal(|ui| {
                 ui.label("Loop trajectory:");
@@ -62,8 +61,14 @@ impl UIComponent for TrajectoryConfig {
             for (i, point) in self.point_list.iter_mut().enumerate() {
                 ui.horizontal(|ui| {
                     ui.label(format!("Point {}:", i));
-                    ui.add(egui::DragValue::new(&mut point[0]).max_decimals(crate::constants::TIME_ROUND_DECIMALS));
-                    ui.add(egui::DragValue::new(&mut point[1]).max_decimals(crate::constants::TIME_ROUND_DECIMALS));
+                    ui.add(
+                        egui::DragValue::new(&mut point[0])
+                            .max_decimals(crate::constants::TIME_ROUND_DECIMALS),
+                    );
+                    ui.add(
+                        egui::DragValue::new(&mut point[1])
+                            .max_decimals(crate::constants::TIME_ROUND_DECIMALS),
+                    );
                     if ui.button("-").clicked() {
                         to_remove.push(i);
                     }
@@ -78,7 +83,7 @@ impl UIComponent for TrajectoryConfig {
         });
     }
 
-    fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
+    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
         ui.vertical(|ui| {
             ui.label(format!("Loop trajectory: {}", self.do_loop));
             ui.label("Points:");

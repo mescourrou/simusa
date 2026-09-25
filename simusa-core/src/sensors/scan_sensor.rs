@@ -290,22 +290,18 @@ pub struct ScanSensorConfig {
 }
 
 impl Check for ScanSensorConfig {
-    fn do_check(&self) -> Result<(), Vec<String>> {
-        let mut errors = Vec::new();
+    fn do_check(&self) -> CheckResult {
+        let mut ret = CheckResult::new();
         if self.detection_distance < 0. {
-            errors.push(format!(
+            ret.add_error(format!(
                 "Detection distance should be positive, got {}",
                 self.detection_distance
             ));
         }
         if self.height < 0. {
-            errors.push(format!("Height should be positive, got {}", self.height));
+            ret.add_error(format!("Height should be positive, got {}", self.height));
         }
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
+        ret
     }
 }
 

@@ -23,14 +23,16 @@ use serde_derive::{Deserialize, Serialize};
 use simusa_com::pub_sub::{BrokerTrait, BrokerTraitExtended, PathKey};
 use simusa_macros::config_derives;
 
+#[cfg(feature = "gui")]
+use crate::constants::TIME_ROUND_DECIMALS;
 use crate::context::Context;
+#[cfg(feature = "gui")]
+use crate::gui::UIComponent;
 use crate::internal;
 use crate::networking::{channels, message_types::MessageTypes};
-use crate::simulator::{SimusaBroker, SimusaBrokerMultiClient, SimulatorConfig};
+use crate::simulator::{SimulatorConfig, SimusaBroker, SimusaBrokerMultiClient};
 use crate::utils::SharedRwLock;
 use crate::utils::determinist_random_variable::DeterministRandomVariableFactory;
-#[cfg(feature = "gui")]
-use crate::{constants::TIME_ROUND, gui::UIComponent};
 
 /// Configuration for the [`Network`].
 #[config_derives]
@@ -46,22 +48,18 @@ pub struct NetworkConfig {
 }
 
 impl Check for NetworkConfig {
-    fn do_check(&self) -> Result<(), Vec<String>> {
-        let mut errors = Vec::new();
+    fn do_check(&self) -> CheckResult {
+        let mut ret = CheckResult::new();
         if self.range < 0. {
-            errors.push(format!("Range should be positive, got {}", self.range));
+            ret.add_error(format!("Range should be positive, got {}", self.range));
         }
         if self.reception_delay < 0. {
-            errors.push(format!(
+            ret.add_error(format!(
                 "Reception_delay should be positive, got {}",
                 self.reception_delay
             ));
         }
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
+        ret
     }
 }
 
@@ -101,7 +99,7 @@ impl UIComponent for NetworkConfig {
                 }
                 ui.add(
                     egui::DragValue::new(&mut self.reception_delay)
-                        .max_decimals((1. / TIME_ROUND) as usize),
+                        .max_decimals(TIME_ROUND_DECIMALS),
                 );
             });
         });

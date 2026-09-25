@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use simusa_com::time_ordered_data::TimeOrderedData;
 
-use crate::{gui::UIComponent, node::node_factory::{ComputationUnitRecord, RecordType}};
+use crate::{gui::UIComponent, node::node_factory::ComputationUnitRecord};
 
 pub struct VirtualNodesPanel {
     records: BTreeMap<String, TimeOrderedData<ComputationUnitRecord>>,

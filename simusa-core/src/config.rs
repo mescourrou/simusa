@@ -5,9 +5,9 @@
 
 use simusa_macros::config_derives;
 
+use crate::utils::determinist_random_variable::RandomVariableTypeConfig;
 #[cfg(feature = "gui")]
 use crate::{constants::TIME_ROUND_DECIMALS, gui::UIComponent};
-use crate::utils::determinist_random_variable::RandomVariableTypeConfig;
 
 /// Numeric configuration value.
 ///
@@ -40,8 +40,7 @@ impl UIComponent for NumberConfig {
         global_config: &crate::simulator::SimulatorConfig,
         current_node_name: Option<&String>,
         unique_id: &str,
-    )
-    {
+    ) {
         match self {
             NumberConfig::Num(num) => {
                 ui.add(egui::DragValue::new(num).max_decimals(TIME_ROUND_DECIMALS));
@@ -59,9 +58,7 @@ impl UIComponent for NumberConfig {
         }
         if ui.button("Switch number type").clicked() {
             *self = match self {
-                NumberConfig::Num(_) => {
-                    NumberConfig::Rand(RandomVariableTypeConfig::default())
-                }
+                NumberConfig::Num(_) => NumberConfig::Rand(RandomVariableTypeConfig::default()),
                 NumberConfig::Rand(_) => NumberConfig::Num(1.),
             }
         }

@@ -89,7 +89,7 @@ mod tests {
             robot_sensor::RobotSensorConfig,
             sensor_manager::{ManagedSensorConfig, SensorManagerConfig},
         },
-        simulator::{SimusaBrokerMultiClient, Simulator, SimulatorConfig},
+        simulator::{Simulator, SimulatorConfig, SimusaBrokerMultiClient},
         state_estimators::{
             BenchStateEstimatorConfig, StateEstimator, StateEstimatorConfig, StateEstimatorRecord,
             WorldState,

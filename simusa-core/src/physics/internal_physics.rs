@@ -10,7 +10,10 @@ use std::sync::{Arc, Mutex};
 use crate::{gui::UIComponent, simulator::SimulatorConfig};
 
 use crate::{
-    context::Context, error, internal, logger::InternalLog, physics::{
+    context::Context,
+    error, internal,
+    logger::InternalLog,
+    physics::{
         fault_models::fault_model::{
             PhysicsFaultModel, PhysicsFaultModelConfig, make_physics_fault_model_from_config,
         },
@@ -259,8 +262,7 @@ impl Physics for InternalPhysics {
             );
             panic!(
                 "State should be requested at the same time as the last update: {} != {}",
-                time,
-                self.last_time_update
+                time, self.last_time_update
             );
         }
         self.state.clone()

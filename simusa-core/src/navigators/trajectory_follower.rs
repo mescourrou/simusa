@@ -7,7 +7,7 @@
 //! The behavior is configured through [`TrajectoryFollowerConfig`].
 
 #[cfg(feature = "gui")]
-use crate::gui::{UIComponent, utils::path_finder};
+use crate::gui::UIComponent;
 
 use crate::{
     context::Context,
@@ -27,8 +27,6 @@ use config_checker::*;
 use serde_derive::{Deserialize, Serialize};
 use simusa_macros::config_derives;
 
-use std::path::Path;
-
 /// Configuration of the [`TrajectoryFollower`] strategy.
 ///
 /// The trajectory is loaded from the file specified by `trajectory_path`, which should be compatible with
@@ -43,7 +41,7 @@ use std::path::Path;
 #[config_derives]
 pub struct TrajectoryFollowerConfig {
     /// Path to follow.
-    /// 
+    ///
     /// To use an external file, use !include path/to/file.yaml. The path is relative to the path of the configuration file.
     pub trajectory: TrajectoryConfig,
     /// Forward projection distance used during map matching, in meters.
@@ -66,21 +64,21 @@ pub struct TrajectoryFollowerConfig {
 }
 
 impl Check for TrajectoryFollowerConfig {
-    fn do_check(&self) -> Result<(), Vec<String>> {
-        let mut errs = Vec::new();
+    fn do_check(&self) -> CheckResult {
+        let mut ret = CheckResult::new();
         if self.forward_distance < 0. {
-            errs.push("Forward distance should be positive".to_string());
+            ret.add_error("Forward distance should be positive".to_string());
         }
         if self.target_speed < 0. {
-            errs.push("Target speed should be positive".to_string());
+            ret.add_error("Target speed should be positive".to_string());
         }
         if self.stop_distance < 0. {
-            errs.push("Stop distance should be positive".to_string());
+            ret.add_error("Stop distance should be positive".to_string());
         }
         if self.stop_ramp_coefficient < 0. {
-            errs.push("Stop ramp coefficient should be positive".to_string());
+            ret.add_error("Stop ramp coefficient should be positive".to_string());
         }
-        if errs.is_empty() { Ok(()) } else { Err(errs) }
+        ret
     }
 }
 
@@ -114,7 +112,14 @@ impl UIComponent for TrajectoryFollowerConfig {
                     egui::CollapsingHeader::new("Trajectory")
                         .id_salt(format!("trajectory-{}", unique_id))
                         .show(ui, |ui| {
-                            self.trajectory.show_mut(ui, _ctx, _buffer_stack, global_config, _current_node_name, unique_id);
+                            self.trajectory.show_mut(
+                                ui,
+                                _ctx,
+                                _buffer_stack,
+                                global_config,
+                                _current_node_name,
+                                unique_id,
+                            );
                         });
                 });
 
@@ -275,10 +280,10 @@ impl TrajectoryFollower {
     /// * `initial_time` - Initial simulation time, in seconds. Not used by this navigator, but provided for consistency with other navigators and potential future use.
     pub fn from_config(
         config: &TrajectoryFollowerConfig,
-        global_config: &SimulatorConfig,
+        _global_config: &SimulatorConfig,
         _initial_time: f32,
     ) -> Self {
-        let trajectory =  Trajectory::from_config(&config.trajectory);
+        let trajectory = Trajectory::from_config(&config.trajectory);
         TrajectoryFollower {
             trajectory,
             forward_distance: config.forward_distance,

@@ -21,26 +21,22 @@ pub struct NormalRandomVariableConfig {
 }
 
 impl Check for NormalRandomVariableConfig {
-    fn do_check(&self) -> Result<(), Vec<String>> {
-        let mut errors = Vec::new();
+    fn do_check(&self) -> CheckResult {
+        let mut ret = CheckResult::new();
         if self.mean.is_empty() {
-            errors.push("Mean vector cannot be empty.".to_string());
+            ret.add_error("Mean vector cannot be empty.".to_string());
         }
         if self.covariance.is_empty() {
-            errors.push("Covariance vector cannot be empty.".to_string());
+            ret.add_error("Covariance vector cannot be empty.".to_string());
         }
         if self.mean.len().pow(2) != self.covariance.len() {
-            errors.push(format!(
+            ret.add_error(format!(
                 "The length of the covariance vector should be the square of the means' one. Got {} mean values and {} covariance values.",
                 self.mean.len(),
                 self.covariance.len()
             ));
         }
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
+        ret
     }
 }
 

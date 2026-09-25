@@ -28,7 +28,7 @@ use crate::{
         AreaEventTriggerConfig, EventConfig, EventRecord, EventTriggerConfig, EventTypeConfig,
         ProximityEventTriggerConfig, ScenarioConfig, SpawnEventConfig, TimeEventTriggerConfig,
     },
-    simulator::{RunningParameters, SimusaBroker, Simulator, SimulatorConfig},
+    simulator::{RunningParameters, Simulator, SimulatorConfig, SimusaBroker},
     utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
     warning,
 };

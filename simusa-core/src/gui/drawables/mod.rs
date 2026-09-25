@@ -1,11 +1,24 @@
-use std::{cell::Cell, collections::{BTreeMap, HashMap}, default, sync::{Arc, Mutex}};
+use std::{
+    cell::Cell,
+    collections::BTreeMap,
+    sync::{Arc, Mutex},
+};
 
-use colored::Colorize;
-use eframe::egui_glow::painter;
-use egui::{FontId, Rect, Response, RichText, Shape, Vec2};
+use egui::{Rect, Response, RichText, Shape, Vec2};
 use serde::{Deserialize, Serialize};
 
-use crate::{api::async_api::AsyncApiRunner, context::Context, environment::map::MapRecord, error, gui::app::PainterInfo, node::node_factory::{ComputationUnitConfig, ComputationUnitRecord, RecordType, RobotConfig, RobotRecord}, plugin_api::PluginAPI, recordable::Recordable, scenario::config::EventRecord, simulator::SimulatorConfig};
+use crate::{
+    api::async_api::AsyncApiRunner,
+    context::Context,
+    environment::map::MapRecord,
+    error,
+    gui::app::PainterInfo,
+    node::node_factory::{ComputationUnitRecord, RecordType, RobotRecord},
+    plugin_api::PluginAPI,
+    recordable::Recordable,
+    scenario::config::EventRecord,
+    simulator::SimulatorConfig,
+};
 
 pub mod map;
 pub mod observations;
@@ -26,7 +39,7 @@ pub trait Drawable {
     fn add_robot_record(&mut self, time: f32, record: RobotRecord) {}
 
     /// Function called when a new computation unit record is received. The time of the record can be different from the time of the last drawing.
-    /// 
+    ///
     /// See [`add_robot_record`](Drawable::add_robot_record) for more information.
     #[allow(unused_variables)]
     fn add_computation_unit_record(&mut self, time: f32, record: ComputationUnitRecord) {}
@@ -38,7 +51,7 @@ pub trait Drawable {
     fn add_map_record(&mut self, time: f32, record: MapRecord) {}
 
     /// Function called when a new scenario event record is received. The time of the record can be different from the time of the last drawing.
-    /// 
+    ///
     /// See [`add_robot_record`](Drawable::add_robot_record) for more information.
     #[allow(unused_variables)]
     fn add_scenario_record(&mut self, time: f32, record: EventRecord) {}
@@ -50,16 +63,15 @@ pub trait Drawable {
     }
 
     /// Returns the name of the drawable, to display its settings on the GUI and its toggle button.
-    /// 
+    ///
     /// If the drawable is not associated with a node, it should return a name.
-    /// 
+    ///
     /// If the drawable is associated with a node, if it returns None, the drawable will be toggled with the node global button.
     fn name(&self) -> Option<String>;
 
     /// Show parameters of the drawable to be customized in the GUI.
     #[allow(unused_variables)]
     fn show_params_mut(&mut self, ui: &mut egui::Ui, unique_id: &str) {}
-
 
     /// Draws the drawable for the given time.
     ///
@@ -131,13 +143,23 @@ impl DrawableManager {
 
     fn add_drawable(&mut self, drawable: Box<dyn Drawable>, context: &Context) {
         if let Some(category) = drawable.associated_node_name() {
-            self.categories.get_mut().entry(category).or_insert_with(Vec::new).push(self.drawables.len());
+            self.categories
+                .get_mut()
+                .entry(category)
+                .or_default()
+                .push(self.drawables.len());
         } else {
             if drawable.name().is_none() {
-                error!(context, "Drawables without name and without associated node are ignored.", );
+                error!(
+                    context,
+                    "Drawables without name and without associated node are ignored.",
+                );
                 return;
             }
-            self.categories.get_mut().entry(Self::GLOBAL_CATEGORY.to_string()).and_modify(|v| v.push(self.drawables.len()));
+            self.categories
+                .get_mut()
+                .entry(Self::GLOBAL_CATEGORY.to_string())
+                .and_modify(|v| v.push(self.drawables.len()));
         }
         self.drawables.push(drawable);
         if self.enabled.len() < self.drawables.len() {
@@ -145,7 +167,13 @@ impl DrawableManager {
         }
     }
 
-    pub fn init_drawables(&mut self, config: &SimulatorConfig, plugin_api: &Option<Arc<dyn PluginAPI>>, server: &Option<Arc<Mutex<AsyncApiRunner>>>, context: &Context) {
+    pub fn init_drawables(
+        &mut self,
+        config: &SimulatorConfig,
+        plugin_api: &Option<Arc<dyn PluginAPI>>,
+        server: &Option<Arc<Mutex<AsyncApiRunner>>>,
+        context: &Context,
+    ) {
         let environment = server
             .as_ref()
             .unwrap()
@@ -158,18 +186,26 @@ impl DrawableManager {
         // Prepare drawable management
         self.drawables.clear();
         self.categories.set(BTreeMap::new());
-        self.categories.get_mut().insert(Self::GLOBAL_CATEGORY.to_string(), Vec::new());
+        self.categories
+            .get_mut()
+            .insert(Self::GLOBAL_CATEGORY.to_string(), Vec::new());
         // Insert Map
-        self.add_drawable(Box::new(map::Map::init(
-            environment.map().record(context),
-            config,
+        self.add_drawable(
+            Box::new(map::Map::init(
+                Some(environment.map().record(context)),
+                config,
+                context,
+            )),
             context,
-        )), context);
-        
+        );
+
         // Insert robots
         for robot in &config.robots {
             if robot.autospawn {
-                self.add_drawable(Box::new(robot::Robot::init(robot, config, robot.name.clone())), context);
+                self.add_drawable(
+                    Box::new(robot::Robot::init(robot, config, robot.name.clone())),
+                    context,
+                );
                 self.drawn_robots.push(robot.name.clone());
             }
         }
@@ -208,7 +244,6 @@ impl DrawableManager {
         &mut self,
         ui: &mut egui::Ui,
         ctx: &egui::Context,
-        _viewport: Rect,
         response: &Response,
         painter_info: &PainterInfo,
         drawing_scale: f32,
@@ -229,7 +264,13 @@ impl DrawableManager {
         }
     }
 
-    pub fn add_record(&mut self, time: f32, record: &RecordType, simulator_config: &Option<SimulatorConfig>, context: &Context) {
+    pub fn add_record(
+        &mut self,
+        time: f32,
+        record: &RecordType,
+        simulator_config: &Option<SimulatorConfig>,
+        context: &Context,
+    ) {
         match &record {
             RecordType::ComputationUnit(rec) => {
                 for drawable in self.drawables.iter_mut() {
@@ -237,17 +278,19 @@ impl DrawableManager {
                 }
             }
             RecordType::Robot(rec) => {
-                if !self.drawn_robots.contains(&rec.name) && let Some(config) = simulator_config {
+                if !self.drawn_robots.contains(&rec.name)
+                    && let Some(config) = simulator_config
+                {
                     if let Some(new_config) =
-                            config.robots.iter().find(|rc| rc.name == rec.model_name)
+                        config.robots.iter().find(|rc| rc.name == rec.model_name)
                     {
-                        self.add_drawable(Box::new(robot::Robot::init(new_config, config, rec.name.clone())), context);
+                        self.add_drawable(
+                            Box::new(robot::Robot::init(new_config, config, rec.name.clone())),
+                            context,
+                        );
                         self.drawn_robots.push(rec.name.clone());
                     } else {
-                        error!(
-                            context,
-                            "Received record for unknown robot {}", rec.name
-                        );
+                        error!(context, "Received record for unknown robot {}", rec.name);
                     }
                 }
                 for drawable in self.drawables.iter_mut() {
@@ -270,11 +313,11 @@ impl DrawableManager {
     fn draw_one_drawable(&mut self, ui: &mut egui::Ui, index: usize, unique_id: &str) {
         if let Some(name) = self.drawables[index].name() {
             egui::CollapsingHeader::new(name)
-            .id_salt(format!("{}", unique_id))
-            .show(ui, |ui| {
-                ui.checkbox(&mut self.enabled[index], "Enabled");
-                self.drawables[index].show_params_mut(ui, unique_id);
-            });
+                .id_salt(unique_id.to_string())
+                .show(ui, |ui| {
+                    ui.checkbox(&mut self.enabled[index], "Enabled");
+                    self.drawables[index].show_params_mut(ui, unique_id);
+                });
         } else {
             self.drawables[index].show_params_mut(ui, unique_id);
         }
@@ -287,7 +330,7 @@ impl DrawableManager {
             if category != Self::GLOBAL_CATEGORY {
                 ui.separator();
                 egui::CollapsingHeader::new(category)
-                    .id_salt(format!("{}", unique_id))
+                    .id_salt(unique_id.to_string())
                     .show(ui, |ui| {
                         for index in indices {
                             let unique_id = format!("{}-{}", unique_id, index);

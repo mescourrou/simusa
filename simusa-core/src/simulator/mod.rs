@@ -489,16 +489,17 @@ impl Simulator {
     ) -> SimusaResult<()> {
         println!("Checking configuration...");
         self.init_log(&config.log)?;
-        match config.check() {
-            Ok(_) => println!("Config valid"),
-            Err(e) => {
-                let e = SimusaError::new(
-                    SimusaErrorTypes::ConfigError,
-                    format!("Error in config:\n{e}"),
-                );
-                error!(Context::default(), "{}", e.detailed_error());
-                return Err(e);
-            }
+        let check_result = config.check();
+        print!("{}", check_result);
+        if check_result.is_ok() {
+            println!("Config valid");
+        } else {
+            let e = SimusaError::new(
+                SimusaErrorTypes::ConfigError,
+                format!("Error in config: {}", check_result),
+            );
+            error!(self.context, "{}", e.detailed_error());
+            return Err(e);
         };
         let config_version: Vec<usize> = config
             .version
@@ -515,7 +516,7 @@ impl Simulator {
             || config_version[1] != env!("CARGO_PKG_VERSION_MINOR").parse::<usize>().unwrap()
         {
             warning!(
-                Context::default(),
+                self.context,
                 "Config major version ({}) differs from software version ({})",
                 config.version,
                 VERSION
@@ -569,7 +570,8 @@ impl Simulator {
         initial_time: f32,
         context: &Context,
     ) -> SimusaResult<()> {
-        let context: Context = context.new_callstack_level(&format!("add_robot({})", robot_config.name));
+        let context: Context =
+            context.new_callstack_level(&format!("add_robot({})", robot_config.name));
         let new_node = NodeFactory::make_robot(
             robot_config,
             &mut MakeNodeParams {
@@ -2008,7 +2010,7 @@ def show():
     }
 
     /// Get the list of nodes of the simulator.
-    /// 
+    ///
     /// WARNING: The list is empty while the simulator is running in multithreaded mode,
     /// as the nodes are running in their own threads and are not accessible from the main thread.
     pub fn get_nodes(&self) -> &Vec<Node> {

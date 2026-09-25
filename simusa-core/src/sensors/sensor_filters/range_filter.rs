@@ -38,12 +38,12 @@ pub struct RangeFilterConfig<SV: EnumVariables> {
 }
 
 impl<SV: EnumVariables> Check for RangeFilterConfig<SV> {
-    fn do_check(&self) -> Result<(), Vec<String>> {
-        let mut errors = Vec::new();
+    fn do_check(&self) -> CheckResult {
+        let mut ret = CheckResult::new();
         if self.variables.len() != self.min_range.len()
             || self.variables.len() != self.max_range.len()
         {
-            errors.push(format!(
+            ret.add_error(format!(
                 "variables, min_range and max_range should have the same length, got {} variables, {} min_range and {} max_range",
                 self.variables.len(),
                 self.min_range.len(),
@@ -53,18 +53,14 @@ impl<SV: EnumVariables> Check for RangeFilterConfig<SV> {
         let possible_variables = SV::to_vec();
         for var in &self.variables {
             if !possible_variables.contains(&var.to_string().as_str()) {
-                errors.push(format!(
+                ret.add_error(format!(
                     "Unknown variable name: '{}'. Available variable names: [{}]",
                     var,
                     possible_variables.join(", ")
                 ));
             }
         }
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
+        ret
     }
 }
 

@@ -40,19 +40,15 @@ pub struct MisdetectionFaultConfig {
 }
 
 impl Check for MisdetectionFaultConfig {
-    fn do_check(&self) -> Result<(), Vec<String>> {
-        let mut errors = Vec::new();
+    fn do_check(&self) -> CheckResult {
+        let mut ret = CheckResult::new();
         if self.apparition.probability.len() != 1 {
-            errors.push(format!(
+            ret.add_error(format!(
                 "Apparition probability should be of length 1, got {}",
                 self.apparition.probability.len()
             ));
         }
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
+        ret
     }
 }
 

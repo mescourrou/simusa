@@ -33,7 +33,7 @@ use crate::{
     plugin_api::PluginAPI,
     scenario::config::EventRecord,
     sensors::sensor_manager::{SensorManager, SensorManagerConfig, SensorManagerRecord},
-    simulator::{SimusaBroker, SimusaBrokerMultiClient, SimulatorConfig, TimeCv},
+    simulator::{SimulatorConfig, SimusaBroker, SimusaBrokerMultiClient, TimeCv},
     state_estimators::{
         self, BenchStateEstimator, BenchStateEstimatorConfig, BenchStateEstimatorRecord, State,
         StateEstimatorConfig, StateEstimatorRecord, perfect_estimator,

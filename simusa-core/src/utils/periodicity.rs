@@ -7,7 +7,7 @@ use crate::{
     constants::TIME_ROUND,
     utils::{
         determinist_random_variable::{
-            DeterministRandomVariable, DeterministRandomVariableFactory, RandomVariableTypeConfig,
+            DeterministRandomVariable, DeterministRandomVariableFactory,
         },
         distributions::fixed::{DeterministFixedRandomVariable, FixedRandomVariableConfig},
         maths::round_precision,
@@ -37,34 +37,30 @@ pub struct PeriodicityConfig {
 }
 
 impl Check for PeriodicityConfig {
-    fn do_check(&self) -> Result<(), Vec<String>> {
-        let mut errors = Vec::new();
+    fn do_check(&self) -> CheckResult {
+        let mut ret = CheckResult::new();
         if let NumberConfig::Num(num) = &self.period
             && *num <= 0.
         {
-            errors.push("Periodicity period should be positive".to_string());
+            ret.add_error("Periodicity period should be positive".to_string());
         }
         if let Some(offset) = &self.offset
             && let NumberConfig::Num(num) = offset
             && *num < 0.
         {
-            errors.push("Periodicity offset should be positive or null".to_string());
+            ret.add_error("Periodicity offset should be positive or null".to_string());
         }
         if let Some(table) = &self.table {
             if table.iter().any(|v| *v < 0.) {
-                errors.push("Periodic table values should be positive or null".to_string());
+                ret.add_error("Periodic table values should be positive or null".to_string());
             }
             if let NumberConfig::Num(p) = &self.period
                 && table.iter().any(|v| *v > *p)
             {
-                errors.push("Periodic table values should be within the period".to_string());
+                ret.add_error("Periodic table values should be within the period".to_string());
             }
         }
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
+        ret
     }
 }
 
@@ -118,12 +114,12 @@ impl UIComponent for PeriodicityConfig {
             ui.horizontal(|ui| {
                 ui.label("Period:");
                 self.period.show_mut(
-                            ui,
-                            ctx,
-                            buffer_stack,
-                            global_config,
-                            current_node_name,
-                            unique_id,
+                    ui,
+                    ctx,
+                    buffer_stack,
+                    global_config,
+                    current_node_name,
+                    unique_id,
                 );
             });
             ui.horizontal(|ui| {

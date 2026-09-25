@@ -58,25 +58,21 @@ pub struct StateConfig {
 }
 
 impl Check for StateConfig {
-    fn do_check(&self) -> Result<(), Vec<String>> {
-        let mut errors = Vec::new();
+    fn do_check(&self) -> CheckResult {
+        let mut ret = CheckResult::new();
         if self.pose.len() > 3 {
-            errors.push(format!(
+            ret.add_error(format!(
                 "Pose should contain at most 3 elements, got {}",
                 self.pose.len()
             ));
         }
         if self.velocity.len() > 2 {
-            errors.push(format!(
+            ret.add_error(format!(
                 "Velocity should contain at most 2 elements, got {}",
                 self.velocity.len()
             ));
         }
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
+        ret
     }
 }
 

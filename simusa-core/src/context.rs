@@ -32,9 +32,8 @@ pub struct Context {
     /// Empty by default, meaning no exclusion filter.
     pub excluded_nodes: SharedRwLock<HashSet<String>>,
 
-    write_targets: SharedMutex<Vec<LoggerType>>,
-    /// Keep track if the write target has been modified from the default one, to avoid unnecessary cloning of the write targets when logging.
-    is_write_target_default: SharedMutex<bool>,
+    config_write_targets: SharedMutex<Vec<LoggerType>>,
+    manual_write_targets: SharedMutex<Vec<LoggerType>>,
 }
 
 impl Default for Context {
@@ -46,10 +45,10 @@ impl Default for Context {
             current_sim_time: None,
             included_nodes: Arc::new(RwLock::new(HashSet::new())),
             excluded_nodes: Arc::new(RwLock::new(HashSet::new())),
-            write_targets: Arc::new(Mutex::new(vec![LoggerType::Console(
+            manual_write_targets: Arc::new(Mutex::new(vec![LoggerType::Console(
                 ConsoleLogger::default(),
             )])),
-            is_write_target_default: Arc::new(Mutex::new(true)),
+            config_write_targets: Arc::new(Mutex::new(Vec::new())),
         }
     }
 }
@@ -57,13 +56,10 @@ impl Default for Context {
 impl Context {
     /// Creates a new context for the given node name and log level.
     pub fn new(log_config: &LoggerConfig, time: Option<f32>) -> Self {
-        let mut write_targets = Vec::new();
+        let mut config_write_targets = Vec::new();
         for output in &log_config.outputs {
             match output {
-                LoggerTypeConfig::Console => {
-                    write_targets.push(LoggerType::Console(ConsoleLogger::default()))
-                }
-                LoggerTypeConfig::File(filepath) => write_targets.push(LoggerType::File(
+                LoggerTypeConfig::File(filepath) => config_write_targets.push(LoggerType::File(
                     crate::logger::FileLogger::new(filepath.clone()),
                 )),
             }
@@ -79,8 +75,10 @@ impl Context {
             excluded_nodes: Arc::new(RwLock::new(
                 log_config.excluded_nodes.iter().cloned().collect(),
             )),
-            write_targets: Arc::new(Mutex::new(write_targets)),
-            is_write_target_default: Arc::new(Mutex::new(false)),
+            config_write_targets: Arc::new(Mutex::new(config_write_targets)),
+            manual_write_targets: Arc::new(Mutex::new(vec![LoggerType::Console(
+                ConsoleLogger::default(),
+            )])),
         }
     }
 
@@ -95,26 +93,20 @@ impl Context {
             excluded_nodes.clear();
             excluded_nodes.extend(log_config.excluded_nodes.iter().cloned());
 
-            let mut write_targets = self.write_targets.lock().unwrap();
-            let mut is_write_target_default = self.is_write_target_default.lock().unwrap();
-            if *is_write_target_default && !log_config.outputs.is_empty() {
-                write_targets.clear();
-                *is_write_target_default = false;
-            } else if !*is_write_target_default {
-                write_targets.clear();
-            }
+            let mut config_write_targets = self.config_write_targets.lock().unwrap();
+            config_write_targets.clear();
             // let _ = write_targets.drain(0..default_len);
             for output in &log_config.outputs {
                 match output {
-                    LoggerTypeConfig::Console => {
-                        write_targets.push(LoggerType::Console(ConsoleLogger::default()))
-                    }
-                    LoggerTypeConfig::File(filepath) => write_targets.push(LoggerType::File(
-                        crate::logger::FileLogger::new(filepath.clone()),
-                    )),
+                    LoggerTypeConfig::File(filepath) => config_write_targets.push(
+                        LoggerType::File(crate::logger::FileLogger::new(filepath.clone())),
+                    ),
                 }
             }
-            println!("There is now logging to {} targets", write_targets.len());
+            println!(
+                "There is now logging to {} targets",
+                config_write_targets.len() + self.manual_write_targets.lock().unwrap().len()
+            );
         }
         info!(self, "Log level updated to {:?}", log_config.log_level);
     }
@@ -191,9 +183,13 @@ impl Context {
             None
         };
         if !message.is_empty() {
-            let mut write_targets = self.write_targets.lock().unwrap();
+            let mut config_write_targets = self.config_write_targets.lock().unwrap();
+            let mut manual_write_targets = self.manual_write_targets.lock().unwrap();
             let time = self.get_time();
-            for target in write_targets.iter_mut() {
+            for target in manual_write_targets
+                .iter_mut()
+                .chain(config_write_targets.iter_mut())
+            {
                 target.log(
                     &level,
                     time,
@@ -210,9 +206,9 @@ impl Context {
     ///
     /// See [`LoggerType`] for available write targets.
     pub fn add_write_target(&self, target: LoggerType) {
-        let mut write_targets = self.write_targets.lock().unwrap();
-        println!("Adding write target: {}", target);
-        write_targets.push(target);
+        let mut manual_write_targets = self.manual_write_targets.lock().unwrap();
+        println!("Adding manual write target: {:?}", target);
+        manual_write_targets.push(target);
     }
 
     /// Check if the given internal log category is enabled in the context's configuration.

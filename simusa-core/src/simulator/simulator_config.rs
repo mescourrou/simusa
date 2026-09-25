@@ -20,7 +20,7 @@ use crate::{
     scenario::config::ScenarioConfig,
     simulator::ResultConfig,
     time_analysis::TimeAnalysisConfig,
-    utils::{self, format_option_f32},
+    utils::format_option_f32,
 };
 
 #[cfg(feature = "gui")]
@@ -59,24 +59,23 @@ impl Default for OptimizationConfig {
 }
 
 impl Check for OptimizationConfig {
-    fn do_check(&self) -> Result<(), Vec<String>> {
+    fn do_check(&self) -> CheckResult {
         #[cfg(not(feature = "monothreaded"))]
         {
-            Ok(())
+            CheckResult::new() // No check for now, any value is valid
         }
         #[cfg(feature = "monothreaded")]
         {
+            let mut ret = CheckResult::new();
             if self.threads != 1 {
                 use crate::context::Context;
                 use crate::warning;
 
-                warning!(
-                    Context::default(),
-                    "The 'monothreaded' feature is enabled, so only 1 thread (no parallelization) is supported, got {} in the configuration (ignoring the 'threads' value)",
+                ret.add_warning(format!("The 'monothreaded' feature is enabled, so only 1 thread (no parallelization) is supported, got {} in the configuration (ignoring the 'threads' value)",
                     self.threads
-                );
+                ));
             }
-            Ok(())
+            ret
         }
     }
 }
@@ -87,7 +86,7 @@ impl Check for OptimizationConfig {
 /// # Example
 ///
 /// ```yaml
-/// version: 1.8.0
+/// version: 1.9.0
 /// max_time: 10.0
 /// log:
 ///   log_level:
@@ -100,7 +99,7 @@ impl Check for OptimizationConfig {
 ///   analysis_unit: s
 /// random_seed: null # Different seed each run
 /// environment:
-///   map_path: null
+///   map: null
 /// robots:
 ///   - name: robot1
 ///     navigator:
@@ -205,17 +204,15 @@ impl SimulatorConfig {
     /// input path and expands time-analysis output paths accordingly.
     pub fn load_from_path(path: &Path) -> SimusaResult<Self> {
         // let mut value = .expect("Failed to load config").parse();
-        let mut config: serde_yaml_ng::Value = match yaml_include::Transformer::new(path.into(), true) {
-            Ok(loader) => loader.parse(),
-            Err(error) => {
-                let what = format!(
-                    "Error while loading the config file : {}",
-                    error
-                );
-                println!("ERROR: {what}");
-                return Err(SimusaError::new(SimusaErrorTypes::ConfigError, what));
-            }
-        };
+        let mut config: serde_yaml_ng::Value =
+            match yaml_include::Transformer::new(path.into(), true) {
+                Ok(loader) => loader.parse(),
+                Err(error) => {
+                    let what = format!("Error while loading the config file : {}", error);
+                    println!("ERROR: {what}");
+                    return Err(SimusaError::new(SimusaErrorTypes::ConfigError, what));
+                }
+            };
         config.apply_merge().map_err(|e| {
             let what = format!("Error from SerdeYAML while merging YAML tags: {}", e);
             println!("ERROR: {what}");
