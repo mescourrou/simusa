@@ -33,7 +33,7 @@ use crate::simulator::SimulatorConfig;
 use crate::state_estimators::State;
 use crate::utils::determinist_random_variable::DeterministRandomVariableFactory;
 use crate::utils::enum_tools::EnumVariables;
-use crate::utils::frame::{Frame, FrameConfig, FrameRecord};
+use crate::utils::frame::{self, Frame, FrameConfig, FrameRecord};
 use crate::utils::periodicity::{Periodicity, PeriodicityConfig};
 use serde_derive::{Deserialize, Serialize};
 
@@ -252,9 +252,6 @@ pub struct RobotSensorConfig {
     pub filters: Vec<RobotSensorFilterConfig>,
     /// If `true`, line-of-sight occlusion checks are bypassed.
     pub xray: bool,
-    /// Frame of the sensor with respect to the robot frame. The observations will be given in this frame.
-    #[check]
-    pub frame: FrameConfig,
 }
 
 impl Check for RobotSensorConfig {
@@ -282,7 +279,6 @@ impl Default for RobotSensorConfig {
             faults: Vec::new(),
             filters: Vec::new(),
             xray: false,
-            frame: FrameConfig::default(),
         }
     }
 }
@@ -332,15 +328,6 @@ impl UIComponent for RobotSensorConfig {
                     ui.checkbox(&mut self.xray, "");
                 });
 
-                self.frame.show_mut(
-                    ui,
-                    ctx,
-                    buffer_stack,
-                    global_config,
-                    current_node_name,
-                    unique_id,
-                );
-
                 RobotSensorFilterConfig::show_all_mut(
                     &mut self.filters,
                     ui,
@@ -383,8 +370,6 @@ impl UIComponent for RobotSensorConfig {
                     ui.label(format!("X-Ray mode: {}", self.xray));
                 });
 
-                self.frame.show(ui, ctx, unique_id);
-
                 RobotSensorFilterConfig::show_all(&self.filters, ui, ctx, unique_id);
 
                 RobotSensorFaultModelConfig::show_all(&self.faults, ui, ctx, unique_id);
@@ -396,7 +381,6 @@ impl UIComponent for RobotSensorConfig {
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct RobotSensorRecord {
     last_time: Option<f32>,
-    frame: FrameRecord,
 }
 
 #[cfg(feature = "gui")]
@@ -409,7 +393,6 @@ impl UIComponent for RobotSensorRecord {
                 None => "None".to_string(),
             }
         ));
-        self.frame.show(ui, _ctx, _unique_id);
     }
 }
 
@@ -424,8 +407,6 @@ pub struct OrientedRobotObservation {
     pub pose: Vector3<f32>,
     /// Fault models applied to this observation.
     pub applied_faults: Vec<RobotSensorFaultModelConfig>,
-    /// Frame of the observation with respect to the robot frame.
-    pub frame: Frame,
 }
 
 impl Recordable<OrientedRobotObservationRecord> for OrientedRobotObservation {
@@ -434,7 +415,6 @@ impl Recordable<OrientedRobotObservationRecord> for OrientedRobotObservation {
             name: self.name.clone(),
             labels: self.labels.clone(),
             pose: self.pose.to_owned().into(),
-            frame: self.frame.record(context),
         }
     }
 }
@@ -448,8 +428,6 @@ pub struct OrientedRobotObservationRecord {
     pub labels: Vec<String>,
     /// Pose of the Robot
     pub pose: [f32; 3],
-    /// Frame of the observation with respect to the robot frame.
-    pub frame: FrameRecord,
 }
 
 #[cfg(feature = "gui")]
@@ -465,7 +443,6 @@ impl UIComponent for OrientedRobotObservationRecord {
                 "Pose: ({}, {}, {})",
                 self.pose[0], self.pose[1], self.pose[2]
             ));
-            self.frame.show(ui, ctx, unique_id);
         });
     }
 }
@@ -482,7 +459,6 @@ pub struct RobotSensor {
     xray: bool,
     faults: Vec<RobotSensorFaultModelType>,
     filters: Vec<RobotSensorFilterType>,
-    frame: Frame,
 }
 
 impl RobotSensor {
@@ -584,7 +560,6 @@ impl RobotSensor {
             faults: fault_models,
             xray: config.xray,
             filters,
-            frame: Frame::from_config(&config.frame),
         })
     }
 }
@@ -611,6 +586,7 @@ impl Sensor for RobotSensor {
         &mut self,
         node: &mut Node,
         time: f32,
+        frame: &Frame,
         context: &Context,
     ) -> Vec<SensorObservation> {
         let mut observation_list = Vec::<SensorObservation>::new();
@@ -630,7 +606,7 @@ impl Sensor for RobotSensor {
         } else {
             State::new() // 0
         };
-        let attached_frame = self.frame.attach_to_state(&state);
+        let attached_frame = frame.attach_to_state(&state);
         let state = attached_frame.state();
 
         let rotation_matrix =
@@ -687,7 +663,6 @@ impl Sensor for RobotSensor {
                     labels,
                     pose,
                     applied_faults: Vec::new(),
-                    frame: self.frame.clone(),
                 });
 
                 let mut keep_observation = Some(obs);
@@ -999,7 +974,6 @@ impl Sensor for RobotSensor {
                                                     f.config().clone(),
                                                 ),
                                             ],
-                                            frame: self.frame.clone(),
                                         },
                                     );
                                     new_obs.push(obs);
@@ -1079,10 +1053,9 @@ impl Sensor for RobotSensor {
 }
 
 impl Recordable<SensorRecord> for RobotSensor {
-    fn record(&self, context: &Context) -> SensorRecord {
+    fn record(&self, _context: &Context) -> SensorRecord {
         SensorRecord::RobotSensor(RobotSensorRecord {
             last_time: self.last_time,
-            frame: self.frame.record(context),
         })
     }
 }

@@ -30,7 +30,7 @@ use crate::simulator::SimulatorConfig;
 use crate::state_estimators::{State, StateRecord};
 use crate::utils::determinist_random_variable::DeterministRandomVariableFactory;
 use crate::utils::enum_tools::EnumVariables;
-use crate::utils::frame::{Frame, FrameConfig, FrameRecord};
+use crate::utils::frame::{self, Frame, FrameConfig, FrameRecord};
 use crate::utils::periodicity::{Periodicity, PeriodicityConfig};
 use serde_derive::{Deserialize, Serialize};
 use simusa_macros::{EnumToString, UIComponent, config_derives, enum_variables};
@@ -194,9 +194,6 @@ pub struct SpeedSensorConfig {
     /// Filter chain applied before fault injection.
     #[check]
     pub filters: Vec<SpeedSensorFilterConfig>,
-    /// Frame of the sensor, the velocity will be expressed in this frame.
-    #[check]
-    pub frame: FrameConfig,
 }
 
 impl Default for SpeedSensorConfig {
@@ -209,7 +206,6 @@ impl Default for SpeedSensorConfig {
             }),
             faults: Vec::new(),
             filters: Vec::new(),
-            frame: FrameConfig::default(),
         }
     }
 }
@@ -246,15 +242,6 @@ impl UIComponent for SpeedSensorConfig {
                     }
                 });
 
-                self.frame.show_mut(
-                    ui,
-                    ctx,
-                    buffer_stack,
-                    global_config,
-                    current_node_name,
-                    unique_id,
-                );
-
                 SpeedSensorFilterConfig::show_all_mut(
                     &mut self.filters,
                     ui,
@@ -288,7 +275,7 @@ impl UIComponent for SpeedSensorConfig {
                         ui.label("No activation");
                     }
                 });
-                self.frame.show(ui, ctx, unique_id);
+
                 SpeedSensorFilterConfig::show_all(&self.filters, ui, ctx, unique_id);
 
                 SpeedSensorFaultModelConfig::show_all(&self.faults, ui, ctx, unique_id);
@@ -301,7 +288,6 @@ impl UIComponent for SpeedSensorConfig {
 pub struct SpeedSensorRecord {
     last_time: Option<f32>,
     last_state: StateRecord,
-    frame: FrameRecord,
 }
 
 #[cfg(feature = "gui")]
@@ -316,8 +302,6 @@ impl UIComponent for SpeedSensorRecord {
         ));
         ui.label("Last state: ");
         self.last_state.show(ui, ctx, unique_id);
-        ui.label("Frame: ");
-        self.frame.show(ui, ctx, unique_id);
     }
 }
 
@@ -332,8 +316,6 @@ pub struct SpeedObservation {
     pub angular_velocity: f32,
     /// Fault models that were applied to produce this observation.
     pub applied_faults: Vec<SpeedSensorFaultModelConfig>,
-    /// Frame of the sensor, where the velocity will be expressed.
-    pub frame: Frame,
 }
 
 impl Recordable<SpeedObservationRecord> for SpeedObservation {
@@ -342,7 +324,6 @@ impl Recordable<SpeedObservationRecord> for SpeedObservation {
             linear_velocity: self.linear_velocity,
             lateral_velocity: self.lateral_velocity,
             angular_velocity: self.angular_velocity,
-            frame: self.frame.record(context),
         }
     }
 }
@@ -356,8 +337,6 @@ pub struct SpeedObservationRecord {
     pub lateral_velocity: f32,
     /// Recorded angular velocity component.
     pub angular_velocity: f32,
-    /// Frame of the sensor, where the velocity is expressed.
-    pub frame: FrameRecord,
 }
 
 #[cfg(feature = "gui")]
@@ -367,7 +346,6 @@ impl UIComponent for SpeedObservationRecord {
             ui.label(format!("Linear velocity: {}", self.linear_velocity));
             ui.label(format!("Lateral velocity: {}", self.lateral_velocity));
             ui.label(format!("Angular velocity: {}", self.angular_velocity));
-            self.frame.show(ui, ctx, unique_id);
         });
     }
 }
@@ -383,7 +361,6 @@ pub struct SpeedSensor {
     last_time: Option<f32>,
     faults: Vec<SpeedSensorFaultModelType>,
     filters: Vec<SpeedSensorFilterType>,
-    frame: Frame,
 }
 
 impl SpeedSensor {
@@ -450,7 +427,6 @@ impl SpeedSensor {
             last_time: None,
             faults: fault_models,
             filters,
-            frame: Frame::from_config(&config.frame),
         })
     }
 }
@@ -484,6 +460,7 @@ impl Sensor for SpeedSensor {
         &mut self,
         node: &mut Node,
         time: f32,
+        frame: &Frame,
         context: &Context,
     ) -> Vec<SensorObservation> {
         if let Some(last_time) = self.last_time
@@ -496,7 +473,7 @@ impl Sensor for SpeedSensor {
             .expect("Node with Speed sensor should have Physics");
         let physic = arc_physic.read().unwrap();
         let state = physic.state(time, context);
-        let attached_frame = self.frame.attach_to_state(&state);
+        let attached_frame = frame.attach_to_state(&state);
         let state = attached_frame.state();
 
         let obs = SensorObservation::Speed(SpeedObservation {
@@ -504,7 +481,6 @@ impl Sensor for SpeedSensor {
             lateral_velocity: state.velocity.y,
             angular_velocity: state.velocity.z,
             applied_faults: Vec::new(),
-            frame: self.frame.clone(),
         });
 
         let mut keep_observation = Some(obs);
@@ -632,7 +608,6 @@ impl Recordable<SensorRecord> for SpeedSensor {
         SensorRecord::SpeedSensor(SpeedSensorRecord {
             last_time: self.last_time,
             last_state: self.last_state.record(context),
-            frame: self.frame.record(context),
         })
     }
 }

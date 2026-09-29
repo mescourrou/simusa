@@ -138,6 +138,7 @@ impl Drawable for Robot {
                                 painter_info,
                                 scale,
                                 o,
+                                &obs.frame,
                                 &Vector3::from(pose),
                             )?)
                         }
@@ -148,6 +149,7 @@ impl Drawable for Robot {
                                 painter_info,
                                 scale,
                                 o,
+                                &obs.frame,
                                 &Vector3::from(pose),
                             )?)
                         }
@@ -158,6 +160,7 @@ impl Drawable for Robot {
                                 painter_info,
                                 scale,
                                 o,
+                                &obs.frame,
                             )?)
                         }
                         SensorObservationRecord::Scan(o) => {
@@ -167,6 +170,7 @@ impl Drawable for Robot {
                                 painter_info,
                                 scale,
                                 o,
+                                &obs.frame,
                                 &Vector3::from(pose),
                             )?)
                         }

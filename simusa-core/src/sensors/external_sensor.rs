@@ -21,6 +21,7 @@ use crate::networking::network::Network;
 use crate::recordable::Recordable;
 use crate::simulator::SimulatorConfig;
 use crate::utils::SharedRwLock;
+use crate::utils::frame::Frame;
 use crate::utils::macros::{external_config, external_record_python_methods};
 use crate::utils::maths::round_precision;
 use crate::{
@@ -169,9 +170,10 @@ impl Sensor for ExternalSensor {
         &mut self,
         node: &mut Node,
         time: f32,
+        frame: &Frame,
         context: &Context,
     ) -> Vec<SensorObservation> {
-        self.sensor.get_observations(node, time, context)
+        self.sensor.get_observations(node, time, frame, context)
     }
 
     fn next_time_step(&self) -> f32 {

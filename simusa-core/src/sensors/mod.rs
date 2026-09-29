@@ -38,15 +38,11 @@ use {
 };
 
 use crate::{
-    context::Context,
-    errors::SimusaResult,
-    node::Node,
-    recordable::Recordable,
-    sensors::{
+    context::Context, errors::SimusaResult, node::Node, recordable::Recordable, sensors::{
         displacement_sensor::{DisplacementObservation, DisplacementObservationRecord},
         external_sensor::{ExternalObservation, ExternalObservationRecord},
         scan_sensor::{ScanObservation, ScanObservationRecord},
-    },
+    }, utils::frame::{Frame, FrameRecord},
 };
 #[cfg(feature = "gui")]
 use crate::{
@@ -66,6 +62,8 @@ pub struct Observation {
     pub time: f32,
     /// Sensor-specific observation payload.
     pub sensor_observation: SensorObservation,
+    /// Frame of the sensor's pose observations, relative to the node's reference point.
+    pub frame: Frame,
 }
 
 impl Observation {
@@ -76,6 +74,7 @@ impl Observation {
             observer: "someone".to_string(),
             time: 0.,
             sensor_observation: SensorObservation::Speed(SpeedObservation::default()),
+            frame: Frame::default(),
         }
     }
 }
@@ -93,6 +92,7 @@ impl Recordable<ObservationRecord> for Observation {
             observer: self.observer.clone(),
             time: self.time,
             sensor_observation: self.sensor_observation.record(context),
+            frame: self.frame.record(context),
         }
     }
 }
@@ -108,6 +108,8 @@ pub struct ObservationRecord {
     pub time: f32,
     /// Sensor-specific recorded payload.
     pub sensor_observation: SensorObservationRecord,
+    /// Frame of the sensor's pose observations, relative to the node's reference point.
+    pub frame: FrameRecord,
 }
 
 // Implementation of traits needed for sorting observations, first by time, then by sensor name, then by observer.
@@ -144,6 +146,7 @@ impl UIComponent for ObservationRecord {
         ui.label(format!("Sensor name: {}", self.sensor_name));
         ui.label(format!("Observer: {}", self.observer));
         ui.label(format!("Time: {}", self.time));
+        self.frame.show(ui, ctx, unique_id);
         self.sensor_observation.show(ui, ctx, unique_id);
     }
 }
@@ -453,6 +456,7 @@ pub trait Sensor:
     /// ## Arguments
     /// * `node` - Reference to the node to access the modules.
     /// * `time` - Time at which the observations are taken.
+    /// * `frame` - Position of the sensor relative to the node's reference point.
     /// * `context` - Shared simulation context used for logging and communication metadata.
     ///
     /// ## Return
@@ -462,6 +466,7 @@ pub trait Sensor:
         &mut self,
         node: &mut Node,
         time: f32,
+        frame: &Frame,
         context: &Context,
     ) -> Vec<SensorObservation>;
 

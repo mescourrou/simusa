@@ -25,6 +25,7 @@ use simusa::state_estimators::{
 };
 use simusa::utils::determinist_random_variable::DeterministRandomVariableFactory;
 use simusa::utils::SharedRwLock;
+use simusa::utils::frame::Frame;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -283,6 +284,7 @@ impl Sensor for MyWonderfulSensor {
         &mut self,
         _node: &mut Node,
         time: f32,
+        _frame: &Frame,
         _context: &Context,
     ) -> Vec<SensorObservation> {
         self.last_observation = Some(MyWonderfulSensorObservation { data: time });

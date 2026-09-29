@@ -40,6 +40,7 @@ use crate::sensors::scan_sensor::ScanSensor;
 use crate::simulator::SimusaBrokerMultiClient;
 use crate::state_estimators::State;
 use crate::utils::SharedRwLock;
+use crate::utils::frame::{Frame, FrameConfig};
 use crate::{internal, networking, warning};
 use crate::{recordable::Recordable, simulator::SimulatorConfig};
 
@@ -71,6 +72,9 @@ pub struct ManagedSensorConfig {
     #[check]
     /// Concrete sensor configuration.
     pub config: SensorConfig,
+    /// Frame configuration for the sensor's pose observations, relative to the node's reference point.
+    #[check]
+    pub frame: FrameConfig,
 }
 
 impl Default for ManagedSensorConfig {
@@ -80,6 +84,7 @@ impl Default for ManagedSensorConfig {
             send_to: Vec::new(),
             triggered: false,
             config: SensorConfig::Speed(SpeedSensorConfig::default()),
+            frame: FrameConfig::default(),
         }
     }
 }
@@ -132,6 +137,15 @@ impl UIComponent for ManagedSensorConfig {
                     string_checkbox(ui, &node_list, &mut self.send_to);
                 });
 
+                self.frame.show_mut(
+                    ui,
+                    ctx,
+                    buffer_stack,
+                    global_config,
+                    current_node_name,
+                    unique_id,
+                );
+
                 self.config.show_mut(
                     ui,
                     ctx,
@@ -161,6 +175,8 @@ impl UIComponent for ManagedSensorConfig {
                         ui.label(format!("{}, ", to));
                     }
                 });
+
+                self.frame.show(ui, ctx, unique_id);
 
                 self.config.show(ui, ctx, unique_id);
             });
@@ -284,6 +300,7 @@ struct ManagedSensor {
     triggered: bool,
     last_triggered: Option<f32>,
     sensor: SharedRwLock<Box<dyn Sensor>>,
+    frame: Frame,
 }
 
 /// Message used to trigger a sensor through the internal network.
@@ -432,6 +449,7 @@ impl SensorManager {
                 })),
                 triggered: sensor_config.triggered,
                 last_triggered: None,
+                frame: Frame::from_config(&sensor_config.frame),
             });
         }
 
@@ -611,13 +629,14 @@ impl SensorManager {
                     .sensor
                     .write()
                     .unwrap()
-                    .get_observations(node, time, context)
+                    .get_observations(node, time, &sensor.frame, context)
                     .into_iter()
                     .map(|obs| Observation {
                         sensor_name: sensor.name.clone(),
                         observer: node.name(),
                         time,
                         sensor_observation: obs,
+                        frame: sensor.frame.clone(),
                     })
                     .collect()
             } else {

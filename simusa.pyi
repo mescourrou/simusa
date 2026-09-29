@@ -161,6 +161,7 @@ class Observation:
         self.observer: str
         self.time: float
         self.sensor_observation: SensorObservation
+        self.frame: Pose
 
 
 class Command(Enum):
