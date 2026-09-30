@@ -211,7 +211,7 @@ macro_rules! external_record {
         $struct_name:ident,
     ) => {
 $(#[$meta])*
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[simusa_macros::config_derives(skip_unknown_fields)]
 pub struct $struct_name {
     /// Record serialized.
     #[serde(flatten)]

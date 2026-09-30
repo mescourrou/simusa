@@ -43,6 +43,15 @@ pub struct ExternalObservation {
     pub observation: Value,
 }
 
+impl ExternalObservation {
+    /// Creates an [`ExternalObservation`] from the given record.
+    pub fn from_record(record: &ExternalObservationRecord) -> Self {
+        Self {
+            observation: record.record.clone(),
+        }
+    }
+}
+
 #[cfg(feature = "gui")]
 impl UIComponent for ExternalObservation {
     fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {

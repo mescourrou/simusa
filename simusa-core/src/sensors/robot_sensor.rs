@@ -409,6 +409,17 @@ pub struct OrientedRobotObservation {
     pub applied_faults: Vec<RobotSensorFaultModelConfig>,
 }
 
+impl OrientedRobotObservation {
+    pub fn from_record(record: &OrientedRobotObservationRecord) -> Self {
+        Self {
+            name: record.name.clone(),
+            labels: record.labels.clone(),
+            pose: Vector3::new(record.pose[0], record.pose[1], record.pose[2]),
+            applied_faults: Vec::new(),
+        }
+    }
+}
+
 impl Recordable<OrientedRobotObservationRecord> for OrientedRobotObservation {
     fn record(&self, context: &Context) -> OrientedRobotObservationRecord {
         OrientedRobotObservationRecord {
@@ -420,7 +431,8 @@ impl Recordable<OrientedRobotObservationRecord> for OrientedRobotObservation {
 }
 
 /// Serializable record representation of an [`OrientedRobotObservation`].
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[config_derives]
+#[derive(Default)]
 pub struct OrientedRobotObservationRecord {
     /// Name of the Robot
     pub name: String,

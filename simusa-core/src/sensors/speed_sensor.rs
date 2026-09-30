@@ -318,18 +318,31 @@ pub struct SpeedObservation {
     pub applied_faults: Vec<SpeedSensorFaultModelConfig>,
 }
 
+impl SpeedObservation {
+    pub fn from_record(record: &SpeedObservationRecord) -> Self {
+        Self {
+            linear_velocity: record.linear_velocity,
+            lateral_velocity: record.lateral_velocity,
+            angular_velocity: record.angular_velocity,
+            applied_faults: record.applied_faults.clone(),
+        }
+    }
+}
+
 impl Recordable<SpeedObservationRecord> for SpeedObservation {
     fn record(&self, context: &Context) -> SpeedObservationRecord {
         SpeedObservationRecord {
             linear_velocity: self.linear_velocity,
             lateral_velocity: self.lateral_velocity,
             angular_velocity: self.angular_velocity,
+            applied_faults: self.applied_faults.clone(),
         }
     }
 }
 
 /// Serializable record for a [`SpeedObservation`].
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[config_derives]
+#[derive(Default)]
 pub struct SpeedObservationRecord {
     /// Recorded forward linear velocity component.
     pub linear_velocity: f32,
@@ -337,6 +350,8 @@ pub struct SpeedObservationRecord {
     pub lateral_velocity: f32,
     /// Recorded angular velocity component.
     pub angular_velocity: f32,
+    /// Fault models that were applied to produce this observation.
+    pub applied_faults: Vec<SpeedSensorFaultModelConfig>,
 }
 
 #[cfg(feature = "gui")]
@@ -346,6 +361,14 @@ impl UIComponent for SpeedObservationRecord {
             ui.label(format!("Linear velocity: {}", self.linear_velocity));
             ui.label(format!("Lateral velocity: {}", self.lateral_velocity));
             ui.label(format!("Angular velocity: {}", self.angular_velocity));
+            if self.applied_faults.is_empty() {
+                ui.label("No applied faults.");
+            } else {
+                ui.label("Applied faults:");
+                for fault in &self.applied_faults {
+                    ui.label(format!("{:?}", fault));
+                }
+            }
         });
     }
 }

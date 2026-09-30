@@ -619,6 +619,7 @@ pub fn config_derives(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_str = attr.to_string();
 
     let mut check_derive = quote! { Check, };
+    let mut partial_eq_derive = quote! { PartialEq, };
     let mut deserialize_derive = quote! { serde::Deserialize, };
     let mut serialize_derive = quote! { serde::Serialize, };
     let mut tagged_derive = quote! { #[serde(tag = "type")] };
@@ -645,6 +646,9 @@ pub fn config_derives(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
             "tag_content" => {
                 tagged_derive = quote! {  #[serde(tag = "type", content = "value")] };
+            }
+            "skip_partial_eq" => {
+                partial_eq_derive = quote! {};
             }
             "untagged" => {
                 tagged_derive = quote! {  #[serde(untagged)] };
@@ -697,7 +701,7 @@ pub fn config_derives(attr: TokenStream, item: TokenStream) -> TokenStream {
             #deserialize_derive
             Debug,
             Clone,
-            PartialEq,
+            #partial_eq_derive
             #check_derive
             simusa_macros::ToVec,
         )]

@@ -213,11 +213,21 @@ scenario:
     event_type: 
       type: Kill
       value: $0
-    
-
-  
-    
-        
-        
-  
+  - trigger: 
+      type: Time
+      value:
+        occurences: 
+          type: Num
+          value: 1
+        time:
+          type: Num
+          value: 3
+    event_type:
+      type: SendMessage
+      value:
+        channel: /simusa/nodes/robot1/sensors/set_frame
+        message:
+          type: SensorFrame
+          sensor_name: "RobotSensor"
+          frame: [0, 0, 0.5]
   

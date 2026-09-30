@@ -1121,7 +1121,7 @@ impl NodeWrapper {
         flags: Vec<MessageFlag>,
     ) -> PyResult<()> {
         if let Some(network) = self.network.as_ref().and_then(|n| n.upgrade()) {
-            let msg = message.to_rust();
+            let msg = message.to_rust(&self.context);
             let key = PathKey::from_str(to.as_str()).unwrap();
             let msg = Envelope {
                 from: self.name.clone(),
@@ -1151,7 +1151,7 @@ impl NodeWrapper {
                 .write()
                 .unwrap()
                 .subscribe_to(&keys, None, &self.context);
-            Ok(MultiClientWrapper::from_rust(client))
+            Ok(MultiClientWrapper::from_rust(client, self.context.clone()))
         } else {
             Err(PyErr::new::<PyTypeError, _>("No network on this node"))
         }
@@ -1207,6 +1207,7 @@ impl NodeWrapper {
 #[pyo3(name = "Client")]
 pub struct MultiClientWrapper {
     client: SimusaBrokerMultiClient,
+    context: Context,
 }
 
 #[pymethods]
@@ -1244,7 +1245,7 @@ impl MultiClientWrapper {
         time: f32,
         flags: Vec<MessageFlag>,
     ) -> PyResult<()> {
-        let msg = message.to_rust();
+        let msg = message.to_rust(&self.context);
         let key = PathKey::from_str(to.as_str()).unwrap();
         let msg = Envelope {
             from: self.client.node_id().to_string(),
@@ -1296,8 +1297,8 @@ impl MultiClientWrapper {
 
 impl MultiClientWrapper {
     /// Create a new MultiClientWrapper from a SimusaBrokerMultiClient.
-    pub fn from_rust(client: SimusaBrokerMultiClient) -> Self {
-        Self { client }
+    pub fn from_rust(client: SimusaBrokerMultiClient, context: Context) -> Self {
+        Self { client, context }
     }
 }
 

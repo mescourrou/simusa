@@ -911,6 +911,24 @@
             "type",
             "value"
           ]
+        },
+        {
+          "description": "Sends a message to a channel.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "SendMessage"
+            },
+            "value": {
+              "$ref": "#/$defs/SendMessageEventConfig"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ]
         }
       ]
     },
@@ -931,6 +949,11 @@
       "additionalProperties": true
     },
     "ExternalNavigatorConfig": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "ExternalObservationRecord": {
+      "description": "Record for the external sensor (generic).",
       "type": "object",
       "additionalProperties": true
     },
@@ -1744,12 +1767,16 @@
             },
             "faults": [],
             "filters": [],
-            "frame": {
-              "theta": 0.0,
-              "x": 0.0,
-              "y": 0.0
-            },
             "type": "Speed"
+          }
+        },
+        "frame": {
+          "description": "Frame configuration for the sensor's pose observations, relative to the node's reference point.",
+          "$ref": "#/$defs/FrameConfig",
+          "default": {
+            "theta": 0.0,
+            "x": 0.0,
+            "y": 0.0
           }
         },
         "name": {
@@ -1823,6 +1850,174 @@
           "description": "Width of the landmark\n\n\nSerialization values(s) for this variable: `width`, `w`",
           "type": "string",
           "const": "width"
+        }
+      ]
+    },
+    "MessageType": {
+      "description": "Payload variants that can transit through the network.\n\nThis enum is exposed to Python through `pyo3` and is serializable for transport.",
+      "oneOf": [
+        {
+          "description": "Arbitrary UTF-8 textual payload.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "String"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Navigation payload used by [`GoToMessage`].",
+          "type": "object",
+          "properties": {
+            "target_point": {
+              "description": "Target point in world coordinates `[x, y]`.\n\n`None` clears the current target.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "default": null,
+              "items": {
+                "type": "number",
+                "format": "float"
+              },
+              "maxItems": 2,
+              "minItems": 2
+            },
+            "type": {
+              "type": "string",
+              "const": "GoTo"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Sensor event payload used by [`SensorTriggerMessage`].",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "SensorTrigger"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Observations payload used by [`Observation`].",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Observations"
+            }
+          },
+          "items": {
+            "$ref": "#/$defs/ObservationRecord"
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Setting the frame of a sensor, used by [`SensorManager`](crate::sensors::sensor_manager::SensorManager).",
+          "type": "object",
+          "properties": {
+            "frame": {
+              "description": "New frame",
+              "type": "array",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "items": {
+                "type": "number",
+                "format": "float"
+              },
+              "maxItems": 3,
+              "minItems": 3
+            },
+            "sensor_name": {
+              "description": "Name of the sensor (should already be created in the node)",
+              "type": "string",
+              "default": ""
+            },
+            "type": {
+              "type": "string",
+              "const": "SensorFrame"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Scenario event record payload used by [`EventRecord`].",
+          "type": "object",
+          "properties": {
+            "event": {
+              "description": "Event action associated with this record.",
+              "$ref": "#/$defs/EventTypeConfig",
+              "default": {
+                "type": "Kill",
+                "value": "$0"
+              }
+            },
+            "trigger": {
+              "description": "Trigger configuration that led to this record.",
+              "$ref": "#/$defs/EventTriggerConfig",
+              "default": {
+                "type": "Time",
+                "value": {
+                  "occurences": {
+                    "type": "Num",
+                    "value": 1.0
+                  },
+                  "time": {
+                    "type": "Num",
+                    "value": 0.0
+                  }
+                }
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Event"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Custom payloads that can be serialized and deserialized as needed.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Custom"
+            }
+          },
+          "items": {
+            "type": "integer",
+            "format": "uint8",
+            "maximum": 255,
+            "minimum": 0
+          },
+          "required": [
+            "type"
+          ]
         }
       ]
     },
@@ -2011,6 +2206,49 @@
           ]
         }
       ]
+    },
+    "ObservationRecord": {
+      "description": "Serializable record representation of [`Observation`].",
+      "type": "object",
+      "properties": {
+        "frame": {
+          "description": "Frame of the sensor's pose observations, relative to the node's reference point.",
+          "$ref": "#/$defs/FrameConfig",
+          "default": {
+            "theta": 0.0,
+            "x": 0.0,
+            "y": 0.0
+          }
+        },
+        "observer": {
+          "description": "Name of the observing node.",
+          "type": "string",
+          "default": ""
+        },
+        "sensor_name": {
+          "description": "Sensor name that produced the observation.",
+          "type": "string",
+          "default": ""
+        },
+        "sensor_observation": {
+          "description": "Sensor-specific recorded payload.",
+          "$ref": "#/$defs/SensorObservationRecord",
+          "default": {
+            "angular_velocity": 0.0,
+            "applied_faults": [],
+            "lateral_velocity": 0.0,
+            "linear_velocity": 0.0,
+            "type": "Speed"
+          }
+        },
+        "time": {
+          "description": "Simulation time at which the observation was generated.",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
+        }
+      },
+      "additionalProperties": false
     },
     "OptimizationConfig": {
       "description": "Configuration for the simulator optimization settings.\n\nThese settings can speedup the simulation or not depending on the scenario and the hardware.",
@@ -4668,6 +4906,19 @@
       },
       "additionalProperties": false
     },
+    "SendMessageEventConfig": {
+      "type": "object",
+      "properties": {
+        "channel": {
+          "type": "string",
+          "default": ""
+        },
+        "message": {
+          "$ref": "#/$defs/MessageType"
+        }
+      },
+      "additionalProperties": false
+    },
     "SensorConfig": {
       "description": "Enumerates all the possible sensors configurations.\n\nDefault value (from `#[config_derives]` generated implementation):\n[`SensorConfig::OrientedLandmark`]\nwith [`OrientedLandmarkSensorConfig::default`](crate::sensors::oriented_landmark_sensor::OrientedLandmarkSensorConfig::default).",
       "oneOf": [
@@ -4714,15 +4965,6 @@
               "default": [],
               "items": {
                 "$ref": "#/$defs/OrientedLandmarkSensorFilterConfig"
-              }
-            },
-            "frame": {
-              "description": "Frame of the sensor with respect to the robot frame. The observations will be given in this frame.",
-              "$ref": "#/$defs/FrameConfig",
-              "default": {
-                "theta": 0.0,
-                "x": 0.0,
-                "y": 0.0
               }
             },
             "type": {
@@ -4779,15 +5021,6 @@
                 "$ref": "#/$defs/SpeedSensorFilterConfig"
               }
             },
-            "frame": {
-              "description": "Frame of the sensor, the velocity will be expressed in this frame.",
-              "$ref": "#/$defs/FrameConfig",
-              "default": {
-                "theta": 0.0,
-                "x": 0.0,
-                "y": 0.0
-              }
-            },
             "type": {
               "type": "string",
               "const": "Speed"
@@ -4835,15 +5068,6 @@
               "default": [],
               "items": {
                 "$ref": "#/$defs/DisplacementSensorFilterConfig"
-              }
-            },
-            "frame": {
-              "description": "Frame configuration for the sensor observations.",
-              "$ref": "#/$defs/FrameConfig",
-              "default": {
-                "theta": 0.0,
-                "x": 0.0,
-                "y": 0.0
               }
             },
             "lie_movement": {
@@ -4900,15 +5124,6 @@
                 "$ref": "#/$defs/GNSSSensorFilterConfig"
               }
             },
-            "frame": {
-              "description": "Frame configuration for the sensor's pose observations, relative to the node's reference point.",
-              "$ref": "#/$defs/FrameConfig",
-              "default": {
-                "theta": 0.0,
-                "x": 0.0,
-                "y": 0.0
-              }
-            },
             "type": {
               "type": "string",
               "const": "GNSS"
@@ -4962,15 +5177,6 @@
               "default": [],
               "items": {
                 "$ref": "#/$defs/RobotSensorFilterConfig"
-              }
-            },
-            "frame": {
-              "description": "Frame of the sensor with respect to the robot frame. The observations will be given in this frame.",
-              "$ref": "#/$defs/FrameConfig",
-              "default": {
-                "theta": 0.0,
-                "x": 0.0,
-                "y": 0.0
               }
             },
             "type": {
@@ -5033,15 +5239,6 @@
                 "$ref": "#/$defs/ScanSensorFilterConfig"
               }
             },
-            "frame": {
-              "description": "Frame of the sensor with respect to the robot frame. The observations will be given in this frame.",
-              "$ref": "#/$defs/FrameConfig",
-              "default": {
-                "theta": 0.0,
-                "x": 0.0,
-                "y": 0.0
-              }
-            },
             "height": {
               "description": "Height of the sensor: will only detect objects at this height or higher.",
               "type": "number",
@@ -5096,6 +5293,304 @@
         }
       },
       "additionalProperties": false
+    },
+    "SensorObservationRecord": {
+      "description": "Serializable record sum type for all sensor observations.",
+      "oneOf": [
+        {
+          "description": "Record payload for oriented-landmark observations.",
+          "type": "object",
+          "properties": {
+            "applied_faults": {
+              "description": "Fault models applied at observation generation time.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/OrientedLandmarkSensorFaultModelConfig"
+              }
+            },
+            "height": {
+              "description": "Landmark height.",
+              "type": "number",
+              "format": "float",
+              "default": 0.0
+            },
+            "id": {
+              "description": "Id of the landmark",
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            },
+            "labels": {
+              "description": "Labels associated with the observed landmark.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "string"
+              }
+            },
+            "pose": {
+              "description": "Pose of the landmark",
+              "type": "array",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "items": {
+                "type": "number",
+                "format": "float"
+              },
+              "maxItems": 3,
+              "minItems": 3
+            },
+            "type": {
+              "type": "string",
+              "const": "OrientedLandmark"
+            },
+            "width": {
+              "description": "Landmark width.",
+              "type": "number",
+              "format": "float",
+              "default": 0.0
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Record payload for speed observations.",
+          "type": "object",
+          "properties": {
+            "angular_velocity": {
+              "description": "Recorded angular velocity component.",
+              "type": "number",
+              "format": "float",
+              "default": 0.0
+            },
+            "applied_faults": {
+              "description": "Fault models that were applied to produce this observation.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/SpeedSensorFaultModelConfig"
+              }
+            },
+            "lateral_velocity": {
+              "description": "Recorded lateral linear velocity component.",
+              "type": "number",
+              "format": "float",
+              "default": 0.0
+            },
+            "linear_velocity": {
+              "description": "Recorded forward linear velocity component.",
+              "type": "number",
+              "format": "float",
+              "default": 0.0
+            },
+            "type": {
+              "type": "string",
+              "const": "Speed"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Record payload for displacement observations.",
+          "type": "object",
+          "properties": {
+            "applied_faults": {
+              "description": "Fault models applied at observation generation time.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/DisplacementSensorFaultModelConfig"
+              }
+            },
+            "rotation": {
+              "description": "Recorded rotation during displacement.",
+              "type": "number",
+              "format": "float",
+              "default": 0.0
+            },
+            "translation": {
+              "description": "Recorded planar translation in the sensor frame.",
+              "type": "array",
+              "default": [
+                0.0,
+                0.0
+              ],
+              "items": {
+                "type": "number",
+                "format": "float"
+              },
+              "maxItems": 2,
+              "minItems": 2
+            },
+            "type": {
+              "type": "string",
+              "const": "Displacement"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Record payload for GNSS observations.",
+          "type": "object",
+          "properties": {
+            "pose": {
+              "description": "Recorded global pose represented as `[x, y, theta]`.",
+              "type": "array",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "items": {
+                "type": "number",
+                "format": "float"
+              },
+              "maxItems": 3,
+              "minItems": 3
+            },
+            "type": {
+              "type": "string",
+              "const": "GNSS"
+            },
+            "velocity": {
+              "description": "Recorded global planar velocity represented as `[vx, vy]`.",
+              "type": "array",
+              "default": [
+                0.0,
+                0.0
+              ],
+              "items": {
+                "type": "number",
+                "format": "float"
+              },
+              "maxItems": 2,
+              "minItems": 2
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Record payload for oriented-robot observations.",
+          "type": "object",
+          "properties": {
+            "labels": {
+              "description": "Labels associated with the observed robot.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "string"
+              }
+            },
+            "name": {
+              "description": "Name of the Robot",
+              "type": "string",
+              "default": ""
+            },
+            "pose": {
+              "description": "Pose of the Robot",
+              "type": "array",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "items": {
+                "type": "number",
+                "format": "float"
+              },
+              "maxItems": 3,
+              "minItems": 3
+            },
+            "type": {
+              "type": "string",
+              "const": "OrientedRobot"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Record payload for scan observations.",
+          "type": "object",
+          "properties": {
+            "angles": {
+              "description": "Recorded angle values.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            },
+            "applied_faults": {
+              "description": "Fault configurations applied at observation generation time.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/ScanSensorFaultModelConfig"
+              }
+            },
+            "distances": {
+              "description": "Recorded distance values.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            },
+            "radial_velocities": {
+              "description": "Recorded radial velocity values.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Scan"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Record payload for external observations.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "External"
+            }
+          },
+          "$ref": "#/$defs/ExternalObservationRecord",
+          "required": [
+            "type"
+          ]
+        }
+      ]
     },
     "Sort": {
       "description": "Ordering strategy used to pick replacement labels.\n\nThis controls how candidate labels are arranged before indexing with a sampled value.",

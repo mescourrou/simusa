@@ -5,6 +5,7 @@ Since version 1.5.0, the communication network is based on a publisher-subscribe
 ## Available channels:
 - `/simusa/scenario`: publish scenario events, such as node creation or destruction, with the event type and node name as data.
 - `/simusa/nodes/<node_name>/sensors/<sensor_name>`: allow to trigger the sensor with a `SensorTrigger` message.
+- `/simusa/nodes/<node_name>/sensors/set_frame`: set the frame of the sensor with a `SensorFrame` message.
 - `/simusa/nodes/<node_name>/sensors/observations`: allow to send observation to `node_name`.
 - `/simusa/nodes/<node_name>/navigator/goto`: if using a `GoTo` navigator, allow to change the target point, target speed and stop distance with a `GoTo` message.
 - `/simusa/command/<node_name>`: allow to send a command to `node_name` using message Flags. For now, only `Kill` is available.

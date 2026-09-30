@@ -29,7 +29,7 @@ use crate::context::Context;
 #[cfg(feature = "gui")]
 use crate::gui::UIComponent;
 use crate::internal;
-use crate::networking::{channels, message_types::MessageTypes};
+use crate::networking::{channels, message_types::MessageType};
 use crate::simulator::{SimulatorConfig, SimusaBroker, SimusaBrokerMultiClient};
 use crate::utils::SharedRwLock;
 use crate::utils::determinist_random_variable::DeterministRandomVariableFactory;
@@ -138,7 +138,7 @@ pub struct Envelope {
     /// Sender node name.
     pub from: String,
     /// Message payload.
-    pub message: MessageTypes,
+    pub message: MessageType,
     /// Simulation timestamp associated with this message.
     pub timestamp: f32,
     /// Optional transport flags that alter handling behavior.

@@ -20,7 +20,7 @@ use crate::{
     errors::SimusaResult,
     info,
     navigators::{Navigator, NavigatorRecord},
-    networking::{message_types::MessageTypes, network::Network},
+    networking::{message_types::MessageType, network::Network},
     simulator::SimusaBrokerMultiClient,
     utils::{SharedMutex, SharedRwLock, geometry::smallest_theta_diff},
 };
@@ -34,7 +34,8 @@ use serde_derive::{Deserialize, Serialize};
 use simusa_com::pub_sub::{MultiClientTrait, PathKey};
 use simusa_macros::config_derives;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[config_derives]
+#[derive(Default)]
 #[pyclass(get_all, set_all)]
 /// Runtime message used to update the target point of a [`GoTo`] navigator.
 pub struct GoToMessage {
@@ -348,7 +349,7 @@ impl Navigator for GoTo {
 
     fn pre_loop_hook(&mut self, _node: &mut Node, time: f32, context: &Context) {
         while let Some((_, envelope)) = self.message_client.lock().unwrap().try_receive(time) {
-            if let MessageTypes::GoTo(msg) = envelope.message {
+            if let MessageType::GoTo(msg) = envelope.message {
                 self.current_point = msg.target_point;
                 info!(context, "Update target point to {:?}", self.current_point);
             }

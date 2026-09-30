@@ -8,7 +8,7 @@
 use serde::{Deserialize, Serialize};
 use simusa_macros::config_derives;
 
-use crate::config::NumberConfig;
+use crate::{config::NumberConfig, networking::message_types::MessageType};
 #[cfg(feature = "gui")]
 use crate::gui::UIComponent;
 
@@ -271,6 +271,8 @@ pub enum EventTypeConfig {
     Spawn(SpawnEventConfig),
     /// Kills a node by name.
     Kill(String),
+    /// Sends a message to a channel.
+    SendMessage(SendMessageEventConfig),
 }
 
 impl Default for EventTypeConfig {
@@ -288,6 +290,9 @@ impl UIComponent for EventTypeConfig {
             }
             Self::Kill(target) => {
                 ui.label(format!("Kill Event (target: {})", target));
+            }
+            Self::SendMessage(message) => {
+                message.show(ui, ctx, unique_id);
             }
         }
     }
@@ -325,8 +330,27 @@ impl UIComponent for SpawnEventConfig {
     }
 }
 
+#[config_derives]
+#[derive(Default)]
+pub struct SendMessageEventConfig {
+    pub channel: String,
+    pub message: Box<MessageType>,
+}
+
+#[cfg(feature = "gui")]
+impl UIComponent for SendMessageEventConfig {
+    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
+        ui.label(format!(
+            "Send Message Event (to: {}, message: {:?})",
+            self.channel, self.message
+        ));
+    }
+}
+
+
 /// Record emitted when an event is evaluated/executed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[config_derives]
+#[derive(Default)]
 pub struct EventRecord {
     /// Trigger configuration that led to this record.
     pub trigger: EventTriggerConfig,

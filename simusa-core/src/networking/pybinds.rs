@@ -4,8 +4,7 @@ use pyo3::prelude::*;
 use simusa_macros::EnumToString;
 
 use crate::{
-    navigators::go_to::GoToMessage, networking::message_types::MessageTypes,
-    pywrappers::ObservationWrapper, sensors::sensor_manager::SensorTriggerMessage,
+    context::Context, navigators::go_to::GoToMessage, networking::message_types::MessageType, pywrappers::ObservationWrapper, recordable::Recordable, sensors::{Observation, sensor_manager::{SensorFrameMessage, SensorTriggerMessage}},
 };
 
 #[derive(Clone, Debug, EnumToString)]
@@ -21,6 +20,8 @@ pub enum MessageTypesWrapper {
     SensorTrigger(SensorTriggerMessage),
     /// A list of observations, each wrapped in an [`ObservationWrapper`].
     Observations(Vec<ObservationWrapper>),
+    /// Setting the frame of a sensor, used by [`SensorManager`](crate::sensors::sensor_manager::SensorManager).
+    SensorFrame(SensorFrameMessage),
     /// An event record serialized as a JSON string.
     Event(String),
     /// Custom binary payload.
@@ -38,6 +39,12 @@ impl MessageTypesWrapper {
     #[staticmethod]
     pub fn from_sensor_trigger(message: SensorTriggerMessage) -> Self {
         MessageTypesWrapper::SensorTrigger(message)
+    }
+
+    /// Creates a [`MessageTypes::SensorFrame`] from a [`SensorFrameMessage`].
+    #[staticmethod]
+    pub fn from_sensor_frame(message: SensorFrameMessage) -> Self {
+        MessageTypesWrapper::SensorFrame(message)
     }
 
     /// Creates a [`MessageTypes::String`] from a string.
@@ -62,6 +69,14 @@ impl MessageTypesWrapper {
     pub fn as_goto(&self) -> Option<GoToMessage> {
         match self {
             MessageTypesWrapper::GoTo(msg) => Some(msg.clone()),
+            _ => None,
+        }
+    }
+
+    /// Returns the contained [`SensorFrameMessage`] when this value is [`MessageTypes::SensorFrame`].
+    pub fn as_sensor_frame(&self) -> Option<SensorFrameMessage> {
+        match self {
+            MessageTypesWrapper::SensorFrame(msg) => Some(msg.clone()),
             _ => None,
         }
     }
@@ -116,41 +131,44 @@ impl MessageTypesWrapper {
 
 impl MessageTypesWrapper {
     /// Converts this Python wrapper back into the original Rust enum [`MessageTypes`].
-    pub fn to_rust(&self) -> MessageTypes {
+    pub fn to_rust(&self, context: &Context) -> MessageType {
         match self {
-            MessageTypesWrapper::String(s) => MessageTypes::String(s.clone()),
-            MessageTypesWrapper::GoTo(msg) => MessageTypes::GoTo(msg.clone()),
-            MessageTypesWrapper::SensorTrigger(msg) => MessageTypes::SensorTrigger(msg.clone()),
-            MessageTypesWrapper::Observations(observations) => MessageTypes::Observations(
+            MessageTypesWrapper::String(s) => MessageType::String(s.clone()),
+            MessageTypesWrapper::GoTo(msg) => MessageType::GoTo(msg.clone()),
+            MessageTypesWrapper::SensorTrigger(msg) => MessageType::SensorTrigger(msg.clone()),
+            MessageTypesWrapper::Observations(observations) => MessageType::Observations(
                 observations
                     .iter()
                     .map(ObservationWrapper::to_rust)
+                    .map(|o| o.record(context))
                     .collect(),
             ),
-            MessageTypesWrapper::Event(event) => MessageTypes::Event(
+            MessageTypesWrapper::SensorFrame(msg) => MessageType::SensorFrame(msg.clone()),
+            MessageTypesWrapper::Event(event) => MessageType::Event(
                 serde_json::from_str(event).expect("Failed to parse EventRecord from JSON string"),
             ),
-            MessageTypesWrapper::Custom(data) => MessageTypes::Custom(data.clone()),
+            MessageTypesWrapper::Custom(data) => MessageType::Custom(data.clone()),
         }
     }
 
     /// Creates a [`MessageTypesWrapper`] from a Rust enum [`MessageTypes`].
-    pub fn from_rust(msg: &MessageTypes) -> Self {
+    pub fn from_rust(msg: &MessageType) -> Self {
         match msg {
-            MessageTypes::String(s) => MessageTypesWrapper::String(s.clone()),
-            MessageTypes::GoTo(msg) => MessageTypesWrapper::GoTo(msg.clone()),
-            MessageTypes::SensorTrigger(msg) => MessageTypesWrapper::SensorTrigger(msg.clone()),
-            MessageTypes::Observations(observations) => MessageTypesWrapper::Observations(
+            MessageType::String(s) => MessageTypesWrapper::String(s.clone()),
+            MessageType::GoTo(msg) => MessageTypesWrapper::GoTo(msg.clone()),
+            MessageType::SensorTrigger(msg) => MessageTypesWrapper::SensorTrigger(msg.clone()),
+            MessageType::SensorFrame(msg) => MessageTypesWrapper::SensorFrame(msg.clone()),
+            MessageType::Observations(observations) => MessageTypesWrapper::Observations(
                 observations
                     .iter()
-                    .map(ObservationWrapper::from_rust)
+                    .map(|o| ObservationWrapper::from_rust(&Observation::from_record(o)))
                     .collect(),
             ),
-            MessageTypes::Event(event) => MessageTypesWrapper::Event(
+            MessageType::Event(event) => MessageTypesWrapper::Event(
                 serde_json::to_string(event)
                     .expect("Failed to serialize EventRecord to JSON string"),
             ),
-            MessageTypes::Custom(data) => MessageTypesWrapper::Custom(data.clone()),
+            MessageType::Custom(data) => MessageTypesWrapper::Custom(data.clone()),
         }
     }
 }

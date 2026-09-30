@@ -429,6 +429,19 @@ impl Default for OrientedLandmarkObservation {
     }
 }
 
+impl OrientedLandmarkObservation {
+    pub fn from_record(record: &OrientedLandmarkObservationRecord) -> Self {
+        Self {
+            id: record.id,
+            labels: record.labels.clone(),
+            pose: Vector3::from(record.pose),
+            height: record.height,
+            width: record.width,
+            applied_faults: record.applied_faults.clone(),
+        }
+    }
+}
+
 impl Recordable<OrientedLandmarkObservationRecord> for OrientedLandmarkObservation {
     fn record(&self, context: &Context) -> OrientedLandmarkObservationRecord {
         OrientedLandmarkObservationRecord {
@@ -443,7 +456,8 @@ impl Recordable<OrientedLandmarkObservationRecord> for OrientedLandmarkObservati
 }
 
 /// Serializable record representation of [`OrientedLandmarkObservation`].
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[config_derives]
+#[derive(Default)]
 pub struct OrientedLandmarkObservationRecord {
     /// Id of the landmark
     pub id: i32,

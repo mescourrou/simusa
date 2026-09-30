@@ -77,7 +77,7 @@ mod tests {
         debug,
         logger::LogLevel,
         networking::{
-            message_types::MessageTypes,
+            message_types::MessageType,
             network::{Envelope, Network, NetworkConfig},
         },
         node::{Node, node_factory::RobotConfig},
@@ -130,7 +130,7 @@ mod tests {
             if node.name() == "node1" {
                 println!("{} Sending message...", node.name());
                 let message = Envelope {
-                    message: MessageTypes::String(self.message.clone()),
+                    message: MessageType::String(self.message.clone()),
                     from: node.name().to_string(),
                     timestamp: time,
                     ..Default::default()

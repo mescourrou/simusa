@@ -112,6 +112,10 @@ impl Frame {
         Frame::new(config.x, config.y, config.theta)
     }
 
+    pub fn from_record(record: &FrameRecord) -> Self {
+        Self::from_config(record)
+    }
+
     /// Create a new [`Frame`] with the specified position (x, y) and orientation (theta).
     pub fn new(x: f32, y: f32, theta: f32) -> Self {
         Self {

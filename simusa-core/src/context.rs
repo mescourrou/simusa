@@ -162,6 +162,7 @@ impl Context {
         if level > *enabled_loglevel {
             return;
         }
+        let mut do_print = true;
         let matched_category = if let LogLevel::Internal(l) = &level {
             if let LogLevel::Internal(enabled_list) = &*enabled_loglevel {
                 if enabled_list.contains(&InternalLog::All) {
@@ -174,6 +175,9 @@ impl Context {
                             break;
                         }
                     }
+                    if matched_category.is_none() {
+                        do_print = false;
+                    }
                     matched_category
                 }
             } else {
@@ -182,7 +186,7 @@ impl Context {
         } else {
             None
         };
-        if !message.is_empty() {
+        if !message.is_empty() && do_print {
             let mut config_write_targets = self.config_write_targets.lock().unwrap();
             let mut manual_write_targets = self.manual_write_targets.lock().unwrap();
             let time = self.get_time();

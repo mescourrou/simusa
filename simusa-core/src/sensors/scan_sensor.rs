@@ -516,6 +516,18 @@ pub struct ScanObservation {
     pub applied_faults: Vec<ScanSensorFaultModelConfig>,
 }
 
+impl ScanObservation {
+    /// Constructs a [`ScanObservation`] from a [`ScanObservationRecord`].
+    pub fn from_record(record: &ScanObservationRecord) -> Self {
+        Self {
+            distances: record.distances.clone(),
+            angles: record.angles.clone(),
+            radial_velocities: record.radial_velocities.clone(),
+            applied_faults: record.applied_faults.clone(),
+        }
+    }
+}
+
 impl Iterator for ScanObservation {
     type Item = (f32, f32, f32); // distance, angle, radial velocity
 
@@ -545,7 +557,8 @@ impl Recordable<ScanObservationRecord> for ScanObservation {
 }
 
 /// Serializable record representation of [`ScanObservation`].
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[config_derives]
+#[derive(Default)]
 pub struct ScanObservationRecord {
     /// Recorded distance values.
     pub distances: Vec<f32>,

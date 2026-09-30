@@ -62,7 +62,7 @@ mod kill_node {
         constants::TIME_ROUND,
         context::Context,
         networking::{
-            message_types::MessageTypes,
+            message_types::MessageType,
             network::{Envelope, MessageFlag},
         },
         node::Node,
@@ -98,7 +98,7 @@ mod kill_node {
                     PathKey::from_str("/simusa/command/node2").unwrap(),
                     Envelope {
                         from: node.name(),
-                        message: MessageTypes::default(),
+                        message: MessageType::default(),
                         timestamp: time,
                         message_flags: vec![MessageFlag::Kill],
                     },
@@ -212,7 +212,7 @@ mod trigger_sensor {
         context::Context,
         info,
         networking::{
-            message_types::MessageTypes,
+            message_types::MessageType,
             network::{Envelope, Network},
         },
         node::Node,
@@ -270,7 +270,7 @@ mod trigger_sensor {
                     PathKey::from_str("/simusa/nodes/robot1/sensors/RobotSensor").unwrap(),
                     Envelope {
                         from: node.name(),
-                        message: MessageTypes::SensorTrigger(SensorTriggerMessage {}),
+                        message: MessageType::SensorTrigger(SensorTriggerMessage {}),
                         timestamp: time,
                         ..Default::default()
                     },

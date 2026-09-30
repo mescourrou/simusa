@@ -77,6 +77,16 @@ impl Observation {
             frame: Frame::default(),
         }
     }
+
+    pub fn from_record(record: &ObservationRecord) -> Self {
+        Self {
+            sensor_name: record.sensor_name.clone(),
+            observer: record.observer.clone(),
+            time: record.time,
+            sensor_observation: SensorObservation::from_record(&record.sensor_observation),
+            frame: Frame::from_record(&record.frame),
+        }
+    }
 }
 
 impl Default for Observation {
@@ -98,7 +108,8 @@ impl Recordable<ObservationRecord> for Observation {
 }
 
 /// Serializable record representation of [`Observation`].
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[config_derives(skip_partial_eq)]
+#[derive(Default)]
 pub struct ObservationRecord {
     /// Sensor name that produced the observation.
     pub sensor_name: String,
@@ -152,7 +163,7 @@ impl UIComponent for ObservationRecord {
 }
 
 /// Sum type for all concrete sensor observation payloads.
-#[derive(Debug, Clone, Serialize, Deserialize, EnumToString)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SensorObservation {
     /// Oriented-landmark sensor observation payload.
     OrientedLandmark(OrientedLandmarkObservation),
@@ -168,6 +179,34 @@ pub enum SensorObservation {
     Scan(ScanObservation),
     /// External sensor observation payload.
     External(ExternalObservation),
+}
+
+impl SensorObservation {
+    pub fn from_record(record: &SensorObservationRecord) -> Self {
+        match record {
+            SensorObservationRecord::OrientedLandmark(r) => {
+                SensorObservation::OrientedLandmark(OrientedLandmarkObservation::from_record(r))
+            }
+            SensorObservationRecord::Speed(r) => {
+                SensorObservation::Speed(SpeedObservation::from_record(r))
+            }
+            SensorObservationRecord::Displacement(r) => {
+                SensorObservation::Displacement(DisplacementObservation::from_record(r))
+            }
+            SensorObservationRecord::GNSS(r) => {
+                SensorObservation::GNSS(GNSSObservation::from_record(r))
+            }
+            SensorObservationRecord::OrientedRobot(r) => {
+                SensorObservation::OrientedRobot(OrientedRobotObservation::from_record(r))
+            }
+            SensorObservationRecord::Scan(r) => {
+                SensorObservation::Scan(ScanObservation::from_record(r))
+            }
+            SensorObservationRecord::External(r) => {
+                SensorObservation::External(ExternalObservation::from_record(r))
+            }
+        }
+    }
 }
 
 impl Recordable<SensorObservationRecord> for SensorObservation {
@@ -191,7 +230,7 @@ impl Recordable<SensorObservationRecord> for SensorObservation {
 }
 
 /// Serializable record sum type for all sensor observations.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[config_derives]
 pub enum SensorObservationRecord {
     /// Record payload for oriented-landmark observations.
     OrientedLandmark(OrientedLandmarkObservationRecord),
@@ -207,6 +246,12 @@ pub enum SensorObservationRecord {
     Scan(ScanObservationRecord),
     /// Record payload for external observations.
     External(ExternalObservationRecord),
+}
+
+impl Default for SensorObservationRecord {
+    fn default() -> Self {
+        SensorObservationRecord::Speed(SpeedObservationRecord::default())
+    }
 }
 
 #[cfg(feature = "gui")]

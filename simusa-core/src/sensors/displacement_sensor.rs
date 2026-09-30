@@ -337,10 +337,20 @@ pub struct DisplacementObservation {
     pub applied_faults: Vec<DisplacementSensorFaultModelConfig>,
 }
 
+impl DisplacementObservation {
+    pub fn from_record(record: &DisplacementObservationRecord) -> Self {
+        Self {
+            translation: Vector2::new(record.translation[0], record.translation[1]),
+            rotation: record.rotation,
+            applied_faults: record.applied_faults.clone(),
+        }
+    }
+}
+
 impl Recordable<DisplacementObservationRecord> for DisplacementObservation {
     fn record(&self, context: &Context) -> DisplacementObservationRecord {
         DisplacementObservationRecord {
-            translation: self.translation,
+            translation: self.translation.into(),
             rotation: self.rotation,
             applied_faults: self.applied_faults.clone(),
         }
@@ -348,14 +358,24 @@ impl Recordable<DisplacementObservationRecord> for DisplacementObservation {
 }
 
 /// Serializable record representation of [`DisplacementObservation`].
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[config_derives]
 pub struct DisplacementObservationRecord {
     /// Recorded planar translation in the sensor frame.
-    pub translation: Vector2<f32>,
+    pub translation: [f32; 2],
     /// Recorded rotation during displacement.
     pub rotation: f32,
     /// Fault models applied at observation generation time.
     pub applied_faults: Vec<DisplacementSensorFaultModelConfig>,
+}
+
+impl Default for DisplacementObservationRecord {
+    fn default() -> Self {
+        Self {
+            translation: [0.0, 0.0],
+            rotation: 0.0,
+            applied_faults: Vec::new(),
+        }
+    }
 }
 
 #[cfg(feature = "gui")]

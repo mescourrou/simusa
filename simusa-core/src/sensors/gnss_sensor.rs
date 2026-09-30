@@ -320,8 +320,19 @@ pub struct GNSSObservation {
     pub applied_faults: Vec<GNSSSensorFaultModelConfig>,
 }
 
+impl GNSSObservation {
+    pub fn from_record(record: &GNSSObservationRecord) -> Self {
+        Self {
+            pose: Vector3::new(record.pose[0], record.pose[1], record.pose[2]),
+            velocity: Vector2::new(record.velocity[0], record.velocity[1]),
+            applied_faults: Vec::new(),
+        }
+    }
+}
+
 /// Serializable record representation of [`GNSSObservation`].
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[config_derives]
+#[derive(Default)]
 pub struct GNSSObservationRecord {
     /// Recorded global pose represented as `[x, y, theta]`.
     pub pose: [f32; 3],
