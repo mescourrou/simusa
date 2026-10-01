@@ -3481,28 +3481,68 @@
         }
       ]
     },
+    "ResultAnalyserConfig": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "additionnal_params": {
+              "description": "Arbitrary parameters forwarded to the analysis script (additional_params in the script entry point).\nThis can be used to forward any custom configuration to the analysis script without having to add it to the simulator configuration.",
+              "default": null
+            },
+            "function_name": {
+              "description": "Name of the function to call in the analysis script (default: `analyse_results`).\nThis function should have the following signature:\n```def analyse_results(records: list, config: dict, additional_params: dict|None)```",
+              "type": "string",
+              "default": "analyse_results"
+            },
+            "script_path": {
+              "description": "Path to the Python analysis script (path from config location).\n\nIf the file does not exist, a default script (named `analyse_results.py`) is created in the same directory as the config file.",
+              "type": "string",
+              "default": "analyse_results.py"
+            },
+            "show_figures": {
+              "description": "Show the matplotlib figures (call `plt.show()`)",
+              "type": "boolean",
+              "default": false
+            },
+            "type": {
+              "type": "string",
+              "const": "Python"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "External"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
     "ResultConfig": {
       "description": "Configuration controlling result persistence and post-processing.",
       "type": "object",
       "properties": {
-        "analyse_script": {
-          "description": "Path to the Python analysis script (path from config location).\nThis script should have the following entry point:\n```def analyse(records: list, config: dict, figure_path: str, figure_type: str, additional_param: dict|None)```\nIf this option is `None`, the script is not executed.",
-          "type": [
-            "string",
-            "null"
+        "analyser": {
+          "description": "Select an analyser for the results. If `None`, no analysis is performed.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResultAnalyserConfig"
+            },
+            {
+              "type": "null"
+            }
           ],
-          "default": null
-        },
-        "figures_path": {
-          "description": "Optional output directory for generated figures (path from config location).",
-          "type": [
-            "string",
-            "null"
-          ],
-          "default": null
-        },
-        "python_params": {
-          "description": "Arbitrary parameters forwarded to the analysis script (additional_param in the script entry point). This can be used to forward any custom configuration to the analysis script without having to add it to the simulator configuration.",
           "default": null
         },
         "result_path": {
@@ -3519,11 +3559,6 @@
           "default": {
             "type": "AtTheEnd"
           }
-        },
-        "show_figures": {
-          "description": "Show the matplotlib figures (call `plt.show()`)",
-          "type": "boolean",
-          "default": false
         }
       },
       "additionalProperties": false

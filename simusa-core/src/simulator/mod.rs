@@ -53,6 +53,7 @@ use crate::error;
 use crate::info;
 use crate::internal;
 use crate::physics::Physics;
+use crate::result_analyser::ResultAnalyser;
 use crate::utils::SharedRoLock;
 #[cfg(not(feature = "monothreaded"))]
 use crate::utils::barrier::Barrier;
@@ -278,6 +279,8 @@ pub struct Simulator {
     environment: Arc<Environment>,
     context: Context,
     last_sim_time: f32,
+
+    result_analyser: Option<ResultAnalyser>,
 }
 
 impl Simulator {
@@ -320,6 +323,7 @@ impl Simulator {
             max_threads,
             context: Context::new(&LoggerConfig::default(), Some(0.)),
             last_sim_time: -1.,
+            result_analyser: None,
         }
     }
 
@@ -371,6 +375,7 @@ impl Simulator {
         let config = self.config.clone();
         self.common_time = Arc::new(RwLock::new(f32::INFINITY));
         self.max_threads = config.optimization.threads;
+        self.result_analyser = None;
 
         self.time_analysis_factory = match &config.time_analysis {
             Some(time_analysis) => Some(TimeAnalysisFactory::init_from_config(time_analysis)?),
@@ -386,6 +391,19 @@ impl Simulator {
             ..Default::default()
         });
         self.records.clear();
+
+        self.result_analyser = match &config.results {
+            Some(result_config) => match &result_config.analyser {
+                Some(analyser_config) => Some(ResultAnalyser::from_config(
+                    analyser_config,
+                    &self.config,
+                    &self.plugin_api,
+                    &self.context,
+                )?),
+                None => None,
+            },
+            None => None,
+        };
 
         self.plugin_api = plugin_api.clone();
 
@@ -1897,107 +1915,14 @@ impl Simulator {
 
     /// Compute configured post-processing results from in-memory records.
     pub fn compute_results(&self) -> SimusaResult<()> {
-        let results = self.get_records(false);
-        self._compute_results(results, &self.config)
-    }
-
-    /// Compute the results from the file where it was saved before.
-    ///
-    /// If the [`Simulator`] config disabled the computation of the results, this function
-    /// does nothing.
-    fn _compute_results(&self, results: Vec<Record>, config: &SimulatorConfig) -> SimusaResult<()> {
-        if self.config.results.is_none()
-            || self
-                .config
-                .results
-                .as_ref()
-                .unwrap()
-                .analyse_script
-                .is_none()
-        {
-            return Ok(());
-        }
-        let result_config = self.config.results.clone().unwrap();
-
-        info!(self.context, "Starting result analyse...");
-        let show_figures = result_config.show_figures;
-
-        let json_results =
-            serde_json::to_string(&results).expect("Error during converting results to json");
-        let json_config =
-            serde_json::to_string(&config).expect("Error during converting results to json");
-
-        let show_figure_py = cr#"
-import matplotlib.pyplot as plt
-
-def show():
-    plt.show()
-"#;
-
-        let script_path = self
-            .config
-            .base_path
-            .as_ref()
-            .join(result_config.analyse_script.unwrap());
-        let python_script = match fs::read_to_string(script_path.clone()) {
-            Err(e) => {
-                return Err(SimusaError::new(
-                    SimusaErrorTypes::ConfigError,
-                    format!(
-                        "Result analyser script not found ({}): {}",
-                        script_path.to_str().unwrap(),
-                        e
-                    ),
-                ));
-            }
-            Ok(s) => CString::new(s).unwrap(),
-        };
-        let res = Python::attach(|py| -> PyResult<()> {
-            let script = PyModule::from_code(py, CONVERT_TO_DICT, c_str!(""), c_str!(""))?;
-            let convert_fn: Py<PyAny> = script.getattr("convert")?.into();
-            let result_dict = convert_fn.call(py, (json_results,), None)?;
-            let config_dict = convert_fn.call(py, (json_config,), None)?;
-            let param_dict =
-                convert_fn.call(py, (&result_config.python_params.to_string(),), None)?;
-
-            let script = PyModule::from_code(py, &python_script, c_str!(""), c_str!(""))?;
-            let analyse_fn: Py<PyAny> = script.getattr("analyse")?.into();
-            info!(self.context, "Analyse the results...");
-            let figure_path;
-            if let Some(p) = &result_config.figures_path {
-                figure_path = self.config.base_path.as_ref().join(p);
-                fs::create_dir_all(&figure_path).unwrap_or_else(|_| {
-                    panic!(
-                        "Impossible to create figure directory ({:#?})",
-                        figure_path
-                    )
-                });
-            } else {
-                figure_path = PathBuf::new();
-            }
-            let res = analyse_fn.call(
-                py,
-                (result_dict, config_dict, figure_path, ".pdf", param_dict),
-                None,
-            );
-            if let Err(err) = res {
-                err.display(py);
-                return Err(err);
-            }
-            if show_figures {
-                info!(self.context, "Showing figures...");
-                let show_script = PyModule::from_code(py, show_figure_py, c_str!(""), c_str!(""))?;
-                let show_fn: Py<PyAny> = show_script.getattr("show")?.into();
-                show_fn.call(py, (), None)?;
-            }
-            Ok(())
-        });
-        if let Some(err) = res.err() {
-            Err(SimusaError::new(
-                SimusaErrorTypes::PythonError,
-                err.to_string(),
-            ))
+        if let Some(analyser) = &self.result_analyser {
+            let results = self.get_records(false);
+            analyser.analyse_results(&Results {
+                records: results,
+                config: self.config.clone(),
+            }, &self.context)
         } else {
+            warning!(self.context, "No result analyser configured, cannot compute results");
             Ok(())
         }
     }

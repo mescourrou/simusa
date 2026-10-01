@@ -3,10 +3,14 @@ log:
   log_level:
     type: Debug
 results:
-  result_path: "../result.json"
-  show_figures: false # Disabled for automatic testing
-  analyse_script: "../../../python_scripts/analyse_results.py"
-  figures_path: "../figures"
+  result_path: "result.json"
+  analyser:
+    type: Python
+    show_figures: false # Disabled for automatic testing
+    script_path: "../../../config_example/analyse_results.py"
+    function_name: "analyse_results"
+    additionnal_params:
+      figures_path: "figures"
 # time_analysis:
 #   exporter: TraceEventExporter
 #   output_path: "time_performance"

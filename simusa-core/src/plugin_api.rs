@@ -48,15 +48,7 @@ fn main() {
 use std::sync::Arc;
 
 use crate::{
-    context::Context,
-    controllers::Controller,
-    navigators::Navigator,
-    networking::network::Network,
-    physics::Physics,
-    sensors::{Sensor, fault_models::fault_model::FaultModel, sensor_filters::SensorFilter},
-    simulator::SimulatorConfig,
-    state_estimators::StateEstimator,
-    utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
+    context::Context, controllers::Controller, navigators::Navigator, networking::network::Network, physics::Physics, result_analyser::ResultAnalyserTrait, sensors::{Sensor, fault_models::fault_model::FaultModel, sensor_filters::SensorFilter}, simulator::SimulatorConfig, state_estimators::StateEstimator, utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
 };
 
 /// Trait to link the simulator to the external implementation.
@@ -266,5 +258,26 @@ pub trait PluginAPI: Send + Sync {
         context: &Context,
     ) -> Box<dyn FaultModel> {
         panic!("The given PluginAPI does not provide a sensor fault model");
+    }
+
+    /// Return the [`ResultAnalyserTrait`] to be used by the [`ResultAnalyser`](`crate::result_analyser::ResultAnalyser`).
+    /// 
+    /// # Arguments
+    /// * `config` - Config for the external result analyser. The configuration
+    ///   is given using [`serde_json::Value`]. It should be converted by the
+    ///   external plugin to the specific configuration.
+    /// * `global_config` - Full configuration of the simulator.
+    /// * `context` - Context for the simulation, to allow the result analyser to log.
+    ///
+    /// # Return
+    ///
+    /// Returns the [`ResultAnalyserTrait`] to use.
+    fn get_result_analyser(
+        &self,
+        config: &serde_json::Value,
+        global_config: &SimulatorConfig,
+        context: &Context,
+    ) -> Box<dyn ResultAnalyserTrait> {
+        panic!("The given PluginAPI does not provide a result analyser");
     }
 }

@@ -57,6 +57,7 @@ pub mod pywrappers;
 
 pub mod api;
 pub mod time_analysis;
+pub mod result_analyser;
 
 #[cfg(test)]
 mod integration_tests;

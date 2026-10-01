@@ -10,8 +10,11 @@ log:
       value: "simulator.log"
 results:
   result_path: "results.json"
-  analyse_script: ../python_scripts/analyse_results.py
-  show_figures: false
+  analyser:
+    type: Python
+    show_figures: false # Disabled for automatic testing
+    script_path: "analyse_results.py"
+    function_name: "analyse_results"
 max_time: 60.0
 time_analysis:
   exporter:

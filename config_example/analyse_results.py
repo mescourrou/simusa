@@ -4,8 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import IPython
 
-def analyse(records: list, config: dict, figure_path: str, figure_type: str, additional_param: dict|None):
+def analyse_results(records: list, config: dict, additional_param: dict|None):
 
+    figure_path = additional_param["figures_path"] if additional_param is not None and "figures_path" in additional_param else ""
     # config = data["config"]
     # record = data["record"]
     
@@ -60,4 +61,4 @@ def analyse(records: list, config: dict, figure_path: str, figure_type: str, add
     ax.legend()
     
     if figure_path != "":
-        f.savefig(f"{figure_path}/Trajectories_all{figure_type}", bbox_inches='tight')
+        f.savefig(f"{figure_path}/Trajectories_all.pdf", bbox_inches='tight')
