@@ -77,9 +77,8 @@ use crate::{
     scenario::{Scenario, config::ScenarioConfig},
     time_analysis::{TimeAnalysisConfig, TimeAnalysisFactory},
     utils::{
-        SharedMutex, SharedRwLock,
-        determinist_random_variable::DeterministRandomVariableFactory, maths::round_precision,
-        python::CONVERT_TO_DICT,
+        SharedMutex, SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory,
+        maths::round_precision,
     },
 };
 use core::f32;
@@ -1917,12 +1916,18 @@ impl Simulator {
     pub fn compute_results(&self) -> SimusaResult<()> {
         if let Some(analyser) = &self.result_analyser {
             let results = self.get_records(false);
-            analyser.analyse_results(&Results {
-                records: results,
-                config: self.config.clone(),
-            }, &self.context)
+            analyser.analyse_results(
+                &Results {
+                    records: results,
+                    config: self.config.clone(),
+                },
+                &self.context,
+            )
         } else {
-            warning!(self.context, "No result analyser configured, cannot compute results");
+            warning!(
+                self.context,
+                "No result analyser configured, cannot compute results"
+            );
             Ok(())
         }
     }

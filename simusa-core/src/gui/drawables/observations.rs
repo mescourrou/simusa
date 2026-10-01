@@ -2,14 +2,18 @@ use egui::{Color32, Rect, Shape, Stroke, Vec2};
 use nalgebra::{Vector2, Vector3};
 
 use crate::{
-    gui::app::PainterInfo, sensors::{
+    gui::app::PainterInfo,
+    sensors::{
         gnss_sensor::{GNSSObservationRecord, GNSSSensorConfig},
         oriented_landmark_sensor::{
             OrientedLandmarkObservationRecord, OrientedLandmarkSensorConfig,
         },
         robot_sensor::{OrientedRobotObservationRecord, RobotSensorConfig},
         scan_sensor::{ScanObservationRecord, ScanSensorConfig},
-    }, simulator::SimulatorConfig, state_estimators::State, utils::frame::{Frame, FrameRecord},
+    },
+    simulator::SimulatorConfig,
+    state_estimators::State,
+    utils::frame::{Frame, FrameRecord},
 };
 
 pub struct OrientedRobotObservation {

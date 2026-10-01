@@ -25,9 +25,11 @@ use crate::sensors::fault_models::additive::{AdditiveFault, AdditiveFaultConfig}
 use crate::sensors::fault_models::clutter::{ClutterFault, ClutterFaultConfig};
 use crate::sensors::fault_models::external_fault::{ExternalFault, ExternalFaultConfig};
 use crate::sensors::fault_models::misdetection::{MisdetectionFault, MisdetectionFaultConfig};
+#[cfg(feature = "python")]
 use crate::sensors::fault_models::python_fault_model::{PythonFaultModel, PythonFaultModelConfig};
 use crate::sensors::sensor_filters::SensorFilter;
 use crate::sensors::sensor_filters::external_filter::{ExternalFilter, ExternalFilterConfig};
+#[cfg(feature = "python")]
 use crate::sensors::sensor_filters::python_filter::{PythonFilter, PythonFilterConfig};
 use crate::sensors::sensor_filters::range_filter::{RangeFilter, RangeFilterConfig};
 use crate::simulator::SimulatorConfig;
@@ -82,14 +84,19 @@ enum_variables!(
 #[show_all = "Faults"]
 pub enum GNSSSensorFaultModelConfig {
     /// Additive fault model in robot-centered coordinates.
+    #[check]
     Additive(AdditiveFaultConfig<GNSSSensorVariablesFaults, GNSSSensorVariables>),
     /// Clutter fault model.
+    #[check]
     Clutter(ClutterFaultConfig<GNSSSensorVariablesFaults>),
     /// Misdetection fault model.
+    #[check]
     Misdetection(MisdetectionFaultConfig),
     /// Plugin-provided external fault model.
     External(ExternalFaultConfig),
     /// Python-implemented fault model.
+    #[cfg(feature = "python")]
+    #[check]
     Python(PythonFaultModelConfig),
 }
 
@@ -111,6 +118,7 @@ pub enum GNSSSensorFaultModelType {
     /// Instantiated external fault model.
     External(ExternalFault),
     /// Instantiated Python fault model.
+    #[cfg(feature = "python")]
     Python(PythonFaultModel),
 }
 
@@ -123,6 +131,7 @@ impl GNSSSensorFaultModelType {
         context: &Context,
     ) -> crate::errors::SimusaResult<()> {
         match self {
+            #[cfg(feature = "python")]
             Self::Python(f) => f.post_init(node, initial_time, context),
             Self::External(f) => f.post_init(node, initial_time, context),
             Self::Additive(_) | Self::Clutter(_) | Self::Misdetection(_) => Ok(()),
@@ -145,6 +154,7 @@ pub enum GNSSSensorFilterConfig {
     Range(RangeFilterConfig<GNSSSensorVariablesFilter>),
     /// Python-based custom filtering: delegates exclusion logic to user-defined Python methods.
     #[check]
+    #[cfg(feature = "python")]
     Python(PythonFilterConfig),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
     #[check]
@@ -163,6 +173,7 @@ pub enum GNSSSensorFilterType {
     /// Instantiated range filter for GNSS sensor variables.
     Range(RangeFilter<GNSSSensorVariablesFilter>),
     /// Instantiated Python filter for GNSS sensor observations.
+    #[cfg(feature = "python")]
     Python(PythonFilter),
     /// Instantiated external filter for GNSS sensor observations.
     External(ExternalFilter),
@@ -177,6 +188,7 @@ impl GNSSSensorFilterType {
         context: &Context,
     ) -> crate::errors::SimusaResult<()> {
         match self {
+            #[cfg(feature = "python")]
             Self::Python(f) => f.post_init(node, initial_time, context),
             Self::External(f) => f.post_init(node, initial_time, context),
             Self::Range(_) => Ok(()),
@@ -415,6 +427,7 @@ impl GNSSSensor {
                         context,
                     )?)
                 }
+                #[cfg(feature = "python")]
                 GNSSSensorFaultModelConfig::Python(config) => GNSSSensorFaultModelType::Python(
                     PythonFaultModel::from_config(config, global_config, initial_time, context)?,
                 ),
@@ -427,6 +440,7 @@ impl GNSSSensor {
                 GNSSSensorFilterConfig::Range(config) => GNSSSensorFilterType::Range(
                     RangeFilter::from_config(config, initial_time, context),
                 ),
+                #[cfg(feature = "python")]
                 GNSSSensorFilterConfig::Python(config) => GNSSSensorFilterType::Python(
                     PythonFilter::from_config(config, global_config, initial_time, context)?,
                 ),
@@ -511,6 +525,7 @@ impl Sensor for GNSSSensor {
         for filter in self.filters.iter() {
             if let Some(obs) = keep_observation {
                 keep_observation = match filter {
+                    #[cfg(feature = "python")]
                     GNSSSensorFilterType::Python(f) => f.filter(time, obs, state, None, context),
                     GNSSSensorFilterType::External(f) => f.filter(time, obs, state, None, context),
                     GNSSSensorFilterType::Range(f) => {
@@ -552,6 +567,7 @@ impl Sensor for GNSSSensor {
             observation_list.push(observation);
             for fault_model in self.faults.iter_mut() {
                 match fault_model {
+                    #[cfg(feature = "python")]
                     GNSSSensorFaultModelType::Python(f) => f.add_faults(
                         time,
                         time,

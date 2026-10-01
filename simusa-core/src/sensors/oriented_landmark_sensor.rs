@@ -23,9 +23,11 @@ use crate::sensors::fault_models::misassociation::{
     MisassociationFault, MisassociationFaultConfig,
 };
 use crate::sensors::fault_models::misdetection::{MisdetectionFault, MisdetectionFaultConfig};
+#[cfg(feature = "python")]
 use crate::sensors::fault_models::python_fault_model::{PythonFaultModel, PythonFaultModelConfig};
 use crate::sensors::sensor_filters::SensorFilter;
 use crate::sensors::sensor_filters::external_filter::{ExternalFilter, ExternalFilterConfig};
+#[cfg(feature = "python")]
 use crate::sensors::sensor_filters::python_filter::{PythonFilter, PythonFilterConfig};
 use crate::sensors::sensor_filters::range_filter::{RangeFilter, RangeFilterConfig};
 use crate::sensors::sensor_filters::string_filter::{StringFilter, StringFilterConfig};
@@ -85,22 +87,29 @@ enum_variables!(
 #[show_all = "Faults"]
 pub enum OrientedLandmarkSensorFaultModelConfig {
     /// Additive fault model in robot-centered coordinates.
+    #[check]
     AdditiveRobotCentered(
         AdditiveFaultConfig<OrientedLandmarkSensorVariablesFaults, OrientedLandmarkSensorVariables>,
     ),
     /// Additive fault model in observation-centered coordinates.
+    #[check]
     AdditiveObservationCentered(
         AdditiveFaultConfig<OrientedLandmarkSensorVariablesFaults, OrientedLandmarkSensorVariables>,
     ),
     /// Clutter fault model.
+    #[check]
     Clutter(ClutterFaultConfig<OrientedLandmarkSensorVariablesFaults>),
     /// Misdetection fault model.
+    #[check]
     Misdetection(MisdetectionFaultConfig),
     /// Misassociation fault model.
+    #[check]
     Misassociation(MisassociationFaultConfig),
     /// Plugin-provided external fault model.
     External(ExternalFaultConfig),
     /// Python-implemented fault model.
+    #[cfg(feature = "python")]
+    #[check]
     Python(PythonFaultModelConfig),
 }
 
@@ -130,6 +139,7 @@ pub enum OrientedLandmarkSensorFaultModelType {
     /// Instantiated external fault model.
     External(ExternalFault),
     /// Instantiated Python fault model.
+    #[cfg(feature = "python")]
     Python(PythonFaultModel),
 }
 
@@ -142,6 +152,7 @@ impl OrientedLandmarkSensorFaultModelType {
         context: &Context,
     ) -> crate::errors::SimusaResult<()> {
         match self {
+            #[cfg(feature = "python")]
             Self::Python(f) => f.post_init(node, initial_time, context),
             Self::External(f) => f.post_init(node, initial_time, context),
             Self::AdditiveRobotCentered(_)
@@ -185,6 +196,7 @@ pub enum OrientedLandmarkSensorFilterConfig {
     Label(StringFilterConfig),
     /// Python-based custom filtering: delegates exclusion logic to user-defined Python methods.
     #[check]
+    #[cfg(feature = "python")]
     Python(PythonFilterConfig),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
     #[check]
@@ -207,6 +219,7 @@ pub enum OrientedLandmarkSensorFilterType {
     /// Instantiated string filter for observed object labels.
     Label(StringFilter),
     /// Instantiated Python filter for Oriented Landmark sensor observations.
+    #[cfg(feature = "python")]
     Python(PythonFilter),
     /// Instantiated external filter for Oriented Landmark sensor observations.
     External(ExternalFilter),
@@ -221,6 +234,7 @@ impl OrientedLandmarkSensorFilterType {
         context: &Context,
     ) -> crate::errors::SimusaResult<()> {
         match self {
+            #[cfg(feature = "python")]
             Self::Python(f) => f.post_init(node, initial_time, context),
             Self::External(f) => f.post_init(node, initial_time, context),
             Self::Range(_) | Self::Id(_) | Self::Label(_) => Ok(()),
@@ -572,6 +586,7 @@ impl OrientedLandmarkSensor {
                         context,
                     )?)
                 }
+                #[cfg(feature = "python")]
                 OrientedLandmarkSensorFaultModelConfig::Python(c) => {
                     OrientedLandmarkSensorFaultModelType::Python(PythonFaultModel::from_config(
                         c,
@@ -613,6 +628,7 @@ impl OrientedLandmarkSensor {
                         context,
                     )?)
                 }
+                #[cfg(feature = "python")]
                 OrientedLandmarkSensorFilterConfig::Python(c) => {
                     OrientedLandmarkSensorFilterType::Python(PythonFilter::from_config(
                         c,
@@ -712,6 +728,7 @@ impl Sensor for OrientedLandmarkSensor {
                         OrientedLandmarkSensorFilterType::External(f) => {
                             f.filter(time, obs, state, None, context)
                         }
+                        #[cfg(feature = "python")]
                         OrientedLandmarkSensorFilterType::Python(f) => {
                             f.filter(time, obs, state, None, context)
                         }
@@ -784,6 +801,7 @@ impl Sensor for OrientedLandmarkSensor {
                 new_obs.push(observation); // Not adding directly to observation_list to apply faults only once
                 for fault_model in self.faults.iter_mut() {
                     match fault_model {
+                        #[cfg(feature = "python")]
                         OrientedLandmarkSensorFaultModelType::Python(f) => f.add_faults(
                             time,
                             time + landmark_seed,

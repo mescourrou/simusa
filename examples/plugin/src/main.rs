@@ -24,8 +24,8 @@ use simusa::state_estimators::{
     State, StateEstimator, StateEstimatorRecord, StateRecord, WorldState,
 };
 use simusa::utils::determinist_random_variable::DeterministRandomVariableFactory;
-use simusa::utils::SharedRwLock;
 use simusa::utils::frame::Frame;
+use simusa::utils::SharedRwLock;
 use std::path::Path;
 use std::sync::Arc;
 

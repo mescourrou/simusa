@@ -25,6 +25,8 @@ use crate::environment::Environment;
 use crate::networking::network::MessageFlag;
 use crate::physics::robot_models::Command;
 use crate::simulator::SimusaBrokerMultiClient;
+#[cfg(not(feature = "monothreaded"))]
+use crate::simulator::TimeCv;
 use crate::state_estimators::State;
 use crate::time_analysis::TimeAnalysisNode;
 use crate::utils::read_only_lock::RoLock;
@@ -42,8 +44,6 @@ use crate::{
     state_estimators::{BenchStateEstimator, BenchStateEstimatorRecord, StateEstimator},
     utils::maths::round_precision,
 };
-#[cfg(not(feature = "monothreaded"))]
-use crate::simulator::TimeCv;
 use crate::{internal, networking};
 
 /// Mode State machine.
@@ -261,8 +261,8 @@ impl Node {
         time_cv: &TimeCv,
         context: &Context,
     ) -> SimusaResult<()> {
-        use crate::info;
         use crate::errors::{SimusaError, SimusaErrorTypes};
+        use crate::info;
 
         let context = context.new_callstack_level("run_time_step");
         if self.node_meta_data.read().unwrap().state != NodeState::Running {

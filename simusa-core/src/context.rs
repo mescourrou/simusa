@@ -261,7 +261,7 @@ impl Context {
     }
 
     /// Log an internal message with the "Internal" log level and given categories (at least one should be enabled so that the message is logged).
-    pub(crate) fn log_internal(&self, message: &str, category: Vec<InternalLog>) {
+    pub fn log_internal(&self, message: &str, category: Vec<InternalLog>) {
         self.log(LogLevel::Internal(category), message);
     }
 }

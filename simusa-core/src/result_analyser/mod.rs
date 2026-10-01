@@ -2,12 +2,23 @@ use std::sync::Arc;
 
 use simusa_macros::config_derives;
 
+use crate::{
+    context::Context,
+    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
+    plugin_api::PluginAPI,
+    result_analyser::python_analyser::{PythonResultAnalyser, PythonResultAnalyserConfig},
+    simulator::{Record, Results, SimulatorConfig},
+};
 #[cfg(feature = "gui")]
-use crate::{gui::{UIComponent, utils::{json_config, string_combobox}}, utils::enum_tools::ToVec};
-use crate::{context::Context, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, plugin_api::PluginAPI, result_analyser::python_analyser::{PythonResultAnalyser, PythonResultAnalyserConfig}, simulator::{Record, Results, SimulatorConfig}};
+use crate::{
+    gui::{
+        UIComponent,
+        utils::{json_config, string_combobox},
+    },
+    utils::enum_tools::ToVec,
+};
 
 pub mod python_analyser;
-
 
 #[config_derives]
 pub enum ResultAnalyserConfig {
@@ -32,8 +43,7 @@ impl UIComponent for ResultAnalyserConfig {
         global_config: &SimulatorConfig,
         current_node_name: Option<&String>,
         unique_id: &str,
-    )
-    {
+    ) {
         let mut current_str = self.to_string();
         ui.horizontal(|ui| {
             ui.label("Result Analyser:");
@@ -46,17 +56,22 @@ impl UIComponent for ResultAnalyserConfig {
         });
         if current_str != self.to_string() {
             match current_str.as_str() {
-                "Python" => *self = ResultAnalyserConfig::Python(PythonResultAnalyserConfig::default()),
-                "External" => {
-                    *self = ResultAnalyserConfig::External(
-                        serde_json::Value::default(),
-                    )
+                "Python" => {
+                    *self = ResultAnalyserConfig::Python(PythonResultAnalyserConfig::default())
                 }
+                "External" => *self = ResultAnalyserConfig::External(serde_json::Value::default()),
                 _ => panic!("Where did you find this value?"),
             };
         }
         match self {
-            ResultAnalyserConfig::Python(python_config) => python_config.show_mut(ui, ctx, buffer_stack, global_config, current_node_name, unique_id),
+            ResultAnalyserConfig::Python(python_config) => python_config.show_mut(
+                ui,
+                ctx,
+                buffer_stack,
+                global_config,
+                current_node_name,
+                unique_id,
+            ),
             ResultAnalyserConfig::External(config) => {
                 egui::CollapsingHeader::new("External Result Analyser").show(ui, |ui| {
                     ui.vertical(|ui| {
@@ -95,10 +110,20 @@ pub enum ResultAnalyser {
 }
 
 impl ResultAnalyser {
-    pub fn from_config(config: &ResultAnalyserConfig,  global_config: &SimulatorConfig, plugin_api: &Option<Arc<dyn PluginAPI>>, context: &Context) -> SimusaResult<Self> {
+    pub fn from_config(
+        config: &ResultAnalyserConfig,
+        global_config: &SimulatorConfig,
+        plugin_api: &Option<Arc<dyn PluginAPI>>,
+        context: &Context,
+    ) -> SimusaResult<Self> {
         Ok(match config {
             ResultAnalyserConfig::Python(python_config) => {
-                ResultAnalyser::Python(PythonResultAnalyser::from_config(python_config, global_config, plugin_api, context))
+                ResultAnalyser::Python(PythonResultAnalyser::from_config(
+                    python_config,
+                    global_config,
+                    plugin_api,
+                    context,
+                ))
             }
             ResultAnalyserConfig::External(external_analyser_config) => {
                 if let Some(plugin_api) = plugin_api {
@@ -125,7 +150,6 @@ impl ResultAnalyser {
     }
 }
 
-
-pub trait ResultAnalyserTrait : std::fmt::Debug + std::marker::Send + std::marker::Sync {
+pub trait ResultAnalyserTrait: std::fmt::Debug + std::marker::Send + std::marker::Sync {
     fn analyse_results(&self, results: &Results, context: &Context) -> SimusaResult<()>;
 }

@@ -14,7 +14,6 @@
 pub mod message_types;
 pub mod network;
 pub mod network_manager;
-pub mod pybinds;
 
 /// Errors that can occur while using networking and service communication APIs.
 #[derive(Debug, Clone, PartialEq, PartialOrd)]

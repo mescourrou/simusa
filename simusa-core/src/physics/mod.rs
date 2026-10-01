@@ -8,7 +8,7 @@
 
 pub mod external_physics;
 pub mod internal_physics;
-pub mod pybinds;
+#[cfg(feature = "python")]
 pub mod python_physics;
 
 pub mod robot_models;
@@ -33,6 +33,7 @@ pub enum PhysicsConfig {
     External(external_physics::ExternalPhysicsConfig),
     /// Python-backed physics implementation.
     #[check]
+    #[cfg(feature = "python")]
     Python(python_physics::PythonPhysicsConfig),
 }
 
@@ -67,6 +68,7 @@ impl UIComponent for PhysicsConfig {
                     *self =
                         PhysicsConfig::External(external_physics::ExternalPhysicsConfig::default())
                 }
+                #[cfg(feature = "python")]
                 "Python" => {
                     *self = PhysicsConfig::Python(python_physics::PythonPhysicsConfig::default())
                 }
@@ -90,6 +92,7 @@ impl UIComponent for PhysicsConfig {
                 current_node_name,
                 unique_id,
             ),
+            #[cfg(feature = "python")]
             PhysicsConfig::Python(c) => c.show_mut(
                 ui,
                 ctx,
@@ -108,6 +111,7 @@ impl UIComponent for PhysicsConfig {
         match self {
             PhysicsConfig::Internal(c) => c.show(ui, ctx, unique_id),
             PhysicsConfig::External(c) => c.show(ui, ctx, unique_id),
+            #[cfg(feature = "python")]
             PhysicsConfig::Python(c) => c.show(ui, ctx, unique_id),
         }
     }
@@ -121,6 +125,7 @@ pub enum PhysicsRecord {
     /// Record emitted by external physics.
     External(external_physics::ExternalPhysicsRecord),
     /// Record emitted by Python physics.
+    #[cfg(feature = "python")]
     Python(python_physics::PythonPhysicsRecord),
 }
 
@@ -131,7 +136,8 @@ impl PhysicsRecord {
     pub fn pose(&self) -> [f32; 3] {
         match self {
             Self::External(_) => [0., 0., 0.], // TODO: Find a way to get info from external record
-            Self::Python(_) => [0., 0., 0.],   // TODO: Find a way to get info from external record
+            #[cfg(feature = "python")]
+            Self::Python(_) => [0., 0., 0.], // TODO: Find a way to get info from external record
             Self::Internal(p) => p.state.pose,
         }
     }
@@ -151,6 +157,7 @@ impl UIComponent for PhysicsRecord {
                     r.show(ui, ctx, unique_id);
                 });
             }
+            #[cfg(feature = "python")]
             Self::Python(r) => {
                 egui::CollapsingHeader::new("ExternalPythonPhysics").show(ui, |ui| {
                     r.show(ui, ctx, unique_id);
@@ -246,6 +253,7 @@ pub fn make_physics_from_config(
             c,
             from_config_args,
         )?),
+        #[cfg(feature = "python")]
         PhysicsConfig::Python(c) => Box::new(
             python_physics::PythonPhysics::from_config(
                 c,

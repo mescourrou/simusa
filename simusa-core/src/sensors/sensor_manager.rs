@@ -305,7 +305,7 @@ struct ManagedSensor {
 
 impl ManagedSensor {
     /// Sets the frame of the sensor.
-    /// 
+    ///
     /// There is no move dynamics, the change is instaneous.
     pub fn set_frame(&mut self, frame: Frame, context: &Context) {
         internal!(
@@ -417,9 +417,7 @@ impl SensorManager {
             context,
         );
         from_config_args.network.write().unwrap().make_channel(
-            sensor_manager_key
-                .clone()
-                .join_str(Self::SET_FRAME_CHANNEL),
+            sensor_manager_key.clone().join_str(Self::SET_FRAME_CHANNEL),
             context,
         );
         for sensor_config in &config.sensors {
@@ -580,7 +578,8 @@ impl SensorManager {
                 };
                 self.last_observations
                     .extend(obs_list.iter().map(|o| o.clone()));
-                self.distant_observations.extend(obs_list.iter().map(|o| Observation::from_record(o)));
+                self.distant_observations
+                    .extend(obs_list.iter().map(|o| Observation::from_record(o)));
                 // Assure that the observations are always in the same order, for determinism:
                 self.distant_observations
                     .sort_by(|a, b| a.observer.cmp(&b.observer));
@@ -599,26 +598,39 @@ impl SensorManager {
                     .channel_root
                     .as_ref()
                     .unwrap()
-                    .join_str(Self::SET_FRAME_CHANNEL){
+                    .join_str(Self::SET_FRAME_CHANNEL)
+            {
                 let set_frame_message = match envelope.message {
                     MessageType::SensorFrame(msg) => msg,
-                    _ => panic!("Received message on {} channel with invalid type ({})", Self::SET_FRAME_CHANNEL, envelope.message),
+                    _ => panic!(
+                        "Received message on {} channel with invalid type ({})",
+                        Self::SET_FRAME_CHANNEL,
+                        envelope.message
+                    ),
                 };
-                if let Some(managed_sensor) = self.get_managed_sensor_mut(&set_frame_message.sensor_name) {
-                    managed_sensor.set_frame(Frame::new(
-                        set_frame_message.frame[0],
-                        set_frame_message.frame[1],
-                    set_frame_message.frame[2],
-                    ), context);
+                if let Some(managed_sensor) =
+                    self.get_managed_sensor_mut(&set_frame_message.sensor_name)
+                {
+                    managed_sensor.set_frame(
+                        Frame::new(
+                            set_frame_message.frame[0],
+                            set_frame_message.frame[1],
+                            set_frame_message.frame[2],
+                        ),
+                        context,
+                    );
                 } else {
                     error!(
                         context,
                         "Sensor Manager received a set_frame message for unknown sensor {}. Available sensors: {}",
                         set_frame_message.sensor_name,
-                        self.sensors.iter().map(|s| s.name.clone()).collect::<Vec<String>>().join(", ")
+                        self.sensors
+                            .iter()
+                            .map(|s| s.name.clone())
+                            .collect::<Vec<String>>()
+                            .join(", ")
                     );
                 }
-
             } else if let MessageType::SensorTrigger(_) = &envelope.message {
                 let sensor_name = path.to_vec().last().unwrap().clone();
                 for sensor in &mut self.sensors {
@@ -738,7 +750,11 @@ impl SensorManager {
             let key_base = PathKey::from_str(networking::channels::internal::NODE).unwrap();
             for (to, observations) in obs_to_send {
                 if !observations.is_empty() {
-                    let obs_msg = observations.iter().map(|o| o.record(context)).collect::<Vec<_>>().into();
+                    let obs_msg = observations
+                        .iter()
+                        .map(|o| o.record(context))
+                        .collect::<Vec<_>>()
+                        .into();
                     node.network()
                         .expect(
                             "This Node has no network, it cannot send observation to other nodes",
@@ -773,14 +789,14 @@ impl SensorManager {
     }
 
     /// Get a reference to a managed sensor by name.
-    /// 
+    ///
     /// Returns `None` if no sensor with the given name is found.
     pub fn get_managed_sensor(&self, name: &str) -> Option<&ManagedSensor> {
         self.sensors.iter().find(|s| s.name == name)
     }
 
     /// Get a mutable reference to a managed sensor by name.
-    /// 
+    ///
     /// Returns `None` if no sensor with the given name is found.
     pub fn get_managed_sensor_mut(&mut self, name: &str) -> Option<&mut ManagedSensor> {
         self.sensors.iter_mut().find(|s| s.name == name)

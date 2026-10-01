@@ -22,9 +22,11 @@ use crate::plugin_api::PluginAPI;
 use crate::recordable::Recordable;
 use crate::sensors::fault_models::additive::{AdditiveFault, AdditiveFaultConfig};
 use crate::sensors::fault_models::external_fault::{ExternalFault, ExternalFaultConfig};
+#[cfg(feature = "python")]
 use crate::sensors::fault_models::python_fault_model::{PythonFaultModel, PythonFaultModelConfig};
 use crate::sensors::sensor_filters::SensorFilter;
 use crate::sensors::sensor_filters::external_filter::{ExternalFilter, ExternalFilterConfig};
+#[cfg(feature = "python")]
 use crate::sensors::sensor_filters::python_filter::{PythonFilter, PythonFilterConfig};
 use crate::sensors::sensor_filters::range_filter::{RangeFilter, RangeFilterConfig};
 use crate::simulator::SimulatorConfig;
@@ -77,14 +79,18 @@ enum_variables!(
 #[show_all = "Faults"]
 pub enum DisplacementSensorFaultModelConfig {
     /// Additive fault applied in the frame of the robot before displacement.
+    #[check]
     AdditivePreDisplacement(
         AdditiveFaultConfig<DisplacementSensorVariablesFaults, DisplacementSensorVariablesProp>,
     ),
     /// Additive fault applied in the frame of the robot after displacement.
+    #[check]
     AdditivePostDisplacement(
         AdditiveFaultConfig<DisplacementSensorVariablesFaults, DisplacementSensorVariablesProp>,
     ),
     /// Python-implemented custom fault model.
+    #[cfg(feature = "python")]
+    #[check]
     Python(PythonFaultModelConfig),
     /// Plugin-provided external fault model.
     External(ExternalFaultConfig),
@@ -108,6 +114,7 @@ pub enum DisplacementSensorFaultModelType {
         AdditiveFault<DisplacementSensorVariablesFaults, DisplacementSensorVariablesProp>,
     ),
     /// Instantiated Python fault model.
+    #[cfg(feature = "python")]
     Python(PythonFaultModel),
     /// Instantiated external fault model.
     External(ExternalFault),
@@ -122,6 +129,7 @@ impl DisplacementSensorFaultModelType {
         context: &Context,
     ) -> crate::errors::SimusaResult<()> {
         match self {
+            #[cfg(feature = "python")]
             Self::Python(f) => f.post_init(node, initial_time, context),
             Self::External(f) => f.post_init(node, initial_time, context),
             Self::AdditivePreDisplacement(_) | Self::AdditivePostDisplacement(_) => Ok(()),
@@ -144,6 +152,7 @@ pub enum DisplacementSensorFilterConfig {
     Range(RangeFilterConfig<DisplacementSensorVariablesFilter>),
     /// Python-based custom filtering: delegates exclusion logic to user-defined Python methods.
     #[check]
+    #[cfg(feature = "python")]
     Python(PythonFilterConfig),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
     #[check]
@@ -162,6 +171,7 @@ pub enum DisplacementSensorFilterType {
     /// Instantiated range filter for displacement sensor variables.
     Range(RangeFilter<DisplacementSensorVariablesFilter>),
     /// Instantiated Python filter for displacement sensor observations.
+    #[cfg(feature = "python")]
     Python(PythonFilter),
     /// Instantiated external filter for displacement sensor observations.
     External(ExternalFilter),
@@ -176,6 +186,7 @@ impl DisplacementSensorFilterType {
         context: &Context,
     ) -> crate::errors::SimusaResult<()> {
         match self {
+            #[cfg(feature = "python")]
             Self::Python(f) => f.post_init(node, initial_time, context),
             Self::External(f) => f.post_init(node, initial_time, context),
             Self::Range(_) => Ok(()),
@@ -426,6 +437,7 @@ impl DisplacementSensor {
                         AdditiveFault::from_config(cfg, va_factory, initial_time, context),
                     )
                 }
+                #[cfg(feature = "python")]
                 DisplacementSensorFaultModelConfig::Python(cfg) => {
                     DisplacementSensorFaultModelType::Python(PythonFaultModel::from_config(
                         cfg,
@@ -453,6 +465,7 @@ impl DisplacementSensor {
                 DisplacementSensorFilterConfig::Range(cfg) => DisplacementSensorFilterType::Range(
                     RangeFilter::from_config(cfg, initial_time, context),
                 ),
+                #[cfg(feature = "python")]
                 DisplacementSensorFilterConfig::Python(cfg) => {
                     DisplacementSensorFilterType::Python(PythonFilter::from_config(
                         cfg,
@@ -575,6 +588,7 @@ impl Sensor for DisplacementSensor {
                     DisplacementSensorFilterType::External(f) => {
                         f.filter(time, o, state, None, context)
                     }
+                    #[cfg(feature = "python")]
                     DisplacementSensorFilterType::Python(f) => {
                         f.filter(time, o, state, None, context)
                     }
@@ -613,6 +627,7 @@ impl Sensor for DisplacementSensor {
             observation_list.push(obs);
             for fault_model in self.faults.iter_mut() {
                 match fault_model {
+                    #[cfg(feature = "python")]
                     DisplacementSensorFaultModelType::Python(f) => f.add_faults(
                         time,
                         time,

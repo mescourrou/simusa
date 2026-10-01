@@ -11,6 +11,7 @@ use crate::{
 };
 
 pub mod external_filter;
+#[cfg(feature = "python")]
 pub mod python_filter;
 pub mod range_filter;
 pub mod string_filter;

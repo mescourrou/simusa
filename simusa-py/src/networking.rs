@@ -3,9 +3,18 @@
 use pyo3::prelude::*;
 use simusa_macros::EnumToString;
 
-use crate::{
-    context::Context, navigators::go_to::GoToMessage, networking::message_types::MessageType, pywrappers::ObservationWrapper, recordable::Recordable, sensors::{Observation, sensor_manager::{SensorFrameMessage, SensorTriggerMessage}},
+use simusa::{
+    context::Context,
+    navigators::go_to::GoToMessage,
+    networking::message_types::MessageType,
+    recordable::Recordable,
+    sensors::{
+        Observation,
+        sensor_manager::{SensorFrameMessage, SensorTriggerMessage},
+    },
 };
+
+use crate::wrappers::ObservationWrapper;
 
 #[derive(Clone, Debug, EnumToString)]
 #[pyclass]

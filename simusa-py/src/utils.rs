@@ -11,10 +11,10 @@ use pyo3::{PyClass, prelude::*};
 use pyo3::{PyResult, Python};
 use serde::{Deserialize, Serialize};
 
-use crate::context::Context;
-use crate::errors::{SimusaError, SimusaErrorTypes, SimusaResult};
-use crate::info;
-use crate::simulator::SimulatorConfig;
+use simusa::context::Context;
+use simusa::errors::{SimusaError, SimusaErrorTypes, SimusaResult};
+use simusa::info;
+use simusa::simulator::SimulatorConfig;
 
 /// Ensure that the Python virtual environment's site-packages are included in sys.path.
 /// This is useful when the Rust application embeds Python and needs to access packages

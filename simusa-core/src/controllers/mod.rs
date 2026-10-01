@@ -8,9 +8,8 @@
 
 pub mod external_controller;
 pub mod pid;
+#[cfg(feature = "python")]
 pub mod python_controller;
-
-pub mod pybinds;
 
 use crate::{
     context::Context,
@@ -69,6 +68,7 @@ pub enum ControllerConfig {
     External(external_controller::ExternalControllerConfig),
     #[check]
     /// Configuration for [`PythonController`](python_controller::PythonControllerConfig).
+    #[cfg(feature = "python")]
     Python(python_controller::PythonControllerConfig),
 }
 
@@ -101,6 +101,7 @@ impl UIComponent for ControllerConfig {
                         external_controller::ExternalControllerConfig::default(),
                     )
                 }
+                #[cfg(feature = "python")]
                 "Python" => {
                     *self = ControllerConfig::Python(
                         python_controller::PythonControllerConfig::default(),
@@ -126,6 +127,7 @@ impl UIComponent for ControllerConfig {
                 current_node_name,
                 unique_id,
             ),
+            #[cfg(feature = "python")]
             ControllerConfig::Python(c) => c.show_mut(
                 ui,
                 ctx,
@@ -144,6 +146,7 @@ impl UIComponent for ControllerConfig {
         match self {
             ControllerConfig::PID(c) => c.show(ui, ctx, unique_id),
             ControllerConfig::External(c) => c.show(ui, ctx, unique_id),
+            #[cfg(feature = "python")]
             ControllerConfig::Python(c) => c.show(ui, ctx, unique_id),
         }
     }
@@ -157,6 +160,7 @@ pub enum ControllerRecord {
     /// Runtime record for [`external_controller::ExternalController`].
     External(external_controller::ExternalControllerRecord),
     /// Runtime record for [`python_controller::PythonController`].
+    #[cfg(feature = "python")]
     Python(python_controller::PythonControllerRecord),
 }
 
@@ -174,6 +178,7 @@ impl UIComponent for ControllerRecord {
                     r.show(ui, ctx, unique_id);
                 });
             }
+            #[cfg(feature = "python")]
             Self::Python(r) => {
                 egui::CollapsingHeader::new("ExternalPythonController").show(ui, |ui| {
                     r.show(ui, ctx, unique_id);
@@ -249,6 +254,7 @@ pub fn make_controller_from_config(
         ControllerConfig::External(c) => Box::new(
             external_controller::ExternalController::from_config(c, from_config_params)?,
         ) as Box<dyn Controller>,
+        #[cfg(feature = "python")]
         ControllerConfig::Python(c) => Box::new(
             python_controller::PythonController::from_config(
                 c,

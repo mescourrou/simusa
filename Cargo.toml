@@ -6,6 +6,7 @@ members = [
     "simusa-core",
     "simusa-macros",
     "simusa-tools",
+    "simusa-py",
     "examples/stacked_plugins",
     "examples/plugin",
 ]
@@ -14,7 +15,8 @@ default-members = [
     "simusa-com",
     "simusa-core",
     "simusa-macros",
-    "simusa-tools"
+    "simusa-tools",
+    "simusa-py"
     ]
 
 resolver = "2"

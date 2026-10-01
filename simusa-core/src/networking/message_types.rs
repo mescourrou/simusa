@@ -3,7 +3,12 @@
 use simusa_macros::{EnumToString, config_derives};
 
 use crate::{
-    navigators::go_to::GoToMessage, scenario::config::EventRecord, sensors::{Observation, ObservationRecord, sensor_manager::{SensorFrameMessage, SensorTriggerMessage}},
+    navigators::go_to::GoToMessage,
+    scenario::config::EventRecord,
+    sensors::{
+        Observation, ObservationRecord,
+        sensor_manager::{SensorFrameMessage, SensorTriggerMessage},
+    },
 };
 
 /// Payload variants that can transit through the network.
@@ -53,7 +58,6 @@ macro_rules! impl_message_types_from {
         )*
     };
 }
-
 
 impl_message_types_from!(
     String,

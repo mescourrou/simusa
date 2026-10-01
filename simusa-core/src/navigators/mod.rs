@@ -12,9 +12,8 @@ pub mod trajectory;
 pub mod trajectory_follower;
 
 pub mod external_navigator;
+#[cfg(feature = "python")]
 pub mod python_navigator;
-
-pub mod pybinds;
 
 extern crate confy;
 use std::sync::{Arc, RwLock};
@@ -45,6 +44,7 @@ pub enum NavigatorConfig {
     External(external_navigator::ExternalNavigatorConfig),
     /// Configuration for [`python_navigator::PythonNavigator`].
     #[check]
+    #[cfg(feature = "python")]
     Python(python_navigator::PythonNavigatorConfig),
     /// Configuration for [`go_to::GoTo`].
     #[check]
@@ -84,6 +84,7 @@ impl UIComponent for NavigatorConfig {
                         external_navigator::ExternalNavigatorConfig::default(),
                     )
                 }
+                #[cfg(feature = "python")]
                 "Python" => {
                     *self =
                         NavigatorConfig::Python(python_navigator::PythonNavigatorConfig::default())
@@ -109,6 +110,7 @@ impl UIComponent for NavigatorConfig {
                 current_node_name,
                 unique_id,
             ),
+            #[cfg(feature = "python")]
             NavigatorConfig::Python(c) => c.show_mut(
                 ui,
                 ctx,
@@ -136,6 +138,7 @@ impl UIComponent for NavigatorConfig {
         match self {
             NavigatorConfig::TrajectoryFollower(c) => c.show(ui, ctx, unique_id),
             NavigatorConfig::External(c) => c.show(ui, ctx, unique_id),
+            #[cfg(feature = "python")]
             NavigatorConfig::Python(c) => c.show(ui, ctx, unique_id),
             NavigatorConfig::GoTo(c) => c.show(ui, ctx, unique_id),
         }
@@ -150,6 +153,7 @@ pub enum NavigatorRecord {
     /// Runtime record for [`ExternalNavigator`](external_navigator::ExternalNavigator).
     External(external_navigator::ExternalNavigatorRecord),
     /// Runtime record for [`PythonNavigator`](python_navigator::PythonNavigator).
+    #[cfg(feature = "python")]
     Python(python_navigator::PythonNavigatorRecord),
     /// Runtime record for [`GoTo`](go_to::GoTo).
     GoTo(go_to::GoToRecord),
@@ -169,6 +173,7 @@ impl UIComponent for NavigatorRecord {
                     r.show(ui, ctx, unique_id);
                 });
             }
+            #[cfg(feature = "python")]
             Self::Python(r) => {
                 egui::CollapsingHeader::new("PythonNavigator").show(ui, |ui| {
                     r.show(ui, ctx, unique_id);
@@ -247,6 +252,7 @@ pub fn make_navigator_from_config(
         NavigatorConfig::External(c) => Box::new(
             external_navigator::ExternalNavigator::from_config(c, from_config_params)?,
         ) as Box<dyn Navigator>,
+        #[cfg(feature = "python")]
         NavigatorConfig::Python(c) => Box::new(
             python_navigator::PythonNavigator::from_config(
                 c,

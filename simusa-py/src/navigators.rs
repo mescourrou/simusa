@@ -1,59 +1,56 @@
-//! Python bindings and RPC bridge for controller implementations.
+//! Python bindings and RPC bridge for navigator implementations.
 //!
-//! This module connects Python controller objects to the Rust simulation runtime.
-//! [`PythonController`] owns a Python model and serves asynchronous RPC requests from
-//! [`PythonControllerAsyncClient`].
+//! This module connects Python navigator objects to the Rust simulation runtime.
+//! [`PythonNavigator`] owns a Python model and exposes asynchronous request handlers through
+//! [`PythonNavigatorAsyncClient`], based on [`RemoteFunctionCall`].
 //!
-//! It also exposes [`ControllerWrapper`], the Python-visible base class used for custom
-//! controller implementations.
+//! It also defines [`NavigatorWrapper`], the Python-visible base class used when implementing a
+//! navigator from Python.
 
 use std::{str::FromStr, sync::Arc};
 
 use pyo3::{prelude::*, types::PyDict};
 use serde_json::Value;
+
 use simusa_com::rfc::{self, RemoteFunctionCall, RemoteFunctionCallHost};
 
-use crate::{
-    context::Context,
-    controllers::external_controller::ExternalControllerRecord,
-    errors::SimusaResult,
-    internal,
-    node::Node,
-    physics::robot_models::Command,
-    pywrappers::{CommandWrapper, ControllerErrorWrapper, NodeWrapper},
-    recordable::Recordable,
-    utils::python::{call_py_method, call_py_method_void},
+use simusa::{
+    context::Context, controllers::ControllerError, errors::SimusaResult, internal, logger::InternalLog, navigators::{
+        Navigator, NavigatorRecord, external_navigator::ExternalNavigatorRecord,
+    }, node::Node, recordable::Recordable, state_estimators::WorldState,
 };
 
-use super::{Controller, ControllerError, ControllerRecord};
+use crate::{utils::{call_py_method, call_py_method_void}, wrappers::{ControllerErrorWrapper, NodeWrapper, WorldStateWrapper}};
 
+/// Simulator-side RPC handles used by Rust nodes to call Python navigator logic asynchronously.
 #[derive(Debug, Clone)]
-/// Simulator-side RPC handles used by the runtime to call Python controller methods.
-pub struct PythonControllerAsyncClient {
-    post_init: RemoteFunctionCall<NodeWrapper, SimusaResult<()>>,
-    make_command: RemoteFunctionCall<(NodeWrapper, ControllerError, f32), Command>,
-    record: RemoteFunctionCall<(), ControllerRecord>,
-    pre_loop_hook: RemoteFunctionCall<(NodeWrapper, f32), ()>,
-    next_time_step: RemoteFunctionCall<(), Option<f32>>,
+pub struct PythonNavigatorAsyncClient {
+    /// Remote call to `post_init`.
+    pub post_init: RemoteFunctionCall<NodeWrapper, SimusaResult<()>>,
+    /// Remote call to `compute_error`.
+    pub compute_error: RemoteFunctionCall<(NodeWrapper, WorldState), ControllerError>,
+    /// Remote call to `record`.
+    pub record: RemoteFunctionCall<(), NavigatorRecord>,
+    /// Remote call to `pre_loop_hook`.
+    pub pre_loop_hook: RemoteFunctionCall<(NodeWrapper, f32), ()>,
+    /// Remote call to `next_time_step`.
+    pub next_time_step: RemoteFunctionCall<(), Option<f32>>,
 }
 
-impl Controller for PythonControllerAsyncClient {
+impl Navigator for PythonNavigatorAsyncClient {
     fn post_init(&mut self, node: &mut Node, context: &Context) -> SimusaResult<()> {
         let node_py = NodeWrapper::from_rust(node, context.clone());
         self.post_init.call(node_py).unwrap()
     }
 
-    fn make_command(
+    fn compute_error(
         &mut self,
         node: &mut Node,
-        error: &ControllerError,
-        time: f32,
+        world_state: WorldState,
         context: &Context,
-    ) -> Command {
+    ) -> ControllerError {
         let node_py = NodeWrapper::from_rust(node, context.clone());
-        self.make_command
-            .call((node_py, error.clone(), time))
-            .unwrap()
+        self.compute_error.call((node_py, world_state)).unwrap()
     }
 
     fn pre_loop_hook(&mut self, node: &mut Node, time: f32, context: &Context) {
@@ -66,60 +63,60 @@ impl Controller for PythonControllerAsyncClient {
     }
 }
 
-impl Recordable<ControllerRecord> for PythonControllerAsyncClient {
-    fn record(&self, _context: &Context) -> ControllerRecord {
+impl Recordable<NavigatorRecord> for PythonNavigatorAsyncClient {
+    fn record(&self, _context: &Context) -> NavigatorRecord {
         self.record.call(()).unwrap()
     }
 }
 
 #[derive(Debug)]
-/// Python-side bridge that executes controller methods on a Python model.
-pub struct PythonController {
+/// Python-side bridge that executes navigator methods on a Python model.
+pub struct PythonNavigator {
     model: Py<PyAny>,
-    client: PythonControllerAsyncClient,
+    client: PythonNavigatorAsyncClient,
     post_init: Arc<RemoteFunctionCallHost<NodeWrapper, SimusaResult<()>>>,
-    make_command: Arc<RemoteFunctionCallHost<(NodeWrapper, ControllerError, f32), Command>>,
-    record: Arc<RemoteFunctionCallHost<(), ControllerRecord>>,
+    compute_error: Arc<RemoteFunctionCallHost<(NodeWrapper, WorldState), ControllerError>>,
+    record: Arc<RemoteFunctionCallHost<(), NavigatorRecord>>,
     pre_loop_hook: Arc<RemoteFunctionCallHost<(NodeWrapper, f32), ()>>,
     next_time_step: Arc<RemoteFunctionCallHost<(), Option<f32>>>,
 }
 
-impl PythonController {
-    /// Creates a new Python controller bridge.
+impl PythonNavigator {
+    /// Creates a new Python-backed navigator bridge.
     ///
-    /// The provided `py_model` must implement the [`Controller`] trait.
-    pub fn new(py_model: Py<PyAny>) -> PythonController {
+    /// The provided `py_model` must implement the [`Navigator`] interface from Python, otherwise method calls will fail at runtime.
+    pub fn new(py_model: Py<PyAny>) -> PythonNavigator {
         let (post_init_client, post_init_host) = rfc::make_pair();
-        let (make_command_client, make_command_host) = rfc::make_pair();
+        let (compute_error_client, compute_error_host) = rfc::make_pair();
         let (record_client, record_host) = rfc::make_pair();
         let (pre_loop_hook_client, pre_loop_hook_host) = rfc::make_pair();
         let (next_time_step_client, next_time_step_host) = rfc::make_pair();
 
-        PythonController {
+        PythonNavigator {
             model: py_model,
-            client: PythonControllerAsyncClient {
+            client: PythonNavigatorAsyncClient {
                 post_init: post_init_client,
-                make_command: make_command_client,
+                compute_error: compute_error_client,
                 record: record_client,
                 pre_loop_hook: pre_loop_hook_client,
                 next_time_step: next_time_step_client,
             },
             post_init: Arc::new(post_init_host),
-            make_command: Arc::new(make_command_host),
+            compute_error: Arc::new(compute_error_host),
             record: Arc::new(record_host),
-            next_time_step: Arc::new(next_time_step_host),
             pre_loop_hook: Arc::new(pre_loop_hook_host),
+            next_time_step: Arc::new(next_time_step_host),
         }
     }
 }
 
-impl PythonController {
+impl PythonNavigator {
     /// Returns a cloneable asynchronous client used by the runtime.
-    pub fn get_client(&self) -> PythonControllerAsyncClient {
+    pub fn get_client(&self) -> PythonNavigatorAsyncClient {
         self.client.clone()
     }
 
-    /// Polls pending RPC calls and dispatches them to Python implementations.
+    /// Polls all pending RPC requests and dispatches them to Python methods.
     ///
     /// ## Arguments
     /// * `context` - Shared simulation context used for logging and call tracing.
@@ -127,11 +124,9 @@ impl PythonController {
         self.post_init
             .clone()
             .try_recv_closure_mut(|node| self.post_init(node, context));
-        self.make_command
+        self.compute_error
             .clone()
-            .try_recv_closure_mut(|(node, error, time)| {
-                self.make_command(node, &error, time, context)
-            });
+            .try_recv_closure_mut(|(node, state)| self.compute_error(node, &state, context));
         self.record.try_recv_closure(|()| self.record(context));
         self.pre_loop_hook
             .clone()
@@ -144,58 +139,51 @@ impl PythonController {
     fn post_init(&mut self, node: NodeWrapper, context: &Context) -> SimusaResult<()> {
         internal!(
             context,
-            crate::logger::InternalLog::API,
+            InternalLog::API,
             "Calling python implementation of post_init"
         );
         call_py_method_void!(self.model, "post_init", (node,));
         Ok(())
     }
 
-    fn make_command(
+    fn compute_error(
         &mut self,
         node: NodeWrapper,
-        error: &ControllerError,
-        time: f32,
+        state: &WorldState,
         context: &Context,
-    ) -> Command {
+    ) -> ControllerError {
         internal!(
             context,
-            crate::logger::InternalLog::API,
-            "Calling python implementation of make_command"
+            InternalLog::API,
+            "Calling python implementation of compute_error"
         );
-        // let node_record = node.record();
         let result = call_py_method!(
             self.model,
-            "make_command",
-            CommandWrapper,
-            node,
-            ControllerErrorWrapper::from_rust(error),
-            time
+            "compute_error",
+            ControllerErrorWrapper,
+            (node, WorldStateWrapper::from_rust(state))
         );
         result.to_rust()
     }
 
-    fn record(&self, context: &Context) -> ControllerRecord {
+    fn record(&self, context: &Context) -> NavigatorRecord {
         internal!(
             context,
-            crate::logger::InternalLog::API,
+            InternalLog::API,
             "Calling python implementation of record"
         );
         let record_str: String = call_py_method!(self.model, "record", String,);
-        let record = ExternalControllerRecord {
+        NavigatorRecord::External(ExternalNavigatorRecord {
             record: Value::from_str(&record_str).expect(
                 "Impossible to get serde_json::Value from the input serialized python structure",
             ),
-        };
-        // record.clone()
-        // StateEstimatorRecord::External(PythonController::record(&self))
-        ControllerRecord::External(record)
+        })
     }
 
     fn pre_loop_hook(&mut self, node: NodeWrapper, time: f32, context: &Context) {
         internal!(
             context,
-            crate::logger::InternalLog::API,
+            InternalLog::API,
             "Calling python implementation of pre_loop_hook"
         );
         call_py_method_void!(self.model, "pre_loop_hook", node, time);
@@ -204,7 +192,7 @@ impl PythonController {
     fn next_time_step(&self, context: &Context) -> Option<f32> {
         internal!(
             context,
-            crate::logger::InternalLog::API,
+            InternalLog::API,
             "Calling python implementation of next_time_step"
         );
         call_py_method!(self.model, "next_time_step", Option<f32>,)
@@ -212,30 +200,29 @@ impl PythonController {
 }
 
 #[pyclass(subclass)]
-#[pyo3(name = "Controller")]
-/// Python-visible base class for custom controller implementations.
+#[pyo3(name = "Navigator")]
+/// Python-visible base class for custom navigator implementations.
 ///
 /// Python subclasses are expected to override the exposed methods.
-pub struct ControllerWrapper {}
+pub struct NavigatorWrapper {}
 
 #[pymethods]
-impl ControllerWrapper {
-    /// Creates a new Python controller wrapper.
+impl NavigatorWrapper {
+    /// Creates a new Python navigator wrapper.
     ///
-    /// The constructor signature matches simulator expectations.
+    /// Arguments are accepted to match the expected constructor signature used by the simulator.
     #[new]
-    pub fn new(_config: Py<PyAny>, _initial_time: f32) -> ControllerWrapper {
+    pub fn new(_config: Py<PyAny>, _initial_time: f32) -> NavigatorWrapper {
         Self {}
     }
 
     fn post_init(&mut self, _node: NodeWrapper) {}
 
-    fn make_command(
+    fn compute_error(
         &mut self,
         _node: NodeWrapper,
-        _error: ControllerErrorWrapper,
-        _time: f32,
-    ) -> CommandWrapper {
+        _state: WorldStateWrapper,
+    ) -> ControllerErrorWrapper {
         unimplemented!()
     }
 

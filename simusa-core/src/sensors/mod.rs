@@ -38,11 +38,16 @@ use {
 };
 
 use crate::{
-    context::Context, errors::SimusaResult, node::Node, recordable::Recordable, sensors::{
+    context::Context,
+    errors::SimusaResult,
+    node::Node,
+    recordable::Recordable,
+    sensors::{
         displacement_sensor::{DisplacementObservation, DisplacementObservationRecord},
         external_sensor::{ExternalObservation, ExternalObservationRecord},
         scan_sensor::{ScanObservation, ScanObservationRecord},
-    }, utils::frame::{Frame, FrameRecord},
+    },
+    utils::frame::{Frame, FrameRecord},
 };
 #[cfg(feature = "gui")]
 use crate::{

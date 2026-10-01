@@ -8,9 +8,9 @@
 use serde::{Deserialize, Serialize};
 use simusa_macros::config_derives;
 
-use crate::{config::NumberConfig, networking::message_types::MessageType};
 #[cfg(feature = "gui")]
 use crate::gui::UIComponent;
+use crate::{config::NumberConfig, networking::message_types::MessageType};
 
 /// Root scenario configuration.
 ///
@@ -346,7 +346,6 @@ impl UIComponent for SendMessageEventConfig {
         ));
     }
 }
-
 
 /// Record emitted when an event is evaluated/executed.
 #[config_derives]

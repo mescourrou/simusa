@@ -11,6 +11,8 @@ use nalgebra::{Rotation2, Vector2, Vector3};
 use serde::{Deserialize, Serialize};
 use simusa_macros::{EnumToString, UIComponent, config_derives, enum_variables};
 
+#[cfg(feature = "python")]
+use crate::sensors::fault_models::python_fault_model::{PythonFaultModel, PythonFaultModelConfig};
 use crate::{
     config::NumberConfig,
     constants::TIME_ROUND,
@@ -28,12 +30,10 @@ use crate::{
             external_fault::{ExternalFault, ExternalFaultConfig},
             fault_model::FaultModel,
             misdetection::{MisdetectionFault, MisdetectionFaultConfig},
-            python_fault_model::{PythonFaultModel, PythonFaultModelConfig},
         },
         sensor_filters::{
             SensorFilter,
             external_filter::{ExternalFilter, ExternalFilterConfig},
-            python_filter::{PythonFilter, PythonFilterConfig},
             range_filter::{RangeFilter, RangeFilterConfig},
         },
     },
@@ -121,6 +121,7 @@ pub enum ScanSensorFaultModelConfig {
     PointMisdetection(MisdetectionFaultConfig),
     /// Python-implemented custom fault model.
     #[check]
+    #[cfg(feature = "python")]
     Python(PythonFaultModelConfig),
     /// Plugin-provided external fault model.
     #[check]
@@ -155,6 +156,7 @@ pub enum FaultModelTypeScanSensor {
     /// Instantiated per-point misdetection fault model.
     PointMisdetection(MisdetectionFault),
     /// Instantiated Python fault model.
+    #[cfg(feature = "python")]
     Python(PythonFaultModel),
     /// Instantiated external fault model.
     External(ExternalFault),
@@ -169,6 +171,7 @@ impl FaultModelTypeScanSensor {
         context: &Context,
     ) -> crate::errors::SimusaResult<()> {
         match self {
+            #[cfg(feature = "python")]
             Self::Python(f) => f.post_init(node, initial_time, context),
             Self::External(f) => f.post_init(node, initial_time, context),
             Self::AdditiveRobotCentered(_)
@@ -207,6 +210,7 @@ pub enum ScanSensorFilterConfig {
     Range(RangeFilterConfig<ScanSensorVariablesFilter>),
     /// String pattern filtering on observed object unique id (name for nodes, id for landmarks): excludes observations matching configured regexp patterns.
     #[check]
+    #[cfg(feature = "python")]
     Python(PythonFilterConfig),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
     #[check]
@@ -225,6 +229,7 @@ pub enum ScanSensorFilterType {
     /// Instantiated range filter for Scan sensor variables.
     Range(RangeFilter<ScanSensorVariablesFilter>),
     /// Instantiated Python filter for Scan sensor observations.
+    #[cfg(feature = "python")]
     Python(PythonFilter),
     /// Instantiated external filter for Scan sensor observations.
     External(ExternalFilter),
@@ -239,6 +244,7 @@ impl ScanSensorFilterType {
         context: &Context,
     ) -> crate::errors::SimusaResult<()> {
         match self {
+            #[cfg(feature = "python")]
             Self::Python(f) => f.post_init(node, initial_time, context),
             Self::External(f) => f.post_init(node, initial_time, context),
             Self::Range(_) => Ok(()),
@@ -660,6 +666,7 @@ impl ScanSensor {
                         context,
                     ))
                 }
+                #[cfg(feature = "python")]
                 ScanSensorFaultModelConfig::Python(cfg) => FaultModelTypeScanSensor::Python(
                     PythonFaultModel::from_config(cfg, global_config, initial_time, context)?,
                 ),
@@ -682,6 +689,7 @@ impl ScanSensor {
                 ScanSensorFilterConfig::Range(cfg) => ScanSensorFilterType::Range(
                     RangeFilter::from_config(cfg, initial_time, context),
                 ),
+                #[cfg(feature = "python")]
                 ScanSensorFilterConfig::Python(cfg) => ScanSensorFilterType::Python(
                     PythonFilter::from_config(cfg, global_config, initial_time, context)?,
                 ),
@@ -876,6 +884,7 @@ impl Sensor for ScanSensor {
         for filter in &self.filters {
             if let Some(obs) = keep_observation {
                 keep_observation = match filter {
+                    #[cfg(feature = "python")]
                     ScanSensorFilterType::Python(f) => f.filter(time, obs, state, None, context),
                     ScanSensorFilterType::External(f) => f.filter(time, obs, state, None, context),
                     ScanSensorFilterType::Range(f) => {
@@ -924,6 +933,7 @@ impl Sensor for ScanSensor {
             let mut observations = vec![filtered_observation];
             for fault_model in self.faults.iter_mut() {
                 match fault_model {
+                    #[cfg(feature = "python")]
                     FaultModelTypeScanSensor::Python(f) => f.add_faults(
                         time,
                         time,

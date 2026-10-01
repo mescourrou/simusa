@@ -30,7 +30,7 @@ To create a new state estimation strategy, here are the required steps.
 
 pub mod external_estimator;
 pub mod perfect_estimator;
-pub mod pybinds;
+#[cfg(feature = "python")]
 pub mod python_estimator;
 
 extern crate nalgebra as na;
@@ -508,6 +508,7 @@ pub enum StateEstimatorConfig {
     External(external_estimator::ExternalEstimatorConfig),
     /// Python-backed state estimator.
     #[check]
+    #[cfg(feature = "python")]
     Python(python_estimator::PythonEstimatorConfig),
 }
 
@@ -544,6 +545,7 @@ impl UIComponent for StateEstimatorConfig {
                         external_estimator::ExternalEstimatorConfig::default(),
                     )
                 }
+                #[cfg(feature = "python")]
                 "Python" => {
                     *self = StateEstimatorConfig::Python(
                         python_estimator::PythonEstimatorConfig::default(),
@@ -569,6 +571,7 @@ impl UIComponent for StateEstimatorConfig {
                 current_node_name,
                 unique_id,
             ),
+            #[cfg(feature = "python")]
             StateEstimatorConfig::Python(c) => c.show_mut(
                 ui,
                 ctx,
@@ -587,6 +590,7 @@ impl UIComponent for StateEstimatorConfig {
         match self {
             StateEstimatorConfig::Perfect(c) => c.show(ui, ctx, unique_id),
             StateEstimatorConfig::External(c) => c.show(ui, ctx, unique_id),
+            #[cfg(feature = "python")]
             StateEstimatorConfig::Python(c) => c.show(ui, ctx, unique_id),
         }
     }
@@ -600,6 +604,7 @@ pub enum StateEstimatorRecord {
     /// Record for the [`ExternalEstimator`](crate::state_estimators::external_estimator::ExternalEstimator).
     External(external_estimator::ExternalEstimatorRecord),
     /// Record for the [`PythonEstimator`](crate::state_estimators::python_estimator::PythonEstimator).
+    #[cfg(feature = "python")]
     Python(python_estimator::PythonEstimatorRecord),
 }
 
@@ -617,6 +622,7 @@ impl UIComponent for StateEstimatorRecord {
                     r.show(ui, ctx, unique_id);
                 });
             }
+            #[cfg(feature = "python")]
             Self::Python(r) => {
                 egui::CollapsingHeader::new("PythonExternalStateEstimator").show(ui, |ui| {
                     r.show(ui, ctx, unique_id);
@@ -653,6 +659,7 @@ pub fn make_state_estimator_from_config(
         StateEstimatorConfig::External(c) => Box::new(
             external_estimator::ExternalEstimator::from_config(c, from_config_params)?,
         ) as Box<dyn StateEstimator>,
+        #[cfg(feature = "python")]
         StateEstimatorConfig::Python(c) => Box::new(
             python_estimator::PythonEstimator::from_config(
                 c,

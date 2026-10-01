@@ -1,0 +1,32 @@
+[package]
+name = "simusa-py"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description.workspace = true
+readme.workspace = true
+repository.workspace = true
+
+[lib]
+name = "simusa"  # Python imports as 'simusa', Rust uses package name 'simusa-core'
+crate-type = ["cdylib"]  # cdylib for Python
+doctest = false
+
+[features]
+gui = ["simusa/gui"] # Enable GUI features
+
+[dependencies]
+# Workspace dependencies (local)
+simusa = { path = "../simusa-core", version = "1.9.1" }
+simusa-com = { path = "../simusa-com", version = "1.9.1" }
+simusa-macros = { path = "../simusa-macros", version = "1.9.1" }
+
+# Main dependencies (alphabetical order)
+nalgebra = { version = "0.34.1", features = ["serde-serialize"] }
+pyo3 = { version = "0.27.2", features = ["abi3", "abi3-py310"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_derive = "1.0.228"
+serde_json = { version = "1.0.145", features = ["float_roundtrip"] }
+serde_path_to_error = "0.1"
+serde_yaml_ng = "0.10"

@@ -23,9 +23,11 @@ use crate::sensors::fault_models::misassociation::{
     MisassociationFault, MisassociationFaultConfig,
 };
 use crate::sensors::fault_models::misdetection::{MisdetectionFault, MisdetectionFaultConfig};
+#[cfg(feature = "python")]
 use crate::sensors::fault_models::python_fault_model::{PythonFaultModel, PythonFaultModelConfig};
 use crate::sensors::sensor_filters::SensorFilter;
 use crate::sensors::sensor_filters::external_filter::{ExternalFilter, ExternalFilterConfig};
+#[cfg(feature = "python")]
 use crate::sensors::sensor_filters::python_filter::{PythonFilter, PythonFilterConfig};
 use crate::sensors::sensor_filters::range_filter::{RangeFilter, RangeFilterConfig};
 use crate::sensors::sensor_filters::string_filter::{StringFilter, StringFilterConfig};
@@ -98,6 +100,7 @@ pub enum RobotSensorFaultModelConfig {
     Misassociation(MisassociationFaultConfig),
     /// Python-implemented fault model.
     #[check]
+    #[cfg(feature = "python")]
     Python(PythonFaultModelConfig),
     /// Plugin-provided external fault model.
     #[check]
@@ -124,6 +127,7 @@ pub enum RobotSensorFaultModelType {
     /// Instantiated misassociation fault model.
     Misassociation(MisassociationFault),
     /// Instantiated Python fault model.
+    #[cfg(feature = "python")]
     Python(PythonFaultModel),
     /// Instantiated external fault model.
     External(ExternalFault),
@@ -138,6 +142,7 @@ impl RobotSensorFaultModelType {
         context: &Context,
     ) -> crate::errors::SimusaResult<()> {
         match self {
+            #[cfg(feature = "python")]
             Self::Python(f) => f.post_init(node, initial_time, context),
             Self::External(f) => f.post_init(node, initial_time, context),
             Self::AdditiveRobotCentered(_)
@@ -181,6 +186,7 @@ pub enum RobotSensorFilterConfig {
     Label(StringFilterConfig),
     /// Python-based custom filtering: delegates exclusion logic to user-defined Python methods.
     #[check]
+    #[cfg(feature = "python")]
     Python(PythonFilterConfig),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
     #[check]
@@ -203,6 +209,7 @@ pub enum RobotSensorFilterType {
     /// Instantiated string filter for observed object labels.
     Label(StringFilter),
     /// Instantiated Python filter for Robot sensor observations.
+    #[cfg(feature = "python")]
     Python(PythonFilter),
     /// Instantiated external filter for Robot sensor observations.
     External(ExternalFilter),
@@ -217,6 +224,7 @@ impl RobotSensorFilterType {
         context: &Context,
     ) -> crate::errors::SimusaResult<()> {
         match self {
+            #[cfg(feature = "python")]
             Self::Python(f) => f.post_init(node, initial_time, context),
             Self::External(f) => f.post_init(node, initial_time, context),
             Self::Range(_) | Self::Id(_) | Self::Label(_) => Ok(()),
@@ -517,6 +525,7 @@ impl RobotSensor {
                         cfg, va_factory, context,
                     ))
                 }
+                #[cfg(feature = "python")]
                 RobotSensorFaultModelConfig::Python(cfg) => RobotSensorFaultModelType::Python(
                     PythonFaultModel::from_config(cfg, global_config, initial_time, context)?,
                 ),
@@ -545,6 +554,7 @@ impl RobotSensor {
                 RobotSensorFilterConfig::Label(cfg) => RobotSensorFilterType::Label(
                     StringFilter::from_config(cfg, initial_time, context),
                 ),
+                #[cfg(feature = "python")]
                 RobotSensorFilterConfig::Python(cfg) => RobotSensorFilterType::Python(
                     PythonFilter::from_config(cfg, global_config, initial_time, context)?,
                 ),
@@ -682,6 +692,7 @@ impl Sensor for RobotSensor {
                 for filter in self.filters.iter() {
                     if let Some(obs) = keep_observation {
                         keep_observation = match filter {
+                            #[cfg(feature = "python")]
                             RobotSensorFilterType::Python(f) => {
                                 f.filter(time, obs, state, Some(&other_state), context)
                             }
@@ -754,6 +765,7 @@ impl Sensor for RobotSensor {
                     new_obs.push(observation); // Not adding directly to observation_list to apply faults only once
                     for fault_model in self.faults.iter_mut() {
                         match fault_model {
+                            #[cfg(feature = "python")]
                             RobotSensorFaultModelType::Python(f) => f.add_faults(
                                 time,
                                 time + robot_seed,

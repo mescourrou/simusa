@@ -21,7 +21,10 @@ use crate::{
     utils::enum_tools::ToVec,
 };
 
-use crate::{result_analyser::ResultAnalyserConfig, simulator::{Record, SimulatorConfig}};
+use crate::{
+    result_analyser::ResultAnalyserConfig,
+    simulator::{Record, SimulatorConfig},
+};
 
 #[config_derives(tag_content)]
 #[derive(Default)]
@@ -48,7 +51,7 @@ pub struct ResultConfig {
     ///
     /// If `None`, results are not saved on disk but can still be forwarded to the analysis script.
     pub result_path: Option<String>,
-    
+
     /// Result save mode.
     pub save_mode: ResultSaveMode,
 

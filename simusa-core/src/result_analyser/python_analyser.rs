@@ -1,23 +1,55 @@
 #[cfg(feature = "gui")]
 use std::collections::BTreeMap;
-use std::{ffi::CString, fs, io::Write, sync::Arc};
+use std::{ffi::{CStr, CString}, fs, io::Write, sync::Arc};
 
 #[cfg(feature = "gui")]
 use egui::CollapsingHeader;
 use pyo3::{ffi::c_str, prelude::*};
 use simusa_macros::config_derives;
 
-#[cfg(feature = "gui")]
-use crate::{gui::{UIComponent, utils::{json_config, path_finder}}, simulator::SimulatorConfig};
-use crate::{context::Context, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, info, plugin_api::PluginAPI, result_analyser::ResultAnalyserTrait, simulator::Results, utils::python::CONVERT_TO_DICT, warning};
+use crate::{
+    context::Context,
+    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
+    info,
+    plugin_api::PluginAPI,
+    result_analyser::ResultAnalyserTrait,
+    simulator::Results,
+    warning,
+};
 
+const CONVERT_TO_DICT: &CStr = cr#"
+import json
+class NoneDict(dict):
+    """ dict subclass that returns a value of None for missing keys instead
+        of raising a KeyError. Note: doesn't add item to dictionary.
+    """
+    def __missing__(self, key):
+        return None
+
+
+def converter(decoded_dict):
+    """ Convert any None values in decoded dict into empty NoneDict's. """
+    return {k: NoneDict() if v is None else v for k,v in decoded_dict.items()}
+
+def convert(records):
+    return json.loads(records, object_hook=converter)
+"#;
+
+#[cfg(feature = "gui")]
+use crate::{
+    gui::{
+        UIComponent,
+        utils::{json_config, path_finder},
+    },
+    simulator::SimulatorConfig,
+};
 
 #[config_derives]
 pub struct PythonResultAnalyserConfig {
     /// Show the matplotlib figures (call `plt.show()`)
     pub show_figures: bool,
     /// Path to the Python analysis script (path from config location).
-    /// 
+    ///
     /// If the file does not exist, a default script (named `analyse_results.py`) is created in the same directory as the config file.
     pub script_path: String,
     /// Name of the function to call in the analysis script (default: `analyse_results`).
@@ -52,7 +84,8 @@ impl UIComponent for PythonResultAnalyserConfig {
         unique_id: &str,
     ) {
         let python_param_key = format!("python-result-analyser-config-params-{}", unique_id);
-        let python_param_error_key = format!("python-result-analyser-config-params-error-{}", unique_id);
+        let python_param_error_key =
+            format!("python-result-analyser-config-params-error-{}", unique_id);
         CollapsingHeader::new("Python Result Analyser").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label("Script path:");
@@ -66,7 +99,7 @@ impl UIComponent for PythonResultAnalyserConfig {
                 ui.label("Show figures:");
                 ui.checkbox(&mut self.show_figures, "");
             });
-            
+
             ui.vertical(|ui| {
                 ui.label("Additional params (JSON format, null for nothing):");
                 json_config(
@@ -106,14 +139,22 @@ pub struct PythonResultAnalyser {
 }
 
 impl PythonResultAnalyser {
-    pub fn from_config(config: &PythonResultAnalyserConfig, global_config: &SimulatorConfig, _plugin_api: &Option<Arc<dyn PluginAPI>>, _context: &Context) -> Self {
+    pub fn from_config(
+        config: &PythonResultAnalyserConfig,
+        global_config: &SimulatorConfig,
+        _plugin_api: &Option<Arc<dyn PluginAPI>>,
+        _context: &Context,
+    ) -> Self {
         let config = PythonResultAnalyserConfig {
-            script_path: global_config.base_path.join(&config.script_path).to_str().unwrap().to_string(),
+            script_path: global_config
+                .base_path
+                .join(&config.script_path)
+                .to_str()
+                .unwrap()
+                .to_string(),
             ..config.clone()
         };
-        Self {
-            config
-        }
+        Self { config }
     }
 }
 
@@ -121,8 +162,8 @@ impl ResultAnalyserTrait for PythonResultAnalyser {
     fn analyse_results(&self, results: &Results, context: &Context) -> SimusaResult<()> {
         info!(context, "Starting Python Result Analyser");
 
-        let json_results =
-            serde_json::to_string(&results.records).expect("Error during converting results to json");
+        let json_results = serde_json::to_string(&results.records)
+            .expect("Error during converting results to json");
         let json_config =
             serde_json::to_string(&results.config).expect("Error during converting config to json");
 
@@ -136,7 +177,12 @@ def show():
         let script_path = &self.config.script_path;
         let python_script = match fs::read_to_string(script_path.clone()) {
             Err(e) => {
-                warning!(context, "Result analyser script not found ({}): {}.", script_path, e);
+                warning!(
+                    context,
+                    "Result analyser script not found ({}): {}.",
+                    script_path,
+                    e
+                );
                 warning!(context, "Creating default result analyser script");
                 let mut file = fs::File::create(script_path).map_err(|e| {
                     SimusaError::new(
@@ -148,16 +194,21 @@ def show():
                 writeln!(file, "import numpy as np");
                 writeln!(file, "import matplotlib.pyplot as plt");
                 writeln!(file, "");
-                writeln!(file, "def {}(results, config, additional_params):", self.config.function_name);
-                writeln!(file, "    print('It works! You can now edit this script to analyse the results.')");
-                fs::read_to_string(script_path.clone()).map_err(|e| SimusaError::new(
-                    SimusaErrorTypes::ConfigError,
-                    format!(
-                        "Result analyser script not found ({}): {}",
-                        script_path,
-                        e
-                    ),
-                ))?
+                writeln!(
+                    file,
+                    "def {}(results, config, additional_params):",
+                    self.config.function_name
+                );
+                writeln!(
+                    file,
+                    "    print('It works! You can now edit this script to analyse the results.')"
+                );
+                fs::read_to_string(script_path.clone()).map_err(|e| {
+                    SimusaError::new(
+                        SimusaErrorTypes::ConfigError,
+                        format!("Result analyser script not found ({}): {}", script_path, e),
+                    )
+                })?
             }
             Ok(s) => s,
         };
@@ -167,17 +218,16 @@ def show():
             let convert_fn: Py<PyAny> = script.getattr("convert")?.into();
             let result_dict = convert_fn.call(py, (json_results,), None)?;
             let config_dict = convert_fn.call(py, (json_config,), None)?;
-            let param_dict =
-                convert_fn.call(py, (serde_json::to_string(&self.config.additionnal_params).unwrap(),), None)?;
+            let param_dict = convert_fn.call(
+                py,
+                (serde_json::to_string(&self.config.additionnal_params).unwrap(),),
+                None,
+            )?;
 
             let script = PyModule::from_code(py, &python_script, c_str!(""), c_str!(""))?;
             let analyse_fn: Py<PyAny> = script.getattr(&self.config.function_name)?.into();
             info!(context, "Calling Python script to analyse the results...");
-            let res = analyse_fn.call(
-                py,
-                (result_dict, config_dict, param_dict),
-                None,
-            );
+            let res = analyse_fn.call(py, (result_dict, config_dict, param_dict), None);
             if let Err(err) = res {
                 err.display(py);
                 return Err(err);

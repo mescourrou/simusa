@@ -17,10 +17,20 @@ use simusa_com::{
 };
 
 use crate::{
-    config::NumberConfig, constants::TIME_ROUND, context::Context, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, info, internal, logger::InternalLog, networking::{self, message_types::MessageType, network::Envelope}, scenario::config::{
+    config::NumberConfig,
+    constants::TIME_ROUND,
+    context::Context,
+    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
+    info, internal,
+    logger::InternalLog,
+    networking::{self, message_types::MessageType, network::Envelope},
+    scenario::config::{
         AreaEventTriggerConfig, EventConfig, EventRecord, EventTriggerConfig, EventTypeConfig,
         ProximityEventTriggerConfig, ScenarioConfig, SpawnEventConfig, TimeEventTriggerConfig,
-    }, simulator::{RunningParameters, Simulator, SimulatorConfig, SimusaBroker}, utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory}, warning,
+    },
+    simulator::{RunningParameters, Simulator, SimulatorConfig, SimusaBroker},
+    utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
+    warning,
 };
 
 use crate::networking::network::MessageFlag;
@@ -282,16 +292,26 @@ impl Scenario {
                 info!(
                     context,
                     "Executing SendMessage event to channel `{}` with message `{}` triggered by {}",
-                    channel, msg.message, trigger
+                    channel,
+                    msg.message,
+                    trigger
                 );
-                let tmp_client = self.broker.write().unwrap().subscribe_to(
-                    &PathKey::from_str(&channel).unwrap(),
-                    "scenario".to_string(),
-                    0.,
-                ).ok_or(SimusaError::new(
-                    SimusaErrorTypes::ConfigError,
-                    format!("Try to send message to channel `{}` failed: Channel does not exist", channel),
-                ))?;
+                let tmp_client = self
+                    .broker
+                    .write()
+                    .unwrap()
+                    .subscribe_to(
+                        &PathKey::from_str(&channel).unwrap(),
+                        "scenario".to_string(),
+                        0.,
+                    )
+                    .ok_or(SimusaError::new(
+                        SimusaErrorTypes::ConfigError,
+                        format!(
+                            "Try to send message to channel `{}` failed: Channel does not exist",
+                            channel
+                        ),
+                    ))?;
                 tmp_client.send(
                     Envelope {
                         from: "scenario".to_string(),

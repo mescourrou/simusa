@@ -52,25 +52,16 @@ pub mod state_estimators;
 pub mod utils;
 
 pub mod plugin_api;
-pub mod pybinds;
-pub mod pywrappers;
 
 pub mod api;
-pub mod time_analysis;
 pub mod result_analyser;
+pub mod time_analysis;
 
 #[cfg(test)]
 mod integration_tests;
 
 #[cfg(feature = "gui")]
 pub mod gui;
-
-#[pymodule]
-/// Python module initializer for the `simusa` package.
-pub fn simusa(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    pybinds::make_python_bindings(m)?;
-    Ok(())
-}
 
 pub mod constants;
 pub mod errors;
