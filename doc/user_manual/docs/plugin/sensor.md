@@ -70,7 +70,7 @@ impl Sensor for MyWonderfulSensor {
         self.last_observation = Some(MyWonderfulSensorObservation { data: time });
         self.last_time = time;
         // Return a custom observation here, but you can return an existing one as well (e.g. SpeedObservation)
-        vec![SensorObservation::External(ExternalObservation {
+        vec![SensorObservation::Plugin(PluginObservation {
             observation: serde_json::to_value(self.last_observation.as_ref().unwrap()).unwrap(),
         })]
     }
@@ -82,7 +82,7 @@ impl Sensor for MyWonderfulSensor {
 
 impl Recordable<SensorRecord> for MyWonderfulSensor {
     fn record(&self, _context: &Context) -> SensorRecord {
-        SensorRecord::External(ExternalSensorRecord {
+        SensorRecord::Plugin(PluginSensorRecord {
             record: serde_json::to_value(self.last_observation.clone()).unwrap(),
         })
     }

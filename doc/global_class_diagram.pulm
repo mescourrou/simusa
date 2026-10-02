@@ -178,9 +178,9 @@ package physics {
 
     class PerfectPhysics
     Physics <|.. PerfectPhysics
-    class ExternalPhysics
-    Physics <|.. ExternalPhysics
-    ExternalPhysics *-- Physics
+    class PluginPhysics
+    Physics <|.. PluginPhysics
+    PluginPhysics *-- Physics
     class PythonPhysics
     Physics <|.. PythonPhysics
 
@@ -260,9 +260,9 @@ package state_estimators {
 
     class PerfectEstimator
     StateEstimator <|.. PerfectEstimator
-    class ExternalEstimator
-    StateEstimator <|.. ExternalEstimator
-    ExternalEstimator *-- StateEstimator
+    class PluginEstimator
+    StateEstimator <|.. PluginEstimator
+    PluginEstimator *-- StateEstimator
     class PythonEstimator
     StateEstimator <|.. PythonEstimator
 }
@@ -308,9 +308,9 @@ package navigators {
     Navigator <|.. TrajectoryFollower
     class GoTo
     Navigator <|.. GoTo
-    class ExternalNavigator
-    Navigator <|.. ExternalNavigator
-    ExternalNavigator *-- Navigator
+    class PluginNavigator
+    Navigator <|.. PluginNavigator
+    PluginNavigator *-- Navigator
     class PythonNavigator
     Navigator <|.. PythonNavigator
 }
@@ -335,9 +335,9 @@ package controllers {
 
     class PID
     Controller <|.. PID
-    class ExternalController
-    Controller <|.. ExternalController
-    ExternalController *-- Controller
+    class PluginController
+    Controller <|.. PluginController
+    PluginController *-- Controller
     class PythonController
     Controller <|.. PythonController
 }
@@ -475,10 +475,10 @@ package sensors {
     ScanSensor -- ScanObservation
     ScanObservation *-- .utils.Frame
 
-    Sensor <|.. ExternalSensor
-    ExternalSensor *-- Sensor
-    class ExternalSensor
-    class ExternalObservation {
+    Sensor <|.. PluginSensor
+    PluginSensor *-- Sensor
+    class PluginSensor
+    class PluginObservation {
         +{field} observation: serde_json::Value
     }
 
@@ -497,7 +497,7 @@ package sensors {
         OrientedLandmark(OrientedLandmarkObservation)
         OrientedRobot(OrientedRobotObservation)
         Scan(ScanObservation)
-        External(ExternalObservation)
+        Plugin(PluginObservation)
     }
     SensorObservations::GNSS --> GNSSObservation
     SensorObservations::Speed --> SpeedObservation
@@ -505,7 +505,7 @@ package sensors {
     SensorObservations::OrientedLandmark --> OrientedLandmarkObservation
     SensorObservations::OrientedRobot --> OrientedRobotObservation
     SensorObservations::Scan --> ScanObservation
-    SensorObservations::External --> ExternalObservation
+    SensorObservations::Plugin --> PluginObservation
 
     package fault_models {
 
@@ -556,9 +556,9 @@ package sensors {
         }
         Misdetection::apparition *-- Bernouilli
 
-        FaultModel <|.. ExternalFault
-        ExternalFault *-- FaultModel
-        class ExternalFault
+        FaultModel <|.. PluginFault
+        PluginFault *-- FaultModel
+        class PluginFault
 
         FaultModel <|.. PythonFaultModel
         class PythonFaultModel
@@ -577,30 +577,30 @@ package sensors {
             inside: bool
         }
 
-        class ExternalFilter
-        SensorFilter <|.. ExternalFilter
-        ExternalFilter *-- SensorFilter
+        class PluginFilter
+        SensorFilter <|.. PluginFilter
+        PluginFilter *-- SensorFilter
         class PythonFilter
     }
 
     enum DisplacementSensorFilterType {
         Range(RangeFilter)
         Python(PythonFilter)
-        External(ExternalFilter)
+        Plugin(PluginFilter)
     }
     DisplacementSensorFilterType::Range --> sensor_filters.RangeFilter
     DisplacementSensorFilterType::Python --> sensor_filters.PythonFilter
-    DisplacementSensorFilterType::External --> sensor_filters.ExternalFilter
+    DisplacementSensorFilterType::Plugin --> sensor_filters.PluginFilter
     DisplacementSensor *-- DisplacementSensorFilterType
 
     enum GNSSSensorFilterType {
         Range(RangeFilter)
         Python(PythonFilter)
-        External(ExternalFilter)
+        Plugin(PluginFilter)
     }
     GNSSSensorFilterType::Range --> sensor_filters.RangeFilter
     GNSSSensorFilterType::Python --> sensor_filters.PythonFilter
-    GNSSSensorFilterType::External --> sensor_filters.ExternalFilter
+    GNSSSensorFilterType::Plugin --> sensor_filters.PluginFilter
     GNSSSensor *-- GNSSSensorFilterType
 
     enum OrientedLandmarkSensorFilterType {
@@ -608,11 +608,11 @@ package sensors {
         Id(StringFilter)
         Label(StringFilter)
         Python(PythonFilter)
-        External(ExternalFilter)
+        Plugin(PluginFilter)
     }
     OrientedLandmarkSensorFilterType::Range --> sensor_filters.RangeFilter
     OrientedLandmarkSensorFilterType::Python --> sensor_filters.PythonFilter
-    OrientedLandmarkSensorFilterType::External --> sensor_filters.ExternalFilter
+    OrientedLandmarkSensorFilterType::Plugin --> sensor_filters.PluginFilter
     OrientedLandmarkSensorFilterType::Id --> sensor_filters.StringFilter
     OrientedLandmarkSensorFilterType::Label --> sensor_filters.StringFilter
     OrientedLandmarkSensor *-- OrientedLandmarkSensorFilterType
@@ -622,11 +622,11 @@ package sensors {
         Id(StringFilter)
         Label(StringFilter)
         Python(PythonFilter)
-        External(ExternalFilter)
+        Plugin(PluginFilter)
     }
     RobotSensorFilterType::Range --> sensor_filters.RangeFilter
     RobotSensorFilterType::Python --> sensor_filters.PythonFilter
-    RobotSensorFilterType::External --> sensor_filters.ExternalFilter
+    RobotSensorFilterType::Plugin --> sensor_filters.PluginFilter
     RobotSensorFilterType::Id --> sensor_filters.StringFilter
     RobotSensorFilterType::Label --> sensor_filters.StringFilter
     RobotSensor *-- RobotSensorFilterType
@@ -634,21 +634,21 @@ package sensors {
     enum ScanSensorFilterType {
         Range(RangeFilter)
         Python(PythonFilter)
-        External(ExternalFilter)
+        Plugin(PluginFilter)
     }
     ScanSensorFilterType::Range --> sensor_filters.RangeFilter
     ScanSensorFilterType::Python --> sensor_filters.PythonFilter
-    ScanSensorFilterType::External --> sensor_filters.ExternalFilter
+    ScanSensorFilterType::Plugin --> sensor_filters.PluginFilter
     ScanSensor *-- ScanSensorFilterType
 
     enum SpeedSensorFilterType {
         Range(RangeFilter)
         Python(PythonFilter)
-        External(ExternalFilter)
+        Plugin(PluginFilter)
     }
     SpeedSensorFilterType::Range --> sensor_filters.RangeFilter
     SpeedSensorFilterType::Python --> sensor_filters.PythonFilter
-    SpeedSensorFilterType::External --> sensor_filters.ExternalFilter
+    SpeedSensorFilterType::Plugin --> sensor_filters.PluginFilter
     SpeedSensor *-- SpeedSensorFilterType
 
     

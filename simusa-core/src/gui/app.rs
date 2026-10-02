@@ -547,7 +547,7 @@ impl eframe::App for SimusaApp {
                         match res {
                             Err(e) => {
                                 let now = time::Instant::now();
-                                if let SimusaErrorTypes::ExternalAPIError = e.error_type() {
+                                if let SimusaErrorTypes::PluginAPIError = e.error_type() {
                                     self.p.config = Some(SimulatorConfig::load_from_path(Path::new(&self.config_path)).unwrap());
                                 }
                                 self.p.error_buffer.lock().unwrap().push((now, e));

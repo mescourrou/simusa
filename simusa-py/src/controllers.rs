@@ -15,7 +15,6 @@ use simusa_com::rfc::{self, RemoteFunctionCall, RemoteFunctionCallHost};
 
 use simusa::{
     context::Context,
-    controllers::external_controller::ExternalControllerRecord,
     errors::SimusaResult,
     internal,
     node::Node,
@@ -183,14 +182,10 @@ impl PythonController {
             "Calling python implementation of record"
         );
         let record_str: String = call_py_method!(self.model, "record", String,);
-        let record = ExternalControllerRecord {
-            record: Value::from_str(&record_str).expect(
-                "Impossible to get serde_json::Value from the input serialized python structure",
-            ),
-        };
-        // record.clone()
-        // StateEstimatorRecord::External(PythonController::record(&self))
-        ControllerRecord::External(record)
+        let record = Value::from_str(&record_str).expect(
+            "Impossible to get serde_json::Value from the input serialized python structure",
+        );
+        ControllerRecord::Plugin(record)
     }
 
     fn pre_loop_hook(&mut self, node: NodeWrapper, time: f32, context: &Context) {

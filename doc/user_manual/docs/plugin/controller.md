@@ -14,7 +14,7 @@ The `Recordable<ControllerRecord>` trait has to be implemented, but it can be as
 ```Rust
 impl Recordable<ControllerRecord> for MyWonderfulController {
     fn record(&self, _context: &Context) -> ControllerRecord {
-        ControllerRecord::External(ExternalControllerRecord {
+        ControllerRecord::Plugin(PluginControllerRecord {
             record: serde_json::to_value(MyWonderfulControllerRecord {}).unwrap(),
         })
     }
@@ -64,7 +64,7 @@ impl Controller for MyWonderfulController {
 
 impl Recordable<ControllerRecord> for MyWonderfulController {
     fn record(&self, _context: &Context) -> ControllerRecord {
-        ControllerRecord::External(ExternalControllerRecord {
+        ControllerRecord::Plugin(PluginControllerRecord {
             record: serde_json::to_value(MyWonderfulControllerRecord {}).unwrap(),
         })
     }

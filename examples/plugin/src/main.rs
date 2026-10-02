@@ -2,24 +2,19 @@
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
 use simusa::context::Context;
-use simusa::controllers::external_controller::ExternalControllerRecord;
 use simusa::controllers::{Controller, ControllerError, ControllerRecord};
 use simusa::errors::SimusaResult;
 use simusa::info;
-use simusa::navigators::external_navigator::ExternalNavigatorRecord;
 use simusa::navigators::{Navigator, NavigatorRecord};
 use simusa::networking::network::Network;
 use simusa::node::Node;
-use simusa::physics::external_physics::ExternalPhysicsRecord;
 use simusa::physics::robot_models::unicycle::UnicycleCommand;
 use simusa::physics::robot_models::Command;
 use simusa::physics::{Physics, PhysicsRecord};
 use simusa::plugin_api::PluginAPI;
 use simusa::recordable::Recordable;
-use simusa::sensors::external_sensor::{ExternalObservation, ExternalSensorRecord};
 use simusa::sensors::{Observation, Sensor, SensorObservation, SensorRecord};
 use simusa::simulator::{Simulator, SimulatorConfig};
-use simusa::state_estimators::external_estimator::ExternalEstimatorRecord;
 use simusa::state_estimators::{
     State, StateEstimator, StateEstimatorRecord, StateRecord, WorldState,
 };
@@ -67,9 +62,7 @@ impl Controller for MyWonderfulController {
 
 impl Recordable<ControllerRecord> for MyWonderfulController {
     fn record(&self, _context: &Context) -> ControllerRecord {
-        ControllerRecord::External(ExternalControllerRecord {
-            record: serde_json::to_value(MyWonderfulControllerRecord {}).unwrap(),
-        })
+        ControllerRecord::Plugin(serde_json::to_value(MyWonderfulControllerRecord {}).unwrap())
     }
 }
 
@@ -112,9 +105,7 @@ impl Navigator for MyWonderfulNavigator {
 
 impl Recordable<NavigatorRecord> for MyWonderfulNavigator {
     fn record(&self, _context: &Context) -> NavigatorRecord {
-        NavigatorRecord::External(ExternalNavigatorRecord {
-            record: serde_json::to_value(MyWonderfulNavigatorRecord {}).unwrap(),
-        })
+        NavigatorRecord::Plugin(serde_json::to_value(MyWonderfulNavigatorRecord {}).unwrap())
     }
 }
 
@@ -158,12 +149,11 @@ impl Physics for MyWonderfulPhysics {
 
 impl Recordable<PhysicsRecord> for MyWonderfulPhysics {
     fn record(&self, context: &Context) -> PhysicsRecord {
-        PhysicsRecord::External(ExternalPhysicsRecord {
-            record: serde_json::to_value(MyWonderfulPhysicsRecord {
+        PhysicsRecord::Plugin(serde_json::to_value(MyWonderfulPhysicsRecord {
                 state: self.state.record(context),
             })
-            .unwrap(),
-        })
+            .unwrap()
+        )
     }
 }
 
@@ -225,12 +215,12 @@ impl StateEstimator for MyWonderfulStateEstimator {
 
 impl Recordable<StateEstimatorRecord> for MyWonderfulStateEstimator {
     fn record(&self, _context: &Context) -> StateEstimatorRecord {
-        StateEstimatorRecord::External(ExternalEstimatorRecord {
-            record: serde_json::to_value(MyWonderfulStateEstimatorRecord {
+        StateEstimatorRecord::Plugin(
+            serde_json::to_value(MyWonderfulStateEstimatorRecord {
                 last_prediction: self.last_prediction,
             })
-            .unwrap(),
-        })
+            .unwrap()
+        )
     }
 }
 
@@ -290,9 +280,7 @@ impl Sensor for MyWonderfulSensor {
         self.last_observation = Some(MyWonderfulSensorObservation { data: time });
         self.last_time = time;
         // Return a custom observation here, but you can return an existing one as well (e.g. SpeedObservation)
-        vec![SensorObservation::External(ExternalObservation {
-            observation: serde_json::to_value(self.last_observation.as_ref().unwrap()).unwrap(),
-        })]
+        vec![SensorObservation::Plugin(serde_json::to_value(self.last_observation.as_ref().unwrap()).unwrap())]
     }
 
     fn next_time_step(&self) -> f32 {
@@ -302,9 +290,7 @@ impl Sensor for MyWonderfulSensor {
 
 impl Recordable<SensorRecord> for MyWonderfulSensor {
     fn record(&self, _context: &Context) -> SensorRecord {
-        SensorRecord::External(ExternalSensorRecord {
-            record: serde_json::to_value(self.last_observation.clone()).unwrap(),
-        })
+        SensorRecord::Plugin(serde_json::to_value(self.last_observation.clone()).unwrap())
     }
 }
 

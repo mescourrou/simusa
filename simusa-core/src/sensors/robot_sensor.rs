@@ -10,7 +10,7 @@ use super::{Sensor, SensorObservation, SensorRecord};
 use crate::constants::TIME_ROUND;
 
 use crate::context::Context;
-use crate::errors::SimusaResult;
+use crate::errors::{SimusaError, SimusaErrorTypes, SimusaResult};
 #[cfg(feature = "gui")]
 use crate::gui::UIComponent;
 use crate::internal;
@@ -18,7 +18,6 @@ use crate::plugin_api::PluginAPI;
 use crate::recordable::Recordable;
 use crate::sensors::fault_models::additive::{AdditiveFault, AdditiveFaultConfig};
 use crate::sensors::fault_models::clutter::{ClutterFault, ClutterFaultConfig};
-use crate::sensors::fault_models::external_fault::{ExternalFault, ExternalFaultConfig};
 use crate::sensors::fault_models::misassociation::{
     MisassociationFault, MisassociationFaultConfig,
 };
@@ -26,7 +25,6 @@ use crate::sensors::fault_models::misdetection::{MisdetectionFault, Misdetection
 #[cfg(feature = "python")]
 use crate::sensors::fault_models::python_fault_model::{PythonFaultModel, PythonFaultModelConfig};
 use crate::sensors::sensor_filters::SensorFilter;
-use crate::sensors::sensor_filters::external_filter::{ExternalFilter, ExternalFilterConfig};
 #[cfg(feature = "python")]
 use crate::sensors::sensor_filters::python_filter::{PythonFilter, PythonFilterConfig};
 use crate::sensors::sensor_filters::range_filter::{RangeFilter, RangeFilterConfig};
@@ -39,8 +37,7 @@ use crate::utils::frame::{self, Frame, FrameConfig, FrameRecord};
 use crate::utils::periodicity::{Periodicity, PeriodicityConfig};
 use serde_derive::{Deserialize, Serialize};
 
-extern crate nalgebra as na;
-use na::Vector3;
+use nalgebra::Vector3;
 use simusa_macros::{EnumToString, UIComponent, config_derives, enum_variables};
 
 use std::sync::Arc;
@@ -103,8 +100,8 @@ pub enum RobotSensorFaultModelConfig {
     #[cfg(feature = "python")]
     Python(PythonFaultModelConfig),
     /// Plugin-provided external fault model.
-    #[check]
-    External(ExternalFaultConfig),
+    #[plugin("RobotSensorFaultModel", "robot-sensor-fault-model")]
+    Plugin(serde_json::Value),
 }
 
 impl Default for RobotSensorFaultModelConfig {
@@ -129,8 +126,8 @@ pub enum RobotSensorFaultModelType {
     /// Instantiated Python fault model.
     #[cfg(feature = "python")]
     Python(PythonFaultModel),
-    /// Instantiated external fault model.
-    External(ExternalFault),
+    /// Instantiated plugin fault model.
+    Plugin(Box<dyn FaultModel>),
 }
 
 impl RobotSensorFaultModelType {
@@ -144,7 +141,7 @@ impl RobotSensorFaultModelType {
         match self {
             #[cfg(feature = "python")]
             Self::Python(f) => f.post_init(node, initial_time, context),
-            Self::External(f) => f.post_init(node, initial_time, context),
+            Self::Plugin(f) => f.post_init(node, initial_time, context),
             Self::AdditiveRobotCentered(_)
             | Self::AdditiveObservationCentered(_)
             | Self::Clutter(_)
@@ -189,8 +186,8 @@ pub enum RobotSensorFilterConfig {
     #[cfg(feature = "python")]
     Python(PythonFilterConfig),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
-    #[check]
-    External(ExternalFilterConfig),
+    #[plugin("RobotSensorFilter", "robot-sensor-filter")]
+    Plugin(serde_json::Value),
 }
 
 impl Default for RobotSensorFilterConfig {
@@ -211,8 +208,8 @@ pub enum RobotSensorFilterType {
     /// Instantiated Python filter for Robot sensor observations.
     #[cfg(feature = "python")]
     Python(PythonFilter),
-    /// Instantiated external filter for Robot sensor observations.
-    External(ExternalFilter),
+    /// Instantiated plugin filter for Robot sensor observations.
+    Plugin(Box<dyn SensorFilter>),
 }
 
 impl RobotSensorFilterType {
@@ -226,7 +223,7 @@ impl RobotSensorFilterType {
         match self {
             #[cfg(feature = "python")]
             Self::Python(f) => f.post_init(node, initial_time, context),
-            Self::External(f) => f.post_init(node, initial_time, context),
+            Self::Plugin(f) => f.post_init(node, initial_time, context),
             Self::Range(_) | Self::Id(_) | Self::Label(_) => Ok(()),
         }
     }
@@ -529,15 +526,13 @@ impl RobotSensor {
                 RobotSensorFaultModelConfig::Python(cfg) => RobotSensorFaultModelType::Python(
                     PythonFaultModel::from_config(cfg, global_config, initial_time, context)?,
                 ),
-                RobotSensorFaultModelConfig::External(cfg) => {
-                    RobotSensorFaultModelType::External(ExternalFault::from_config(
-                        cfg,
-                        plugin_api,
-                        global_config,
-                        va_factory,
-                        initial_time,
-                        context,
-                    )?)
+                RobotSensorFaultModelConfig::Plugin(cfg) => {
+                    RobotSensorFaultModelType::Plugin(plugin_api.as_ref().ok_or_else(|| {
+                        SimusaError::new(
+                            SimusaErrorTypes::PluginAPIError,
+                            "Plugin API not set!".to_string(),
+                        )
+                    })?.get_sensor_fault(cfg, global_config, va_factory, initial_time, context))
                 }
             });
         }
@@ -558,15 +553,13 @@ impl RobotSensor {
                 RobotSensorFilterConfig::Python(cfg) => RobotSensorFilterType::Python(
                     PythonFilter::from_config(cfg, global_config, initial_time, context)?,
                 ),
-                RobotSensorFilterConfig::External(cfg) => {
-                    RobotSensorFilterType::External(ExternalFilter::from_config(
-                        cfg,
-                        plugin_api,
-                        global_config,
-                        va_factory,
-                        initial_time,
-                        context,
-                    )?)
+                RobotSensorFilterConfig::Plugin(cfg) => {
+                    RobotSensorFilterType::Plugin(plugin_api.as_ref().ok_or_else(|| {
+                        SimusaError::new(
+                            SimusaErrorTypes::PluginAPIError,
+                            "Plugin API not set!".to_string(),
+                        )
+                    })?.get_sensor_filter(cfg, global_config, va_factory, initial_time, context))
                 }
             });
         }
@@ -696,7 +689,7 @@ impl Sensor for RobotSensor {
                             RobotSensorFilterType::Python(f) => {
                                 f.filter(time, obs, state, Some(&other_state), context)
                             }
-                            RobotSensorFilterType::External(f) => {
+                            RobotSensorFilterType::Plugin(f) => {
                                 f.filter(time, obs, state, Some(&other_state), context)
                             }
                             RobotSensorFilterType::Id(f) => {
@@ -776,7 +769,7 @@ impl Sensor for RobotSensor {
                                 node.environment(),
                                 context,
                             ),
-                            RobotSensorFaultModelType::External(f) => f.add_faults(
+                            RobotSensorFaultModelType::Plugin(f) => f.add_faults(
                                 time,
                                 time + robot_seed,
                                 &mut new_obs,

@@ -13,18 +13,16 @@ use super::{Sensor, SensorObservation, SensorRecord};
 use crate::constants::TIME_ROUND;
 
 use crate::context::Context;
-use crate::errors::SimusaResult;
+use crate::errors::{SimusaError, SimusaErrorTypes, SimusaResult};
 #[cfg(feature = "gui")]
 use crate::gui::UIComponent;
 use crate::internal;
 use crate::plugin_api::PluginAPI;
 use crate::recordable::Recordable;
 use crate::sensors::fault_models::additive::{AdditiveFault, AdditiveFaultConfig};
-use crate::sensors::fault_models::external_fault::{ExternalFault, ExternalFaultConfig};
 #[cfg(feature = "python")]
 use crate::sensors::fault_models::python_fault_model::{PythonFaultModel, PythonFaultModelConfig};
 use crate::sensors::sensor_filters::SensorFilter;
-use crate::sensors::sensor_filters::external_filter::{ExternalFilter, ExternalFilterConfig};
 #[cfg(feature = "python")]
 use crate::sensors::sensor_filters::python_filter::{PythonFilter, PythonFilterConfig};
 use crate::sensors::sensor_filters::range_filter::{RangeFilter, RangeFilterConfig};
@@ -36,8 +34,6 @@ use crate::utils::frame::{self, Frame, FrameConfig, FrameRecord};
 use crate::utils::periodicity::{Periodicity, PeriodicityConfig};
 use serde_derive::{Deserialize, Serialize};
 use simusa_macros::{EnumToString, UIComponent, config_derives, enum_variables};
-
-extern crate nalgebra as na;
 
 enum_variables!(
     "Variables used by speed sensors and related fault models."
@@ -70,7 +66,8 @@ pub enum SpeedSensorFaultModelConfig {
     #[cfg(feature = "python")]
     Python(PythonFaultModelConfig),
     /// Plugin-provided external fault model.
-    External(ExternalFaultConfig),
+    #[plugin("SpeedSensorFaultModel", "speed-sensor-fault-model")]
+    Plugin(serde_json::Value),
 }
 
 impl Default for SpeedSensorFaultModelConfig {
@@ -89,8 +86,8 @@ pub enum SpeedSensorFaultModelType {
     /// Instantiated Python fault model.
     #[cfg(feature = "python")]
     Python(PythonFaultModel),
-    /// Instantiated external fault model.
-    External(ExternalFault),
+    /// Instantiated plugin fault model.
+    Plugin(Box<dyn FaultModel>),
 }
 
 impl SpeedSensorFaultModelType {
@@ -110,7 +107,7 @@ impl SpeedSensorFaultModelType {
             Self::Additive(_) => Ok(()),
             #[cfg(feature = "python")]
             Self::Python(f) => f.post_init(node, initial_time, context),
-            Self::External(f) => f.post_init(node, initial_time, context),
+            Self::Plugin(f) => f.post_init(node, initial_time, context),
         }
     }
 }
@@ -144,8 +141,8 @@ pub enum SpeedSensorFilterConfig {
     #[cfg(feature = "python")]
     Python(PythonFilterConfig),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
-    #[check]
-    External(ExternalFilterConfig),
+    #[plugin("SpeedSensorFilter", "speed-sensor-filter")]
+    Plugin(serde_json::Value),
 }
 
 impl Default for SpeedSensorFilterConfig {
@@ -162,8 +159,8 @@ pub enum SpeedSensorFilterType {
     /// Instantiated Python filter for Speed sensor observations.
     #[cfg(feature = "python")]
     Python(PythonFilter),
-    /// Instantiated external filter for Speed sensor observations.
-    External(ExternalFilter),
+    /// Instantiated plugin filter for Speed sensor observations.
+    Plugin(Box<dyn SensorFilter>),
 }
 
 impl SpeedSensorFilterType {
@@ -177,7 +174,7 @@ impl SpeedSensorFilterType {
         match self {
             #[cfg(feature = "python")]
             Self::Python(f) => f.post_init(node, initial_time, context),
-            Self::External(f) => f.post_init(node, initial_time, context),
+            Self::Plugin(f) => f.post_init(node, initial_time, context),
             Self::Range(_) => Ok(()),
         }
     }
@@ -414,15 +411,13 @@ impl SpeedSensor {
                 SpeedSensorFaultModelConfig::Python(c) => SpeedSensorFaultModelType::Python(
                     PythonFaultModel::from_config(c, global_config, initial_time, context)?,
                 ),
-                SpeedSensorFaultModelConfig::External(c) => {
-                    SpeedSensorFaultModelType::External(ExternalFault::from_config(
-                        c,
-                        plugin_api,
-                        global_config,
-                        va_factory,
-                        initial_time,
-                        context,
-                    )?)
+                SpeedSensorFaultModelConfig::Plugin(c) => {
+                    SpeedSensorFaultModelType::Plugin(plugin_api.as_ref().ok_or_else(|| {
+                        SimusaError::new(
+                            SimusaErrorTypes::PluginAPIError, 
+                            "Plugin API is not available.".to_string(),
+                        )
+                    })?.get_sensor_fault(c, global_config, va_factory, initial_time, context))
                 }
             });
         }
@@ -437,15 +432,13 @@ impl SpeedSensor {
                 SpeedSensorFilterConfig::Python(c) => SpeedSensorFilterType::Python(
                     PythonFilter::from_config(c, global_config, initial_time, context)?,
                 ),
-                SpeedSensorFilterConfig::External(c) => {
-                    SpeedSensorFilterType::External(ExternalFilter::from_config(
-                        c,
-                        plugin_api,
-                        global_config,
-                        va_factory,
-                        initial_time,
-                        context,
-                    )?)
+                SpeedSensorFilterConfig::Plugin(c) => {
+                    SpeedSensorFilterType::Plugin(plugin_api.as_ref().ok_or_else(|| {
+                        SimusaError::new(
+                            SimusaErrorTypes::PluginAPIError,
+                            "Plugin API is not available.".to_string(),
+                        )
+                    })?.get_sensor_filter(c, global_config, va_factory, initial_time, context))
                 }
             });
         }
@@ -523,7 +516,7 @@ impl Sensor for SpeedSensor {
                 keep_observation = match filter {
                     #[cfg(feature = "python")]
                     SpeedSensorFilterType::Python(f) => f.filter(time, obs, state, None, context),
-                    SpeedSensorFilterType::External(f) => f.filter(time, obs, state, None, context),
+                    SpeedSensorFilterType::Plugin(f) => f.filter(time, obs, state, None, context),
                     SpeedSensorFilterType::Range(f) => {
                         if let SensorObservation::Speed(obs) = obs {
                             if f.match_exclusion(&SpeedSensorVariablesFilter::mapped_values(
@@ -563,7 +556,7 @@ impl Sensor for SpeedSensor {
                         node.environment(),
                         context,
                     ),
-                    SpeedSensorFaultModelType::External(f) => f.add_faults(
+                    SpeedSensorFaultModelType::Plugin(f) => f.add_faults(
                         time,
                         time,
                         &mut observation_list,

@@ -14,32 +14,19 @@ use simusa_macros::{EnumToString, UIComponent, config_derives, enum_variables};
 #[cfg(feature = "python")]
 use crate::sensors::fault_models::python_fault_model::{PythonFaultModel, PythonFaultModelConfig};
 use crate::{
-    config::NumberConfig,
-    constants::TIME_ROUND,
-    context::Context,
-    errors::SimusaResult,
-    internal,
-    node::Node,
-    plugin_api::PluginAPI,
-    recordable::Recordable,
-    sensors::{
+    config::NumberConfig, constants::TIME_ROUND, context::Context, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, internal, node::Node, plugin_api::PluginAPI, recordable::Recordable, sensors::{
         Sensor, SensorObservation, SensorRecord,
         fault_models::{
             additive::{AdditiveFault, AdditiveFaultConfig},
             clutter::{ClutterFault, ClutterFaultConfig},
-            external_fault::{ExternalFault, ExternalFaultConfig},
             fault_model::FaultModel,
             misdetection::{MisdetectionFault, MisdetectionFaultConfig},
         },
         sensor_filters::{
             SensorFilter,
-            external_filter::{ExternalFilter, ExternalFilterConfig},
             range_filter::{RangeFilter, RangeFilterConfig},
         },
-    },
-    simulator::SimulatorConfig,
-    state_estimators::State,
-    utils::{
+    }, simulator::SimulatorConfig, state_estimators::State, utils::{
         determinist_random_variable::DeterministRandomVariableFactory,
         enum_tools::EnumVariables,
         frame::{Frame, FrameConfig, FrameRecord},
@@ -124,8 +111,8 @@ pub enum ScanSensorFaultModelConfig {
     #[cfg(feature = "python")]
     Python(PythonFaultModelConfig),
     /// Plugin-provided external fault model.
-    #[check]
-    External(ExternalFaultConfig),
+    #[plugin("ScanSensorFaultModel", "scan-sensor-fault-model")]
+    Plugin(serde_json::Value),
 }
 
 impl Default for ScanSensorFaultModelConfig {
@@ -158,8 +145,8 @@ pub enum FaultModelTypeScanSensor {
     /// Instantiated Python fault model.
     #[cfg(feature = "python")]
     Python(PythonFaultModel),
-    /// Instantiated external fault model.
-    External(ExternalFault),
+    /// Instantiated plugin fault model.
+    Plugin(Box<dyn FaultModel>),
 }
 
 impl FaultModelTypeScanSensor {
@@ -173,7 +160,7 @@ impl FaultModelTypeScanSensor {
         match self {
             #[cfg(feature = "python")]
             Self::Python(f) => f.post_init(node, initial_time, context),
-            Self::External(f) => f.post_init(node, initial_time, context),
+            Self::Plugin(f) => f.post_init(node, initial_time, context),
             Self::AdditiveRobotCentered(_)
             | Self::PointAdditiveRobotCentered(_)
             | Self::PointAdditiveObservationCentered(_)
@@ -213,8 +200,8 @@ pub enum ScanSensorFilterConfig {
     #[cfg(feature = "python")]
     Python(PythonFilterConfig),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
-    #[check]
-    External(ExternalFilterConfig),
+    #[plugin("ScanSensorFilter", "scan-sensor-filter")]
+    Plugin(serde_json::Value),
 }
 
 impl Default for ScanSensorFilterConfig {
@@ -231,8 +218,8 @@ pub enum ScanSensorFilterType {
     /// Instantiated Python filter for Scan sensor observations.
     #[cfg(feature = "python")]
     Python(PythonFilter),
-    /// Instantiated external filter for Scan sensor observations.
-    External(ExternalFilter),
+    /// Instantiated plugin filter for Scan sensor observations.
+    Plugin(Box<dyn SensorFilter>),
 }
 
 impl ScanSensorFilterType {
@@ -246,7 +233,7 @@ impl ScanSensorFilterType {
         match self {
             #[cfg(feature = "python")]
             Self::Python(f) => f.post_init(node, initial_time, context),
-            Self::External(f) => f.post_init(node, initial_time, context),
+            Self::Plugin(f) => f.post_init(node, initial_time, context),
             Self::Range(_) => Ok(()),
         }
     }
@@ -670,15 +657,13 @@ impl ScanSensor {
                 ScanSensorFaultModelConfig::Python(cfg) => FaultModelTypeScanSensor::Python(
                     PythonFaultModel::from_config(cfg, global_config, initial_time, context)?,
                 ),
-                ScanSensorFaultModelConfig::External(cfg) => {
-                    FaultModelTypeScanSensor::External(ExternalFault::from_config(
-                        cfg,
-                        plugin_api,
-                        global_config,
-                        va_factory,
-                        initial_time,
-                        context,
-                    )?)
+                ScanSensorFaultModelConfig::Plugin(cfg) => {
+                    FaultModelTypeScanSensor::Plugin(plugin_api.as_ref().ok_or_else(|| {
+                        SimusaError::new(
+                            SimusaErrorTypes::PluginAPIError, 
+                            "Plugin API is not available.".to_string(),
+                        )
+                    })?.get_sensor_fault(cfg, global_config, va_factory, initial_time, context))
                 }
             });
         }
@@ -693,15 +678,13 @@ impl ScanSensor {
                 ScanSensorFilterConfig::Python(cfg) => ScanSensorFilterType::Python(
                     PythonFilter::from_config(cfg, global_config, initial_time, context)?,
                 ),
-                ScanSensorFilterConfig::External(cfg) => {
-                    ScanSensorFilterType::External(ExternalFilter::from_config(
-                        cfg,
-                        plugin_api,
-                        global_config,
-                        va_factory,
-                        initial_time,
-                        context,
-                    )?)
+                ScanSensorFilterConfig::Plugin(cfg) => {
+                    ScanSensorFilterType::Plugin(plugin_api.as_ref().ok_or_else(|| {
+                        SimusaError::new(
+                            SimusaErrorTypes::PluginAPIError, 
+                            "Plugin API is not available.".to_string(),
+                        )
+                    })?.get_sensor_filter(cfg, global_config, va_factory, initial_time, context))
                 }
             });
         }
@@ -886,7 +869,7 @@ impl Sensor for ScanSensor {
                 keep_observation = match filter {
                     #[cfg(feature = "python")]
                     ScanSensorFilterType::Python(f) => f.filter(time, obs, state, None, context),
-                    ScanSensorFilterType::External(f) => f.filter(time, obs, state, None, context),
+                    ScanSensorFilterType::Plugin(f) => f.filter(time, obs, state, None, context),
                     ScanSensorFilterType::Range(f) => {
                         if let SensorObservation::Scan(obs) = obs {
                             let mut obs = obs;
@@ -942,7 +925,7 @@ impl Sensor for ScanSensor {
                         node.environment(),
                         context,
                     ),
-                    FaultModelTypeScanSensor::External(f) => f.add_faults(
+                    FaultModelTypeScanSensor::Plugin(f) => f.add_faults(
                         time,
                         time,
                         &mut observations,

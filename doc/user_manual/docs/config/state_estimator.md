@@ -62,13 +62,13 @@ state_estimator:
 
 For Python integration details, see the [Python Integration Guide](../python/using_python.md).
 
-## State Estimator Type: `External`
+## State Estimator Type: `Plugin`
 
 Implement state estimation via external plugin. Use for maximum performance or proprietary algorithms.
 
 ```yaml
 state_estimator:
-  type: External
+  type: Plugin
   config:
     # Configuration for your plugin
     prediction_period: 0.1

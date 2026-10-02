@@ -11,7 +11,7 @@ use simusa_com::rfc::{self, RemoteFunctionCall, RemoteFunctionCallHost};
 
 use simusa::{
     context::Context, errors::SimusaResult, internal, logger::InternalLog, node::Node, physics::{
-        Physics, PhysicsRecord, external_physics::ExternalPhysicsRecord, robot_models::Command,
+        Physics, PhysicsRecord, robot_models::Command,
     }, recordable::Recordable, state_estimators::State,
 };
 
@@ -183,14 +183,10 @@ impl PythonPhysics {
             "Calling python implementation of record"
         );
         let record_str: String = call_py_method!(self.model, "record", String,);
-        let record = ExternalPhysicsRecord {
-            record: Value::from_str(&record_str).expect(
-                "Impossible to get serde_json::Value from the input serialized python structure",
-            ),
-        };
-        // record.clone()
-        // StateEstimatorRecord::External(PythonPhysics::record(&self))
-        PhysicsRecord::External(record)
+        let record = Value::from_str(&record_str).expect(
+            "Impossible to get serde_json::Value from the input serialized python structure",
+        );
+        PhysicsRecord::Plugin(record)
     }
 
     fn next_time_step(&self, context: &Context) -> Option<f32> {

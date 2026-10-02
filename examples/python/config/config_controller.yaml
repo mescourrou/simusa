@@ -25,9 +25,8 @@ robots:
       target_speed: 0.5
       forward_distance: 0.2
     controller: 
-      type: External
-      config:
-        speed: 5
+      type: Plugin
+      speed: 5
   - name: "robot2"
     navigator: 
       type: TrajectoryFollower

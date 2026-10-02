@@ -141,12 +141,12 @@ state run as "Simulator::run" {
     '     call_physics_update_step --> internal_physics_update_step
     '     state python_physics_update_step as "PythonPhysics::update_state"
     '     call_physics_update_step --> python_physics_update_step
-    '     state external_physics_update_step as "ExternalPhysics::update_state"
-    '     call_physics_update_step --> external_physics_update_step
+    '     state plugin_physics_update_step as "PluginPhysics::update_state"
+    '     call_physics_update_step --> plugin_physics_update_step
 
     '     internal_physics_update_step --> update_node_meta_data
     '     python_physics_update_step --> update_node_meta_data
-    '     external_physics_update_step --> update_node_meta_data
+    '     plugin_physics_update_step --> update_node_meta_data
 
     ' }
 

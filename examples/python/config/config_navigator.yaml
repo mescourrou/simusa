@@ -20,10 +20,9 @@ max_time: 60.
 robots:
   - name: "robot1"
     navigator: 
-      type: External
-      config:
-        radius: 3
-        velocity: 2
+      type: Plugin
+      radius: 3
+      velocity: 2
   - name: "robot2"
     navigator: 
       type: TrajectoryFollower

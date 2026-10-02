@@ -81,8 +81,8 @@ name = "basic"
 path = "../examples/basic.rs"
 
 [[example]]
-name = "python_external"
-path = "../examples/python_external.rs"
+name = "python_plugin"
+path = "../examples/python_plugin.rs"
 
 [[example]]
 name = "gui"

@@ -51,7 +51,7 @@ robots:
         velocity: [0.0, 0.0]
       faults: []
     state_estimator:
-      type: External
+      type: Plugin
       config: ...                       # Your external plugin configuration
     sensor_manager:
       sensors:
@@ -91,7 +91,7 @@ robots:
         velocity: [0.0, 0.0]
       faults: []
     state_estimator:
-      type: External
+      type: Plugin
       config: ...                       # Your external plugin configuration
     sensor_manager:
       sensors:
@@ -242,7 +242,7 @@ computation_units:
     state_estimators:
       - name: global_slam
         config:
-          type: External
+          type: Plugin
           config:
             # Your external plugin configuration
 ```
@@ -463,7 +463,7 @@ navigator:
 
 # ✅ Correct
 navigator:
-  type: GoTo  # or TrajectoryFollower, Python, External
+  type: GoTo  # or TrajectoryFollower, Python, Plugin
 ```
 
 ### Issue: Robot doesn't move

@@ -14,18 +14,16 @@ use crate::config::NumberConfig;
 use crate::constants::TIME_ROUND;
 
 use crate::context::Context;
-use crate::errors::SimusaResult;
+use crate::errors::{SimusaError, SimusaErrorTypes, SimusaResult};
 #[cfg(feature = "gui")]
 use crate::gui::UIComponent;
 use crate::internal;
 use crate::plugin_api::PluginAPI;
 use crate::recordable::Recordable;
 use crate::sensors::fault_models::additive::{AdditiveFault, AdditiveFaultConfig};
-use crate::sensors::fault_models::external_fault::{ExternalFault, ExternalFaultConfig};
 #[cfg(feature = "python")]
 use crate::sensors::fault_models::python_fault_model::{PythonFaultModel, PythonFaultModelConfig};
 use crate::sensors::sensor_filters::SensorFilter;
-use crate::sensors::sensor_filters::external_filter::{ExternalFilter, ExternalFilterConfig};
 #[cfg(feature = "python")]
 use crate::sensors::sensor_filters::python_filter::{PythonFilter, PythonFilterConfig};
 use crate::sensors::sensor_filters::range_filter::{RangeFilter, RangeFilterConfig};
@@ -39,8 +37,6 @@ use crate::utils::periodicity::{Periodicity, PeriodicityConfig};
 use nalgebra::{Matrix3, Vector2};
 use serde_derive::{Deserialize, Serialize};
 use simusa_macros::{EnumToString, UIComponent, config_derives, enum_variables};
-
-extern crate nalgebra as na;
 
 enum_variables!(
     "Variables of the [`DisplacementSensor`]."
@@ -93,7 +89,8 @@ pub enum DisplacementSensorFaultModelConfig {
     #[check]
     Python(PythonFaultModelConfig),
     /// Plugin-provided external fault model.
-    External(ExternalFaultConfig),
+    #[plugin("DisplacementSensorFaultModel", "displacement-sensor-fault-model")]
+    Plugin(serde_json::Value),
 }
 
 impl Default for DisplacementSensorFaultModelConfig {
@@ -116,8 +113,8 @@ pub enum DisplacementSensorFaultModelType {
     /// Instantiated Python fault model.
     #[cfg(feature = "python")]
     Python(PythonFaultModel),
-    /// Instantiated external fault model.
-    External(ExternalFault),
+    /// Instantiated plugin fault model.
+    Plugin(Box<dyn FaultModel>),
 }
 
 impl DisplacementSensorFaultModelType {
@@ -131,7 +128,7 @@ impl DisplacementSensorFaultModelType {
         match self {
             #[cfg(feature = "python")]
             Self::Python(f) => f.post_init(node, initial_time, context),
-            Self::External(f) => f.post_init(node, initial_time, context),
+            Self::Plugin(f) => f.post_init(node, initial_time, context),
             Self::AdditivePreDisplacement(_) | Self::AdditivePostDisplacement(_) => Ok(()),
         }
     }
@@ -145,7 +142,7 @@ impl DisplacementSensorFaultModelType {
 /// Default value: [`DisplacementSensorFilterConfig::Range`] with [`RangeFilterConfig::default`].
 #[config_derives]
 #[derive(UIComponent)]
-#[show_all = "Faults"]
+#[show_all = "Filter"]
 pub enum DisplacementSensorFilterConfig {
     /// Range-based filtering on enumerated variables: excludes observations where numeric values fall outside specified bounds.
     #[check]
@@ -155,8 +152,8 @@ pub enum DisplacementSensorFilterConfig {
     #[cfg(feature = "python")]
     Python(PythonFilterConfig),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
-    #[check]
-    External(ExternalFilterConfig),
+    #[plugin("DisplacementSensorFilter", "displacement-sensor-filter")]
+    Plugin(serde_json::Value),
 }
 
 impl Default for DisplacementSensorFilterConfig {
@@ -173,8 +170,8 @@ pub enum DisplacementSensorFilterType {
     /// Instantiated Python filter for displacement sensor observations.
     #[cfg(feature = "python")]
     Python(PythonFilter),
-    /// Instantiated external filter for displacement sensor observations.
-    External(ExternalFilter),
+    /// Instantiated plugin filter for displacement sensor observations.
+    Plugin(Box<dyn SensorFilter>),
 }
 
 impl DisplacementSensorFilterType {
@@ -188,7 +185,7 @@ impl DisplacementSensorFilterType {
         match self {
             #[cfg(feature = "python")]
             Self::Python(f) => f.post_init(node, initial_time, context),
-            Self::External(f) => f.post_init(node, initial_time, context),
+            Self::Plugin(f) => f.post_init(node, initial_time, context),
             Self::Range(_) => Ok(()),
         }
     }
@@ -446,15 +443,19 @@ impl DisplacementSensor {
                         context,
                     )?)
                 }
-                DisplacementSensorFaultModelConfig::External(cfg) => {
-                    DisplacementSensorFaultModelType::External(ExternalFault::from_config(
+                DisplacementSensorFaultModelConfig::Plugin(cfg) => {
+                    DisplacementSensorFaultModelType::Plugin(plugin_api.as_ref().ok_or_else(|| {
+                        SimusaError::new(
+                            SimusaErrorTypes::PluginAPIError,
+                            "Plugin API is not available.".to_string(),
+                        )
+                    })?.get_sensor_fault(
                         cfg,
-                        plugin_api,
                         global_config,
                         va_factory,
                         initial_time,
                         context,
-                    )?)
+                    ))
                 }
             });
         }
@@ -474,15 +475,19 @@ impl DisplacementSensor {
                         context,
                     )?)
                 }
-                DisplacementSensorFilterConfig::External(cfg) => {
-                    DisplacementSensorFilterType::External(ExternalFilter::from_config(
+                DisplacementSensorFilterConfig::Plugin(cfg) => {
+                    DisplacementSensorFilterType::Plugin(plugin_api.as_ref().ok_or_else(|| {
+                        SimusaError::new(
+                            SimusaErrorTypes::PluginAPIError,
+                            "Plugin API is not available.".to_string(),
+                        )
+                    })?.get_sensor_filter(
                         cfg,
-                        plugin_api,
                         global_config,
                         va_factory,
                         initial_time,
                         context,
-                    )?)
+                    ))
                 }
             });
         }
@@ -585,7 +590,7 @@ impl Sensor for DisplacementSensor {
         for filter in self.filters.iter() {
             if let Some(o) = keep_observation {
                 keep_observation = match filter {
-                    DisplacementSensorFilterType::External(f) => {
+                    DisplacementSensorFilterType::Plugin(f) => {
                         f.filter(time, o, state, None, context)
                     }
                     #[cfg(feature = "python")]
@@ -636,7 +641,7 @@ impl Sensor for DisplacementSensor {
                         node.environment(),
                         context,
                     ),
-                    DisplacementSensorFaultModelType::External(f) => f.add_faults(
+                    DisplacementSensorFaultModelType::Plugin(f) => f.add_faults(
                         time,
                         time,
                         &mut observation_list,

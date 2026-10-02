@@ -92,7 +92,6 @@ mod tests {
         state_estimators::{
             BenchStateEstimatorConfig, StateEstimator, StateEstimatorConfig, StateEstimatorRecord,
             WorldState,
-            external_estimator::{ExternalEstimatorConfig, ExternalEstimatorRecord},
         },
         utils::{
             SharedMutex, SharedRwLock,
@@ -167,12 +166,12 @@ mod tests {
 
     impl Recordable<StateEstimatorRecord> for StateEstimatorTest {
         fn record(&self, _context: &Context) -> StateEstimatorRecord {
-            StateEstimatorRecord::External(ExternalEstimatorRecord {
-                record: serde_json::to_value(StateEstimatorRecordTest {
+            StateEstimatorRecord::Plugin(
+                serde_json::to_value(StateEstimatorRecordTest {
                     last_time: self.last_time,
                 })
                 .unwrap(),
-            })
+            )
         }
     }
 
@@ -224,9 +223,7 @@ mod tests {
             name: "node1".to_string(),
             state_estimator_bench: vec![BenchStateEstimatorConfig {
                 name: "own".to_string(),
-                config: StateEstimatorConfig::External(ExternalEstimatorConfig {
-                    config: Value::Bool(false),
-                }),
+                config: StateEstimatorConfig::Plugin(Value::Bool(false)),
             }],
             ..Default::default()
         });
@@ -238,9 +235,7 @@ mod tests {
             },
             state_estimator_bench: vec![BenchStateEstimatorConfig {
                 name: "own".to_string(),
-                config: StateEstimatorConfig::External(ExternalEstimatorConfig {
-                    config: Value::Bool(true),
-                }),
+                config: StateEstimatorConfig::Plugin(Value::Bool(true)),
             }],
             ..Default::default()
         });

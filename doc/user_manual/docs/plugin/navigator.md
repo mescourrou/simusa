@@ -14,7 +14,7 @@ The `Recordable<NavigatorRecord>` has to be implemented, but it can be as minima
 ```Rust
 impl Recordable<NavigatorRecord> for MyWonderfulNavigator {
     fn record(&self, _context: &Context) -> NavigatorRecord {
-        NavigatorRecord::External(ExternalNavigatorRecord {
+        NavigatorRecord::Plugin(PluginNavigatorRecord {
             record: serde_json::to_value(MyWonderfulNavigatorRecord {}).unwrap(),
         })
     }
@@ -65,7 +65,7 @@ impl Navigator for MyWonderfulNavigator {
 
 impl Recordable<NavigatorRecord> for MyWonderfulNavigator {
     fn record(&self, _context: &Context) -> NavigatorRecord {
-        NavigatorRecord::External(ExternalNavigatorRecord {
+        NavigatorRecord::Plugin(PluginNavigatorRecord {
             record: serde_json::to_value(MyWonderfulNavigatorRecord {}).unwrap(),
         })
     }

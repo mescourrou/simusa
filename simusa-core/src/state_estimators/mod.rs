@@ -28,15 +28,12 @@ To create a new state estimation strategy, here are the required steps.
    Record struct as generic type.
 */
 
-pub mod external_estimator;
 pub mod perfect_estimator;
 #[cfg(feature = "python")]
 pub mod python_estimator;
 
-extern crate nalgebra as na;
-use na::SVector;
+use nalgebra::SVector;
 
-extern crate confy;
 use serde_derive::{Deserialize, Serialize};
 use simusa_macros::config_derives;
 
@@ -472,10 +469,9 @@ impl Recordable<WorldStateRecord> for WorldState {
 
 #[cfg(feature = "gui")]
 use crate::gui::{
-    UIComponent,
-    utils::{string_combobox, text_singleline_with_apply},
+    UIComponent, utils::{edit_plugin_config, show_plugin_config, string_combobox, text_singleline_with_apply},
 };
-use crate::simulator::SimulatorConfig;
+use crate::{errors::{SimusaError, SimusaErrorTypes}, simulator::SimulatorConfig};
 use crate::utils::determinist_random_variable::DeterministRandomVariableFactory;
 #[cfg(feature = "gui")]
 use crate::utils::enum_tools::ToVec;
@@ -503,9 +499,8 @@ pub enum StateEstimatorConfig {
     /// Built-in perfect state estimator.
     #[check]
     Perfect(perfect_estimator::PerfectEstimatorConfig),
-    /// External state estimator provided through plugin API.
-    #[check]
-    External(external_estimator::ExternalEstimatorConfig),
+    /// Plugin state estimator provided through plugin API.
+    Plugin(serde_json::Value),
     /// Python-backed state estimator.
     #[check]
     #[cfg(feature = "python")]
@@ -540,10 +535,8 @@ impl UIComponent for StateEstimatorConfig {
                         perfect_estimator::PerfectEstimatorConfig::default(),
                     )
                 }
-                "External" => {
-                    *self = StateEstimatorConfig::External(
-                        external_estimator::ExternalEstimatorConfig::default(),
-                    )
+                "Plugin" => {
+                    *self = StateEstimatorConfig::Plugin(serde_json::Value::Null)
                 }
                 #[cfg(feature = "python")]
                 "Python" => {
@@ -563,14 +556,7 @@ impl UIComponent for StateEstimatorConfig {
                 current_node_name,
                 unique_id,
             ),
-            StateEstimatorConfig::External(c) => c.show_mut(
-                ui,
-                ctx,
-                buffer_stack,
-                global_config,
-                current_node_name,
-                unique_id,
-            ),
+            StateEstimatorConfig::Plugin(c) => edit_plugin_config(ui, "Plugin State Estimator", "plugin-state-estimator", unique_id, buffer_stack, c),
             #[cfg(feature = "python")]
             StateEstimatorConfig::Python(c) => c.show_mut(
                 ui,
@@ -589,7 +575,7 @@ impl UIComponent for StateEstimatorConfig {
         });
         match self {
             StateEstimatorConfig::Perfect(c) => c.show(ui, ctx, unique_id),
-            StateEstimatorConfig::External(c) => c.show(ui, ctx, unique_id),
+            StateEstimatorConfig::Plugin(c) => show_plugin_config(ui, "Plugin State Estimator", c),
             #[cfg(feature = "python")]
             StateEstimatorConfig::Python(c) => c.show(ui, ctx, unique_id),
         }
@@ -601,8 +587,8 @@ impl UIComponent for StateEstimatorConfig {
 pub enum StateEstimatorRecord {
     /// Record for the [`PerfectEstimator`](crate::state_estimators::perfect_estimator::PerfectEstimator).
     Perfect(perfect_estimator::PerfectEstimatorRecord),
-    /// Record for the [`ExternalEstimator`](crate::state_estimators::external_estimator::ExternalEstimator).
-    External(external_estimator::ExternalEstimatorRecord),
+    /// Record for the plugin [`StateEstimator`].
+    Plugin(serde_json::Value),
     /// Record for the [`PythonEstimator`](crate::state_estimators::python_estimator::PythonEstimator).
     #[cfg(feature = "python")]
     Python(python_estimator::PythonEstimatorRecord),
@@ -617,11 +603,7 @@ impl UIComponent for StateEstimatorRecord {
                     r.show(ui, ctx, unique_id);
                 });
             }
-            Self::External(r) => {
-                egui::CollapsingHeader::new("ExternalStateEstimator").show(ui, |ui| {
-                    r.show(ui, ctx, unique_id);
-                });
-            }
+            Self::Plugin(r) => show_plugin_config(ui, "Plugin State Estimator", r),
             #[cfg(feature = "python")]
             Self::Python(r) => {
                 egui::CollapsingHeader::new("PythonExternalStateEstimator").show(ui, |ui| {
@@ -656,9 +638,19 @@ pub fn make_state_estimator_from_config(
                 from_config_params.context,
             )) as Box<dyn StateEstimator>
         }
-        StateEstimatorConfig::External(c) => Box::new(
-            external_estimator::ExternalEstimator::from_config(c, from_config_params)?,
-        ) as Box<dyn StateEstimator>,
+        StateEstimatorConfig::Plugin(c) => from_config_params.plugin_api.as_ref().ok_or_else(|| {
+            SimusaError::new(
+                SimusaErrorTypes::PluginAPIError,
+                "Plugin API is not available.".to_string(),
+            )
+        })?.get_state_estimator(
+            c,
+            from_config_params.global_config,
+            from_config_params.va_factory,
+            from_config_params.network,
+            from_config_params.initial_time,
+            from_config_params.context,
+        ),
         #[cfg(feature = "python")]
         StateEstimatorConfig::Python(c) => Box::new(
             python_estimator::PythonEstimator::from_config(

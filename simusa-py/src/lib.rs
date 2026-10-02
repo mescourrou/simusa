@@ -4,13 +4,13 @@ use ::simusa::{navigators::go_to::GoToMessage, networking::network::MessageFlag,
 use crate::{controllers::ControllerWrapper, navigators::NavigatorWrapper, networking::MessageTypesWrapper, physics::PhysicsWrapper, state_estimators::StateEstimatorWrapper, wrappers::{CommandWrapper, ControllerErrorWrapper, DisplacementObservationWrapper, GNSSObservationWrapper, MultiClientWrapper, NodeWrapper, ObservationWrapper, OrientedLandmarkObservationWrapper, OrientedRobotObservationWrapper, PluginAPIWrapper, Pose, SensorObservationWrapper, SimulatorWrapper, SpeedObservationWrapper, StateWrapper, UnicycleCommandWrapper, Vec2, Vec3, WorldStateWrapper}};
 
 
-mod controllers;
-mod general;
-mod navigators;
-mod networking;
-mod physics;
-mod state_estimators;
-mod utils;
+pub mod controllers;
+pub mod general;
+pub mod navigators;
+pub mod networking;
+pub mod physics;
+pub mod state_estimators;
+pub mod utils;
 pub mod wrappers;
 
 /// Run the GUI of the simulator. This function will block until the GUI is closed but

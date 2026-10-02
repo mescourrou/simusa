@@ -10,7 +10,7 @@ use super::{Sensor, SensorObservation, SensorRecord};
 
 use crate::constants::TIME_ROUND;
 use crate::context::Context;
-use crate::errors::SimusaResult;
+use crate::errors::{SimusaError, SimusaErrorTypes, SimusaResult};
 #[cfg(feature = "gui")]
 use crate::gui::UIComponent;
 use crate::internal;
@@ -18,7 +18,6 @@ use crate::plugin_api::PluginAPI;
 use crate::recordable::Recordable;
 use crate::sensors::fault_models::additive::{AdditiveFault, AdditiveFaultConfig};
 use crate::sensors::fault_models::clutter::{ClutterFault, ClutterFaultConfig};
-use crate::sensors::fault_models::external_fault::{ExternalFault, ExternalFaultConfig};
 use crate::sensors::fault_models::misassociation::{
     MisassociationFault, MisassociationFaultConfig,
 };
@@ -26,7 +25,6 @@ use crate::sensors::fault_models::misdetection::{MisdetectionFault, Misdetection
 #[cfg(feature = "python")]
 use crate::sensors::fault_models::python_fault_model::{PythonFaultModel, PythonFaultModelConfig};
 use crate::sensors::sensor_filters::SensorFilter;
-use crate::sensors::sensor_filters::external_filter::{ExternalFilter, ExternalFilterConfig};
 #[cfg(feature = "python")]
 use crate::sensors::sensor_filters::python_filter::{PythonFilter, PythonFilterConfig};
 use crate::sensors::sensor_filters::range_filter::{RangeFilter, RangeFilterConfig};
@@ -39,8 +37,7 @@ use crate::utils::frame::{Frame, FrameConfig, FrameRecord};
 use crate::utils::periodicity::{Periodicity, PeriodicityConfig};
 use serde_derive::{Deserialize, Serialize};
 
-extern crate nalgebra as na;
-use na::Vector3;
+use nalgebra::Vector3;
 use simusa_macros::{EnumToString, UIComponent, config_derives, enum_variables};
 
 use std::sync::Arc;
@@ -106,7 +103,8 @@ pub enum OrientedLandmarkSensorFaultModelConfig {
     #[check]
     Misassociation(MisassociationFaultConfig),
     /// Plugin-provided external fault model.
-    External(ExternalFaultConfig),
+    #[plugin("OrientedLandmarkSensorFaultModel", "oriented-landmark-sensor-fault-model")]
+    Plugin(serde_json::Value),
     /// Python-implemented fault model.
     #[cfg(feature = "python")]
     #[check]
@@ -136,8 +134,8 @@ pub enum OrientedLandmarkSensorFaultModelType {
     Misdetection(MisdetectionFault),
     /// Instantiated misassociation fault model.
     Misassociation(MisassociationFault),
-    /// Instantiated external fault model.
-    External(ExternalFault),
+    /// Instantiated plugin fault model.
+    Plugin(Box<dyn FaultModel>),
     /// Instantiated Python fault model.
     #[cfg(feature = "python")]
     Python(PythonFaultModel),
@@ -154,7 +152,7 @@ impl OrientedLandmarkSensorFaultModelType {
         match self {
             #[cfg(feature = "python")]
             Self::Python(f) => f.post_init(node, initial_time, context),
-            Self::External(f) => f.post_init(node, initial_time, context),
+            Self::Plugin(f) => f.post_init(node, initial_time, context),
             Self::AdditiveRobotCentered(_)
             | Self::AdditiveObservationCentered(_)
             | Self::Clutter(_)
@@ -199,8 +197,8 @@ pub enum OrientedLandmarkSensorFilterConfig {
     #[cfg(feature = "python")]
     Python(PythonFilterConfig),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
-    #[check]
-    External(ExternalFilterConfig),
+    #[plugin("OrientedLandmarkSensorFilter", "oriented-landmark-sensor-filter")]
+    Plugin(serde_json::Value),
 }
 
 impl Default for OrientedLandmarkSensorFilterConfig {
@@ -221,8 +219,8 @@ pub enum OrientedLandmarkSensorFilterType {
     /// Instantiated Python filter for Oriented Landmark sensor observations.
     #[cfg(feature = "python")]
     Python(PythonFilter),
-    /// Instantiated external filter for Oriented Landmark sensor observations.
-    External(ExternalFilter),
+    /// Instantiated plugin filter for Oriented Landmark sensor observations.
+    Plugin(Box<dyn SensorFilter>),
 }
 
 impl OrientedLandmarkSensorFilterType {
@@ -236,7 +234,7 @@ impl OrientedLandmarkSensorFilterType {
         match self {
             #[cfg(feature = "python")]
             Self::Python(f) => f.post_init(node, initial_time, context),
-            Self::External(f) => f.post_init(node, initial_time, context),
+            Self::Plugin(f) => f.post_init(node, initial_time, context),
             Self::Range(_) | Self::Id(_) | Self::Label(_) => Ok(()),
         }
     }
@@ -457,7 +455,7 @@ impl OrientedLandmarkObservation {
 }
 
 impl Recordable<OrientedLandmarkObservationRecord> for OrientedLandmarkObservation {
-    fn record(&self, context: &Context) -> OrientedLandmarkObservationRecord {
+    fn record(&self, _context: &Context) -> OrientedLandmarkObservationRecord {
         OrientedLandmarkObservationRecord {
             id: self.id,
             labels: self.labels.clone(),
@@ -576,15 +574,13 @@ impl OrientedLandmarkSensor {
                         MisassociationFault::from_config(c, va_factory, context),
                     )
                 }
-                OrientedLandmarkSensorFaultModelConfig::External(c) => {
-                    OrientedLandmarkSensorFaultModelType::External(ExternalFault::from_config(
-                        c,
-                        plugin_api,
-                        global_config,
-                        va_factory,
-                        initial_time,
-                        context,
-                    )?)
+                OrientedLandmarkSensorFaultModelConfig::Plugin(c) => {
+                    OrientedLandmarkSensorFaultModelType::Plugin(plugin_api.as_ref().ok_or_else(|| {
+                        SimusaError::new(
+                            SimusaErrorTypes::PluginAPIError,
+                            "Plugin API not set!".to_string(),
+                        )
+                    })?.get_sensor_fault(c, global_config, va_factory, initial_time, context))
                 }
                 #[cfg(feature = "python")]
                 OrientedLandmarkSensorFaultModelConfig::Python(c) => {
@@ -618,15 +614,13 @@ impl OrientedLandmarkSensor {
                         context,
                     ))
                 }
-                OrientedLandmarkSensorFilterConfig::External(c) => {
-                    OrientedLandmarkSensorFilterType::External(ExternalFilter::from_config(
-                        c,
-                        plugin_api,
-                        global_config,
-                        va_factory,
-                        initial_time,
-                        context,
-                    )?)
+                OrientedLandmarkSensorFilterConfig::Plugin(c) => {
+                    OrientedLandmarkSensorFilterType::Plugin(plugin_api.as_ref().ok_or_else(|| {
+                        SimusaError::new(
+                            SimusaErrorTypes::PluginAPIError,
+                            "Plugin API not set!".to_string(),
+                        )
+                    })?.get_sensor_filter(c, global_config, va_factory, initial_time, context))
                 }
                 #[cfg(feature = "python")]
                 OrientedLandmarkSensorFilterConfig::Python(c) => {
@@ -725,7 +719,7 @@ impl Sensor for OrientedLandmarkSensor {
             for filter in self.filters.iter() {
                 if let Some(obs) = keep_observation {
                     keep_observation = match filter {
-                        OrientedLandmarkSensorFilterType::External(f) => {
+                        OrientedLandmarkSensorFilterType::Plugin(f) => {
                             f.filter(time, obs, state, None, context)
                         }
                         #[cfg(feature = "python")]
@@ -812,7 +806,7 @@ impl Sensor for OrientedLandmarkSensor {
                             node.environment(),
                             context,
                         ),
-                        OrientedLandmarkSensorFaultModelType::External(f) => f.add_faults(
+                        OrientedLandmarkSensorFaultModelType::Plugin(f) => f.add_faults(
                             time,
                             time + landmark_seed,
                             &mut new_obs,

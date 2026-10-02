@@ -56,7 +56,7 @@ impl Robot {
                         c, sim_config,
                     ))
                 }
-                SensorConfig::External(_) => {}
+                SensorConfig::Plugin(_) => {}
             }
         }
 

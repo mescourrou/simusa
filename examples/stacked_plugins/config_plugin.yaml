@@ -9,10 +9,8 @@ max_time: 60.
 robots:
   - name: "robot1"
     navigator:
-      type: External
-      config: {}
-    state_estimator: 
-      type: External
-      config:
-        period: 0.1
-        filter_name: "robot1"
+      type: Plugin
+    state_estimator:
+      type: Plugin
+      period: 0.1
+      filter_name: "robot1"

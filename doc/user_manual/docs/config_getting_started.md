@@ -149,7 +149,7 @@ Many configuration fields use a `type` field to select from options. For example
 
 ```yaml
 navigator:
-  type: GoTo  # Choose between: GoTo, TrajectoryFollower, External, Python
+  type: GoTo  # Choose between: GoTo, TrajectoryFollower, Plugin, Python
 ```
 
 When you select a type, additional fields specific to that type become available:

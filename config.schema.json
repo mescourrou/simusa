@@ -389,29 +389,14 @@
           ]
         },
         {
-          "description": "Configuration for [`ExternalController`](external_controller::ExternalControllerConfig).",
+          "description": "Configuration for a plugin [`Controller`].",
           "type": "object",
           "properties": {
             "type": {
               "type": "string",
-              "const": "External"
+              "const": "Plugin"
             }
           },
-          "$ref": "#/$defs/ExternalControllerConfig",
-          "required": [
-            "type"
-          ]
-        },
-        {
-          "description": "Configuration for [`PythonController`](python_controller::PythonControllerConfig).",
-          "type": "object",
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "Python"
-            }
-          },
-          "$ref": "#/$defs/PythonControllerConfig",
           "required": [
             "type"
           ]
@@ -558,29 +543,14 @@
           ]
         },
         {
-          "description": "Python-implemented custom fault model.",
-          "type": "object",
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "Python"
-            }
-          },
-          "$ref": "#/$defs/PythonFaultModelConfig",
-          "required": [
-            "type"
-          ]
-        },
-        {
           "description": "Plugin-provided external fault model.",
           "type": "object",
           "properties": {
             "type": {
               "type": "string",
-              "const": "External"
+              "const": "Plugin"
             }
           },
-          "$ref": "#/$defs/ExternalFaultConfig",
           "required": [
             "type"
           ]
@@ -635,29 +605,14 @@
           ]
         },
         {
-          "description": "Python-based custom filtering: delegates exclusion logic to user-defined Python methods.",
-          "type": "object",
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "Python"
-            }
-          },
-          "$ref": "#/$defs/PythonFilterConfig",
-          "required": [
-            "type"
-          ]
-        },
-        {
           "description": "Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.",
           "type": "object",
           "properties": {
             "type": {
               "type": "string",
-              "const": "External"
+              "const": "Plugin"
             }
           },
-          "$ref": "#/$defs/ExternalFilterConfig",
           "required": [
             "type"
           ]
@@ -932,39 +887,6 @@
         }
       ]
     },
-    "ExternalControllerConfig": {
-      "type": "object",
-      "additionalProperties": true
-    },
-    "ExternalEstimatorConfig": {
-      "type": "object",
-      "additionalProperties": true
-    },
-    "ExternalFaultConfig": {
-      "type": "object",
-      "additionalProperties": true
-    },
-    "ExternalFilterConfig": {
-      "type": "object",
-      "additionalProperties": true
-    },
-    "ExternalNavigatorConfig": {
-      "type": "object",
-      "additionalProperties": true
-    },
-    "ExternalObservationRecord": {
-      "description": "Record for the external sensor (generic).",
-      "type": "object",
-      "additionalProperties": true
-    },
-    "ExternalPhysicsConfig": {
-      "type": "object",
-      "additionalProperties": true
-    },
-    "ExternalSensorConfig": {
-      "type": "object",
-      "additionalProperties": true
-    },
     "FrameConfig": {
       "description": "Configuration for a 2D frame, including position and orientation.",
       "type": "object",
@@ -1146,24 +1068,9 @@
           "properties": {
             "type": {
               "type": "string",
-              "const": "External"
+              "const": "Plugin"
             }
           },
-          "$ref": "#/$defs/ExternalFaultConfig",
-          "required": [
-            "type"
-          ]
-        },
-        {
-          "description": "Python-implemented fault model.",
-          "type": "object",
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "Python"
-            }
-          },
-          "$ref": "#/$defs/PythonFaultModelConfig",
           "required": [
             "type"
           ]
@@ -1218,29 +1125,14 @@
           ]
         },
         {
-          "description": "Python-based custom filtering: delegates exclusion logic to user-defined Python methods.",
-          "type": "object",
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "Python"
-            }
-          },
-          "$ref": "#/$defs/PythonFilterConfig",
-          "required": [
-            "type"
-          ]
-        },
-        {
           "description": "Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.",
           "type": "object",
           "properties": {
             "type": {
               "type": "string",
-              "const": "External"
+              "const": "Plugin"
             }
           },
-          "$ref": "#/$defs/ExternalFilterConfig",
           "required": [
             "type"
           ]
@@ -2071,29 +1963,14 @@
           ]
         },
         {
-          "description": "Configuration for [`external_navigator::ExternalNavigator`].",
+          "description": "Configuration for a plugin [`Navigator`].",
           "type": "object",
           "properties": {
             "type": {
               "type": "string",
-              "const": "External"
+              "const": "Plugin"
             }
           },
-          "$ref": "#/$defs/ExternalNavigatorConfig",
-          "required": [
-            "type"
-          ]
-        },
-        {
-          "description": "Configuration for [`python_navigator::PythonNavigator`].",
-          "type": "object",
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "Python"
-            }
-          },
-          "$ref": "#/$defs/PythonNavigatorConfig",
           "required": [
             "type"
           ]
@@ -2589,24 +2466,9 @@
           "properties": {
             "type": {
               "type": "string",
-              "const": "External"
+              "const": "Plugin"
             }
           },
-          "$ref": "#/$defs/ExternalFaultConfig",
-          "required": [
-            "type"
-          ]
-        },
-        {
-          "description": "Python-implemented fault model.",
-          "type": "object",
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "Python"
-            }
-          },
-          "$ref": "#/$defs/PythonFaultModelConfig",
           "required": [
             "type"
           ]
@@ -2731,29 +2593,14 @@
           ]
         },
         {
-          "description": "Python-based custom filtering: delegates exclusion logic to user-defined Python methods.",
-          "type": "object",
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "Python"
-            }
-          },
-          "$ref": "#/$defs/PythonFilterConfig",
-          "required": [
-            "type"
-          ]
-        },
-        {
           "description": "Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.",
           "type": "object",
           "properties": {
             "type": {
               "type": "string",
-              "const": "External"
+              "const": "Plugin"
             }
           },
-          "$ref": "#/$defs/ExternalFilterConfig",
           "required": [
             "type"
           ]
@@ -2980,29 +2827,14 @@
           ]
         },
         {
-          "description": "External plugin-provided physics implementation.",
+          "description": "Plugin-provided physics implementation.",
           "type": "object",
           "properties": {
             "type": {
               "type": "string",
-              "const": "External"
+              "const": "Plugin"
             }
           },
-          "$ref": "#/$defs/ExternalPhysicsConfig",
-          "required": [
-            "type"
-          ]
-        },
-        {
-          "description": "Python-backed physics implementation.",
-          "type": "object",
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "Python"
-            }
-          },
-          "$ref": "#/$defs/PythonPhysicsConfig",
           "required": [
             "type"
           ]
@@ -3154,66 +2986,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "PythonControllerConfig": {
-      "type": "object",
-      "additionalProperties": true,
-      "class_name": {
-        "type": "string"
-      },
-      "file": {
-        "type": "string"
-      }
-    },
-    "PythonEstimatorConfig": {
-      "type": "object",
-      "additionalProperties": true,
-      "class_name": {
-        "type": "string"
-      },
-      "file": {
-        "type": "string"
-      }
-    },
-    "PythonFaultModelConfig": {
-      "type": "object",
-      "additionalProperties": true,
-      "class_name": {
-        "type": "string"
-      },
-      "file": {
-        "type": "string"
-      }
-    },
-    "PythonFilterConfig": {
-      "type": "object",
-      "additionalProperties": true,
-      "class_name": {
-        "type": "string"
-      },
-      "file": {
-        "type": "string"
-      }
-    },
-    "PythonNavigatorConfig": {
-      "type": "object",
-      "additionalProperties": true,
-      "class_name": {
-        "type": "string"
-      },
-      "file": {
-        "type": "string"
-      }
-    },
-    "PythonPhysicsConfig": {
-      "type": "object",
-      "additionalProperties": true,
-      "class_name": {
-        "type": "string"
-      },
-      "file": {
-        "type": "string"
-      }
     },
     "RandomMap": {
       "description": "Configuration for generating random landmarks in the map.",
@@ -3520,7 +3292,7 @@
           "properties": {
             "type": {
               "type": "string",
-              "const": "External"
+              "const": "Plugin"
             }
           },
           "required": [
@@ -4074,29 +3846,14 @@
           ]
         },
         {
-          "description": "Python-implemented fault model.",
-          "type": "object",
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "Python"
-            }
-          },
-          "$ref": "#/$defs/PythonFaultModelConfig",
-          "required": [
-            "type"
-          ]
-        },
-        {
           "description": "Plugin-provided external fault model.",
           "type": "object",
           "properties": {
             "type": {
               "type": "string",
-              "const": "External"
+              "const": "Plugin"
             }
           },
-          "$ref": "#/$defs/ExternalFaultConfig",
           "required": [
             "type"
           ]
@@ -4221,29 +3978,14 @@
           ]
         },
         {
-          "description": "Python-based custom filtering: delegates exclusion logic to user-defined Python methods.",
-          "type": "object",
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "Python"
-            }
-          },
-          "$ref": "#/$defs/PythonFilterConfig",
-          "required": [
-            "type"
-          ]
-        },
-        {
           "description": "Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.",
           "type": "object",
           "properties": {
             "type": {
               "type": "string",
-              "const": "External"
+              "const": "Plugin"
             }
           },
-          "$ref": "#/$defs/ExternalFilterConfig",
           "required": [
             "type"
           ]
@@ -4670,29 +4412,14 @@
           ]
         },
         {
-          "description": "Python-implemented custom fault model.",
-          "type": "object",
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "Python"
-            }
-          },
-          "$ref": "#/$defs/PythonFaultModelConfig",
-          "required": [
-            "type"
-          ]
-        },
-        {
           "description": "Plugin-provided external fault model.",
           "type": "object",
           "properties": {
             "type": {
               "type": "string",
-              "const": "External"
+              "const": "Plugin"
             }
           },
-          "$ref": "#/$defs/ExternalFaultConfig",
           "required": [
             "type"
           ]
@@ -4747,29 +4474,14 @@
           ]
         },
         {
-          "description": "String pattern filtering on observed object unique id (name for nodes, id for landmarks): excludes observations matching configured regexp patterns.",
-          "type": "object",
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "Python"
-            }
-          },
-          "$ref": "#/$defs/PythonFilterConfig",
-          "required": [
-            "type"
-          ]
-        },
-        {
           "description": "Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.",
           "type": "object",
           "properties": {
             "type": {
               "type": "string",
-              "const": "External"
+              "const": "Plugin"
             }
           },
-          "$ref": "#/$defs/ExternalFilterConfig",
           "required": [
             "type"
           ]
@@ -5299,15 +5011,14 @@
           ]
         },
         {
-          "description": "External sensor configuration.",
+          "description": "Plugin sensor configuration.",
           "type": "object",
           "properties": {
             "type": {
               "type": "string",
-              "const": "External"
+              "const": "Plugin"
             }
           },
-          "$ref": "#/$defs/ExternalSensorConfig",
           "required": [
             "type"
           ]
@@ -5612,15 +5323,14 @@
           ]
         },
         {
-          "description": "Record payload for external observations.",
+          "description": "Record payload for plugin observations.",
           "type": "object",
           "properties": {
             "type": {
               "type": "string",
-              "const": "External"
+              "const": "Plugin"
             }
           },
-          "$ref": "#/$defs/ExternalObservationRecord",
           "required": [
             "type"
           ]
@@ -5796,29 +5506,14 @@
           ]
         },
         {
-          "description": "Python-implemented custom fault model.",
-          "type": "object",
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "Python"
-            }
-          },
-          "$ref": "#/$defs/PythonFaultModelConfig",
-          "required": [
-            "type"
-          ]
-        },
-        {
           "description": "Plugin-provided external fault model.",
           "type": "object",
           "properties": {
             "type": {
               "type": "string",
-              "const": "External"
+              "const": "Plugin"
             }
           },
-          "$ref": "#/$defs/ExternalFaultConfig",
           "required": [
             "type"
           ]
@@ -5873,29 +5568,14 @@
           ]
         },
         {
-          "description": "String pattern filtering on observed object unique id (name for nodes, id for landmarks): excludes observations matching configured regexp patterns.",
-          "type": "object",
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "Python"
-            }
-          },
-          "$ref": "#/$defs/PythonFilterConfig",
-          "required": [
-            "type"
-          ]
-        },
-        {
           "description": "Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.",
           "type": "object",
           "properties": {
             "type": {
               "type": "string",
-              "const": "External"
+              "const": "Plugin"
             }
           },
-          "$ref": "#/$defs/ExternalFilterConfig",
           "required": [
             "type"
           ]
@@ -6052,29 +5732,14 @@
           ]
         },
         {
-          "description": "External state estimator provided through plugin API.",
+          "description": "Plugin state estimator provided through plugin API.",
           "type": "object",
           "properties": {
             "type": {
               "type": "string",
-              "const": "External"
+              "const": "Plugin"
             }
           },
-          "$ref": "#/$defs/ExternalEstimatorConfig",
-          "required": [
-            "type"
-          ]
-        },
-        {
-          "description": "Python-backed state estimator.",
-          "type": "object",
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "Python"
-            }
-          },
-          "$ref": "#/$defs/PythonEstimatorConfig",
           "required": [
             "type"
           ]

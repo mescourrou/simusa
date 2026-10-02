@@ -59,7 +59,7 @@ List of parameters:
 			`target_speed`: Float
 			`stop_distance`: Float
 			`stop_ramp_coefficient`: Float
-		- `type`: External => [ExternalNavigatorConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/navigators/external_navigator/struct.ExternalNavigatorConfig.html)
+		- `type`: Plugin => [PluginNavigatorConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/navigators/plugin_navigator/struct.PluginNavigatorConfig.html)
 			Insert User-specific struct
 		- `type`: Python => [PythonNavigatorConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/navigators/python_navigator/struct.PythonNavigatorConfig.html)
 			`file`: String
@@ -82,7 +82,7 @@ List of parameters:
 			`proportional_gains`: Float, List
 			`derivative_gains`: Float, List
 			`integral_gains`: Float, List
-		- `type`: External => [ExternalControllerConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/controllers/external_controller/struct.ExternalControllerConfig.html)
+		- `type`: Plugin => [PluginControllerConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/controllers/plugin_controller/struct.PluginControllerConfig.html)
 			Insert User-specific struct
 		- `type`: Python => [PythonControllerConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/controllers/python_controller/struct.PythonControllerConfig.html)
 			`file`: String
@@ -115,7 +115,7 @@ List of parameters:
 					`variable_order`: PhysicsVariables, List
 					`proportional_to`: PhysicsVariables, Optional
 					`proportional_factor`: Float, Optional
-		- `type`: External => [ExternalPhysicsConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/physics/external_physics/struct.ExternalPhysicsConfig.html)
+		- `type`: Plugin => [PluginPhysicsConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/physics/plugin_physics/struct.PluginPhysicsConfig.html)
 			Insert User-specific struct
 		- `type`: Python => [PythonPhysicsConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/physics/python_physics/struct.PythonPhysicsConfig.html)
 			`file`: String
@@ -130,7 +130,7 @@ List of parameters:
 				`offset`: [NumberConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/config/enum.NumberConfig.html), See above, Optional
 				`table`: Float, Optional, List
 			`targets`: String, List
-		- `type`: External => [ExternalEstimatorConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/state_estimators/external_estimator/struct.ExternalEstimatorConfig.html)
+		- `type`: Plugin => [PluginEstimatorConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/state_estimators/plugin_estimator/struct.PluginEstimatorConfig.html)
 			Insert User-specific struct
 		- `type`: Python => [PythonEstimatorConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/state_estimators/python_estimator/struct.PythonEstimatorConfig.html)
 			`file`: String
@@ -171,7 +171,7 @@ List of parameters:
 							`source`: [Source](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/misassociation/enum.Source.html), Enum
 								- `type`: Map  
 								- `type`: Robots  
-						- `type`: External => [ExternalFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/external_fault/struct.ExternalFaultConfig.html)
+						- `type`: Plugin => [PluginFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/plugin_fault/struct.PluginFaultConfig.html)
 							Insert User-specific struct
 						- `type`: Python => [PythonFaultModelConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/python_fault_model/struct.PythonFaultModelConfig.html)
 							`file`: String
@@ -192,7 +192,7 @@ List of parameters:
 							`file`: String
 							`class_name`: String
 							Insert User-specific struct
-						- `type`: External => [ExternalFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/external_filter/struct.ExternalFilterConfig.html)
+						- `type`: Plugin => [PluginFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/plugin_filter/struct.PluginFilterConfig.html)
 							Insert User-specific struct
 					`xray`: Boolean
 					`frame`: [FrameConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/utils/frame/struct.FrameConfig.html)
@@ -204,11 +204,11 @@ List of parameters:
 					`faults`: [SpeedSensorFaultModelConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/speed_sensor/enum.SpeedSensorFaultModelConfig.html), List, Enum
 						- `type`: Additive => [AdditiveFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/additive/struct.AdditiveFaultConfig.html), See above
 						- `type`: Python => [PythonFaultModelConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/python_fault_model/struct.PythonFaultModelConfig.html), See above
-						- `type`: External => [ExternalFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/external_fault/struct.ExternalFaultConfig.html), See above
+						- `type`: Plugin => [PluginFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/plugin_fault/struct.PluginFaultConfig.html), See above
 					`filters`: [SpeedSensorFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/speed_sensor/enum.SpeedSensorFilterConfig.html), List, Enum
 						- `type`: Range => [RangeFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/range_filter/struct.RangeFilterConfig.html), See above
 						- `type`: Python => [PythonFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/python_filter/struct.PythonFilterConfig.html), See above
-						- `type`: External => [ExternalFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/external_filter/struct.ExternalFilterConfig.html), See above
+						- `type`: Plugin => [PluginFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/plugin_filter/struct.PluginFilterConfig.html), See above
 					`frame`: [FrameConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/utils/frame/struct.FrameConfig.html), See above
 				- `type`: Displacement => [DisplacementSensorConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/displacement_sensor/struct.DisplacementSensorConfig.html)
 					`activation_time`: [PeriodicityConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/utils/periodicity/struct.PeriodicityConfig.html), See above, Optional
@@ -216,11 +216,11 @@ List of parameters:
 						- `type`: AdditivePreDisplacement => [AdditiveFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/additive/struct.AdditiveFaultConfig.html), See above
 						- `type`: AdditivePostDisplacement => [AdditiveFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/additive/struct.AdditiveFaultConfig.html), See above
 						- `type`: Python => [PythonFaultModelConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/python_fault_model/struct.PythonFaultModelConfig.html), See above
-						- `type`: External => [ExternalFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/external_fault/struct.ExternalFaultConfig.html), See above
+						- `type`: Plugin => [PluginFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/plugin_fault/struct.PluginFaultConfig.html), See above
 					`filters`: [DisplacementSensorFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/displacement_sensor/enum.DisplacementSensorFilterConfig.html), List, Enum
 						- `type`: Range => [RangeFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/range_filter/struct.RangeFilterConfig.html), See above
 						- `type`: Python => [PythonFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/python_filter/struct.PythonFilterConfig.html), See above
-						- `type`: External => [ExternalFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/external_filter/struct.ExternalFilterConfig.html), See above
+						- `type`: Plugin => [PluginFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/plugin_filter/struct.PluginFilterConfig.html), See above
 					`lie_movement`: Boolean
 					`frame`: [FrameConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/utils/frame/struct.FrameConfig.html), See above
 				- `type`: GNSS => [GNSSSensorConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/gnss_sensor/struct.GNSSSensorConfig.html)
@@ -229,12 +229,12 @@ List of parameters:
 						- `type`: Additive => [AdditiveFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/additive/struct.AdditiveFaultConfig.html), See above
 						- `type`: Clutter => [ClutterFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/clutter/struct.ClutterFaultConfig.html), See above
 						- `type`: Misdetection => [MisdetectionFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/misdetection/struct.MisdetectionFaultConfig.html), See above
-						- `type`: External => [ExternalFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/external_fault/struct.ExternalFaultConfig.html), See above
+						- `type`: Plugin => [PluginFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/plugin_fault/struct.PluginFaultConfig.html), See above
 						- `type`: Python => [PythonFaultModelConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/python_fault_model/struct.PythonFaultModelConfig.html), See above
 					`filters`: [GNSSSensorFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/gnss_sensor/enum.GNSSSensorFilterConfig.html), List, Enum
 						- `type`: Range => [RangeFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/range_filter/struct.RangeFilterConfig.html), See above
 						- `type`: Python => [PythonFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/python_filter/struct.PythonFilterConfig.html), See above
-						- `type`: External => [ExternalFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/external_filter/struct.ExternalFilterConfig.html), See above
+						- `type`: Plugin => [PluginFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/plugin_filter/struct.PluginFilterConfig.html), See above
 					`frame`: [FrameConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/utils/frame/struct.FrameConfig.html), See above
 				- `type`: Robot => [RobotSensorConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/robot_sensor/struct.RobotSensorConfig.html)
 					`detection_distance`: Float
@@ -246,13 +246,13 @@ List of parameters:
 						- `type`: Misdetection => [MisdetectionFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/misdetection/struct.MisdetectionFaultConfig.html), See above
 						- `type`: Misassociation => [MisassociationFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/misassociation/struct.MisassociationFaultConfig.html), See above
 						- `type`: Python => [PythonFaultModelConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/python_fault_model/struct.PythonFaultModelConfig.html), See above
-						- `type`: External => [ExternalFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/external_fault/struct.ExternalFaultConfig.html), See above
+						- `type`: Plugin => [PluginFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/plugin_fault/struct.PluginFaultConfig.html), See above
 					`filters`: [RobotSensorFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/robot_sensor/enum.RobotSensorFilterConfig.html), List, Enum
 						- `type`: Range => [RangeFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/range_filter/struct.RangeFilterConfig.html), See above
 						- `type`: Id => [StringFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/string_filter/struct.StringFilterConfig.html), See above
 						- `type`: Label => [StringFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/string_filter/struct.StringFilterConfig.html), See above
 						- `type`: Python => [PythonFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/python_filter/struct.PythonFilterConfig.html), See above
-						- `type`: External => [ExternalFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/external_filter/struct.ExternalFilterConfig.html), See above
+						- `type`: Plugin => [PluginFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/plugin_filter/struct.PluginFilterConfig.html), See above
 					`xray`: Boolean
 					`frame`: [FrameConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/utils/frame/struct.FrameConfig.html), See above
 				- `type`: Scan => [ScanSensorConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/scan_sensor/struct.ScanSensorConfig.html)
@@ -271,13 +271,13 @@ List of parameters:
 						- `type`: Misdetection => [MisdetectionFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/misdetection/struct.MisdetectionFaultConfig.html), See above
 						- `type`: PointMisdetection => [MisdetectionFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/misdetection/struct.MisdetectionFaultConfig.html), See above
 						- `type`: Python => [PythonFaultModelConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/python_fault_model/struct.PythonFaultModelConfig.html), See above
-						- `type`: External => [ExternalFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/external_fault/struct.ExternalFaultConfig.html), See above
+						- `type`: Plugin => [PluginFaultConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/fault_models/plugin_fault/struct.PluginFaultConfig.html), See above
 					`filters`: [ScanSensorFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/scan_sensor/enum.ScanSensorFilterConfig.html), List, Enum
 						- `type`: Range => [RangeFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/range_filter/struct.RangeFilterConfig.html), See above
 						- `type`: Python => [PythonFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/python_filter/struct.PythonFilterConfig.html), See above
-						- `type`: External => [ExternalFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/external_filter/struct.ExternalFilterConfig.html), See above
+						- `type`: Plugin => [PluginFilterConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/sensor_filters/plugin_filter/struct.PluginFilterConfig.html), See above
 					`frame`: [FrameConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/utils/frame/struct.FrameConfig.html), See above
-				- `type`: External => [ExternalSensorConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/external_sensor/struct.ExternalSensorConfig.html)
+				- `type`: Plugin => [PluginSensorConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/sensors/plugin_sensor/struct.PluginSensorConfig.html)
 					Insert User-specific struct
 	`network`: [NetworkConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/networking/network/struct.NetworkConfig.html)
 		`range`: Float

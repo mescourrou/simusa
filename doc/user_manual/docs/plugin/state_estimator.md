@@ -89,7 +89,7 @@ impl StateEstimator for MyWonderfulStateEstimator {
 
 impl Recordable<StateEstimatorRecord> for MyWonderfulStateEstimator {
     fn record(&self, _context: &Context) -> StateEstimatorRecord {
-        StateEstimatorRecord::External(ExternalEstimatorRecord {
+        StateEstimatorRecord::Plugin(PluginEstimatorRecord {
             record: serde_json::to_value(MyWonderfulStateEstimatorRecord {
                 last_prediction: self.last_prediction,
             })

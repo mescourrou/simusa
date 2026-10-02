@@ -64,7 +64,7 @@ use crate::{
 #[allow(unused_variables)]
 pub trait PluginAPI: Send + Sync {
     /// Return the [`StateEstimator`] to be used by the
-    /// [`ExternalEstimator`](`crate::state_estimators::external_estimator::ExternalEstimator`).
+    /// [`PluginEstimator`](`crate::state_estimators::external_estimator::PluginEstimator`).
     ///
     /// # Arguments
     /// * `config` - Config for the external state estimator. The configuration
@@ -92,7 +92,7 @@ pub trait PluginAPI: Send + Sync {
     }
 
     /// Return the [`Controller`] to be used by the
-    /// [`ExternalController`](`crate::controllers::external_controller::ExternalController`).
+    /// [`PluginController`](`crate::controllers::external_controller::PluginController`).
     ///
     /// # Arguments
     /// * `config` - Config for the external controller. The configuration
@@ -120,7 +120,7 @@ pub trait PluginAPI: Send + Sync {
     }
 
     /// Return the [`Navigator`] to be used by the
-    /// [`ExternalNavigator`](`crate::navigators::external_navigator::ExternalNavigator`).
+    /// [`PluginNavigator`](`crate::navigators::external_navigator::PluginNavigator`).
     ///
     /// # Arguments
     /// * `config` - Config for the external navigator. The configuration
@@ -148,7 +148,7 @@ pub trait PluginAPI: Send + Sync {
     }
 
     /// Return the [`Physics`] to be used by the
-    /// [`ExternalPhysics`](`crate::physics::external_physics::ExternalPhysics`).
+    /// [`PluginPhysics`](`crate::physics::external_physics::PluginPhysics`).
     ///
     /// # Arguments
     /// * `config` - Config for the external physics. The configuration
@@ -180,7 +180,7 @@ pub trait PluginAPI: Send + Sync {
     fn check_requests(&self, context: &Context) {}
 
     /// Return the [`Sensor`] to be used by the
-    /// [`ExternalSensor`](`crate::sensors::external_sensor::ExternalSensor`).
+    /// [`PluginSensor`](`crate::sensors::external_sensor::PluginSensor`).
     ///
     /// # Arguments
     /// * `config` - Config for the external sensor. The configuration
@@ -218,7 +218,7 @@ pub trait PluginAPI: Send + Sync {
     }
 
     /// Return the [`SensorFilter`] to be used by the
-    /// [`ExternalFilter`](`crate::sensors::sensor_filters::external_filter::ExternalFilter`).
+    /// [`PluginFilter`](`crate::sensors::sensor_filters::external_filter::PluginFilter`).
     ///
     /// # Arguments
     /// * `config` - Config for the external sensor filter. The configuration
@@ -244,7 +244,7 @@ pub trait PluginAPI: Send + Sync {
     }
 
     /// Return the [`FaultModel`] to be used by the
-    /// [`ExternalFault`](`crate::sensors::fault_models::external_fault::ExternalFault`).
+    /// [`PluginFault`](`crate::sensors::fault_models::external_fault::PluginFault`).
     ///
     /// # Arguments
     /// * `config` - Config for the external sensor fault. The configuration

@@ -12,7 +12,6 @@
 //! 3. Add a corresponding variant to [`SensorRecord`]
 
 pub mod displacement_sensor;
-pub mod external_sensor;
 pub mod gnss_sensor;
 pub mod oriented_landmark_sensor;
 pub mod robot_sensor;
@@ -22,9 +21,6 @@ pub mod speed_sensor;
 
 pub mod fault_models;
 pub mod sensor_filters;
-
-extern crate confy;
-
 use std::fmt::Debug;
 
 use serde_derive::{Deserialize, Serialize};
@@ -44,16 +40,13 @@ use crate::{
     recordable::Recordable,
     sensors::{
         displacement_sensor::{DisplacementObservation, DisplacementObservationRecord},
-        external_sensor::{ExternalObservation, ExternalObservationRecord},
         scan_sensor::{ScanObservation, ScanObservationRecord},
     },
     utils::frame::{Frame, FrameRecord},
 };
 #[cfg(feature = "gui")]
 use crate::{
-    gui::{UIComponent, utils::string_combobox},
-    simulator::SimulatorConfig,
-    utils::enum_tools::ToVec,
+    gui::{UIComponent, utils::{edit_plugin_config, show_plugin_config, string_combobox}}, simulator::SimulatorConfig, utils::enum_tools::ToVec,
 };
 
 /// Runtime sensor observation with metadata.
@@ -182,8 +175,8 @@ pub enum SensorObservation {
     OrientedRobot(OrientedRobotObservation),
     /// Scan sensor observation payload.
     Scan(ScanObservation),
-    /// External sensor observation payload.
-    External(ExternalObservation),
+    /// Plugin sensor observation payload.
+    Plugin(serde_json::Value),
 }
 
 impl SensorObservation {
@@ -207,8 +200,8 @@ impl SensorObservation {
             SensorObservationRecord::Scan(r) => {
                 SensorObservation::Scan(ScanObservation::from_record(r))
             }
-            SensorObservationRecord::External(r) => {
-                SensorObservation::External(ExternalObservation::from_record(r))
+            SensorObservationRecord::Plugin(r) => {
+                SensorObservation::Plugin(r.clone())
             }
         }
     }
@@ -229,7 +222,7 @@ impl Recordable<SensorObservationRecord> for SensorObservation {
                 SensorObservationRecord::OrientedRobot(o.record(context))
             }
             SensorObservation::Scan(o) => SensorObservationRecord::Scan(o.record(context)),
-            SensorObservation::External(o) => SensorObservationRecord::External(o.record(context)),
+            SensorObservation::Plugin(o) => SensorObservationRecord::Plugin(o.clone()),
         }
     }
 }
@@ -249,8 +242,8 @@ pub enum SensorObservationRecord {
     OrientedRobot(OrientedRobotObservationRecord),
     /// Record payload for scan observations.
     Scan(ScanObservationRecord),
-    /// Record payload for external observations.
-    External(ExternalObservationRecord),
+    /// Record payload for plugin observations.
+    Plugin(serde_json::Value),
 }
 
 impl Default for SensorObservationRecord {
@@ -269,7 +262,7 @@ impl UIComponent for SensorObservationRecord {
             Self::GNSS(r) => r.show(ui, ctx, unique_id),
             Self::OrientedRobot(r) => r.show(ui, ctx, unique_id),
             Self::Scan(r) => r.show(ui, ctx, unique_id),
-            Self::External(r) => r.show(ui, ctx, unique_id),
+            Self::Plugin(r) => show_plugin_config(ui, "Plugin Observation", r)
         });
     }
 }
@@ -299,9 +292,8 @@ pub enum SensorConfig {
     /// Scan sensor configuration.
     #[check]
     Scan(scan_sensor::ScanSensorConfig),
-    /// External sensor configuration.
-    #[check]
-    External(external_sensor::ExternalSensorConfig),
+    /// Plugin sensor configuration.
+    Plugin(serde_json::Value),
 }
 
 #[cfg(feature = "gui")]
@@ -341,8 +333,8 @@ impl UIComponent for SensorConfig {
                 "GNSS" => *self = SensorConfig::GNSS(gnss_sensor::GNSSSensorConfig::default()),
                 "Robot" => *self = SensorConfig::Robot(robot_sensor::RobotSensorConfig::default()),
                 "Scan" => *self = SensorConfig::Scan(scan_sensor::ScanSensorConfig::default()),
-                "External" => {
-                    *self = SensorConfig::External(external_sensor::ExternalSensorConfig::default())
+                "Plugin" => {
+                    *self = SensorConfig::Plugin(serde_json::Value::Null)
                 }
                 _ => panic!("Where did you find this value?"),
             };
@@ -396,14 +388,7 @@ impl UIComponent for SensorConfig {
                 current_node_name,
                 unique_id,
             ),
-            SensorConfig::External(c) => c.show_mut(
-                ui,
-                ctx,
-                buffer_stack,
-                global_config,
-                current_node_name,
-                unique_id,
-            ),
+            SensorConfig::Plugin(c) => edit_plugin_config(ui, "Plugin Sensor", "plugin-sensor", unique_id, buffer_stack, c),
         }
     }
 
@@ -418,7 +403,7 @@ impl UIComponent for SensorConfig {
             SensorConfig::GNSS(c) => c.show(ui, ctx, unique_id),
             SensorConfig::Robot(c) => c.show(ui, ctx, unique_id),
             SensorConfig::Scan(c) => c.show(ui, ctx, unique_id),
-            SensorConfig::External(c) => c.show(ui, ctx, unique_id),
+            SensorConfig::Plugin(c) => show_plugin_config(ui, "Plugin Sensor", c),
         }
     }
 }
@@ -438,8 +423,8 @@ pub enum SensorRecord {
     RobotSensor(robot_sensor::RobotSensorRecord),
     /// Record produced by a scan sensor.
     ScanSensor(scan_sensor::ScanSensorRecord),
-    /// Record produced by an external sensor.
-    External(external_sensor::ExternalSensorRecord),
+    /// Record produced by a plugin sensor.
+    Plugin(serde_json::Value),
 }
 
 #[cfg(feature = "gui")]
@@ -476,11 +461,7 @@ impl UIComponent for SensorRecord {
                     r.show(ui, ctx, unique_id);
                 });
             }
-            Self::External(r) => {
-                egui::CollapsingHeader::new("External").show(ui, |ui| {
-                    r.show(ui, ctx, unique_id);
-                });
-            }
+            Self::Plugin(r) => show_plugin_config(ui, "Plugin Sensor", r),
         });
     }
 }

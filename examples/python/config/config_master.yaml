@@ -30,5 +30,5 @@ computation_units:
     state_estimators:
       - name: "master"
         config:
-          type: External
+          type: Plugin
 

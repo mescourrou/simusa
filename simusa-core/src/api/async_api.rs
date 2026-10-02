@@ -190,7 +190,7 @@ impl AsyncApiRunner {
     /// It will also spawn threads for each API call to execute them in parallel and not block the main thread. The threads will be stopped when the runner is stopped.
     ///
     /// # Arguments
-    /// * `plugin_api` - Optional plugin API to use when loading the configuration. It can be None if the plugin API is not needed but required if the configuration use Externals.
+    /// * `plugin_api` - Optional plugin API to use when loading the configuration. It can be None if the plugin API is not needed but required if the configuration use Plugins.
     pub fn run(&mut self, plugin_api: Option<Arc<dyn PluginAPI>>) {
         let private_api = self.private_api.clone();
         let keep_alive_rx = self.keep_alive_rx.clone();

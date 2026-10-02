@@ -23,7 +23,7 @@ use std::sync::{Arc, RwLock};
 
 use crate::constants::TIME_ROUND;
 use crate::context::{self, Context};
-use crate::errors::SimusaResult;
+use crate::errors::{SimusaError, SimusaErrorTypes, SimusaResult};
 #[cfg(feature = "gui")]
 use crate::gui::{
     UIComponent,
@@ -35,7 +35,6 @@ use crate::networking::network::Envelope;
 use crate::node::Node;
 use crate::node::node_factory::FromConfigArguments;
 use crate::sensors::displacement_sensor::DisplacementSensor;
-use crate::sensors::external_sensor::ExternalSensor;
 use crate::sensors::scan_sensor::ScanSensor;
 use crate::simulator::SimusaBrokerMultiClient;
 use crate::state_estimators::State;
@@ -483,15 +482,12 @@ impl SensorManager {
                         from_config_args.initial_time,
                         context,
                     )?) as Box<dyn Sensor>,
-                    SensorConfig::External(c) => Box::new(ExternalSensor::from_config(
-                        c,
-                        from_config_args.plugin_api,
-                        from_config_args.global_config,
-                        from_config_args.va_factory,
-                        from_config_args.network,
-                        from_config_args.initial_time,
-                        context,
-                    )?) as Box<dyn Sensor>,
+                    SensorConfig::Plugin(c) => from_config_args.plugin_api.as_ref().ok_or_else(|| {
+                        SimusaError::new(
+                            SimusaErrorTypes::PluginAPIError,
+                            "Plugin API not set!".to_string(),
+                        )
+                    })?.get_sensor(c, from_config_args.global_config, from_config_args.va_factory, from_config_args.network, from_config_args.initial_time, context)
                 })),
                 triggered: sensor_config.triggered,
                 last_triggered: None,

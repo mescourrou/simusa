@@ -11,11 +11,9 @@ pub mod go_to;
 pub mod trajectory;
 pub mod trajectory_follower;
 
-pub mod external_navigator;
 #[cfg(feature = "python")]
 pub mod python_navigator;
 
-extern crate confy;
 use std::sync::{Arc, RwLock};
 
 use config_checker::*;
@@ -24,7 +22,9 @@ use simusa_macros::config_derives;
 
 use crate::context::Context;
 use crate::controllers::ControllerError;
-use crate::errors::SimusaResult;
+use crate::errors::{SimusaError, SimusaErrorTypes, SimusaResult};
+#[cfg(feature = "gui")]
+use crate::gui::utils::{edit_plugin_config, show_plugin_config};
 #[cfg(feature = "gui")]
 use crate::gui::{UIComponent, utils::string_combobox};
 use crate::node::node_factory::FromConfigArguments;
@@ -39,9 +39,8 @@ pub enum NavigatorConfig {
     /// Configuration for [`trajectory_follower::TrajectoryFollower`].
     #[check]
     TrajectoryFollower(trajectory_follower::TrajectoryFollowerConfig),
-    /// Configuration for [`external_navigator::ExternalNavigator`].
-    #[check]
-    External(external_navigator::ExternalNavigatorConfig),
+    /// Configuration for a plugin [`Navigator`].
+    Plugin(serde_json::Value),
     /// Configuration for [`python_navigator::PythonNavigator`].
     #[check]
     #[cfg(feature = "python")]
@@ -79,10 +78,8 @@ impl UIComponent for NavigatorConfig {
                         trajectory_follower::TrajectoryFollowerConfig::default(),
                     )
                 }
-                "External" => {
-                    *self = NavigatorConfig::External(
-                        external_navigator::ExternalNavigatorConfig::default(),
-                    )
+                "Plugin" => {
+                    *self = NavigatorConfig::Plugin(serde_json::Value::Null)
                 }
                 #[cfg(feature = "python")]
                 "Python" => {
@@ -102,14 +99,7 @@ impl UIComponent for NavigatorConfig {
                 current_node_name,
                 unique_id,
             ),
-            NavigatorConfig::External(c) => c.show_mut(
-                ui,
-                ctx,
-                buffer_stack,
-                global_config,
-                current_node_name,
-                unique_id,
-            ),
+            NavigatorConfig::Plugin(c) => edit_plugin_config(ui, "Plugin Navigator", "plugin-navigator", unique_id, buffer_stack, c),
             #[cfg(feature = "python")]
             NavigatorConfig::Python(c) => c.show_mut(
                 ui,
@@ -137,7 +127,7 @@ impl UIComponent for NavigatorConfig {
 
         match self {
             NavigatorConfig::TrajectoryFollower(c) => c.show(ui, ctx, unique_id),
-            NavigatorConfig::External(c) => c.show(ui, ctx, unique_id),
+            NavigatorConfig::Plugin(c) => show_plugin_config(ui, "Plugin Navigator", c),
             #[cfg(feature = "python")]
             NavigatorConfig::Python(c) => c.show(ui, ctx, unique_id),
             NavigatorConfig::GoTo(c) => c.show(ui, ctx, unique_id),
@@ -150,8 +140,8 @@ impl UIComponent for NavigatorConfig {
 pub enum NavigatorRecord {
     /// Runtime record for [`TrajectoryFollower`](trajectory_follower::TrajectoryFollower).
     TrajectoryFollower(trajectory_follower::TrajectoryFollowerRecord),
-    /// Runtime record for [`ExternalNavigator`](external_navigator::ExternalNavigator).
-    External(external_navigator::ExternalNavigatorRecord),
+    /// Runtime record for a Plugin [`Navigator`].
+    Plugin(serde_json::Value),
     /// Runtime record for [`PythonNavigator`](python_navigator::PythonNavigator).
     #[cfg(feature = "python")]
     Python(python_navigator::PythonNavigatorRecord),
@@ -168,11 +158,7 @@ impl UIComponent for NavigatorRecord {
                     r.show(ui, ctx, unique_id);
                 });
             }
-            Self::External(r) => {
-                egui::CollapsingHeader::new("ExternalNavigator").show(ui, |ui| {
-                    r.show(ui, ctx, unique_id);
-                });
-            }
+            Self::Plugin(r) => show_plugin_config(ui, "Plugin Navigator", r),
             #[cfg(feature = "python")]
             Self::Python(r) => {
                 egui::CollapsingHeader::new("PythonNavigator").show(ui, |ui| {
@@ -249,9 +235,19 @@ pub fn make_navigator_from_config(
                 from_config_params.initial_time,
             )) as Box<dyn Navigator>
         }
-        NavigatorConfig::External(c) => Box::new(
-            external_navigator::ExternalNavigator::from_config(c, from_config_params)?,
-        ) as Box<dyn Navigator>,
+        NavigatorConfig::Plugin(c) => from_config_params.plugin_api.as_ref().ok_or_else(|| {
+            SimusaError::new(
+                SimusaErrorTypes::PluginAPIError,
+                "Plugin API not set!".to_string(),
+            )
+        })?.get_navigator(
+            c,
+            from_config_params.global_config,
+            from_config_params.va_factory,
+            from_config_params.network,
+            from_config_params.initial_time,
+            from_config_params.context,
+        ),
         #[cfg(feature = "python")]
         NavigatorConfig::Python(c) => Box::new(
             python_navigator::PythonNavigator::from_config(

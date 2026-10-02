@@ -22,7 +22,7 @@ use crate::{
     simulator::{ResultConfig, Simulator, SimulatorConfig},
     state_estimators::{
         BenchStateEstimatorConfig, StateEstimator, StateEstimatorConfig,
-        external_estimator::ExternalEstimatorConfig, perfect_estimator::PerfectEstimatorConfig,
+        perfect_estimator::PerfectEstimatorConfig,
     },
     utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
 };
@@ -71,7 +71,6 @@ mod kill_node {
         sensors::Observation,
         state_estimators::{
             StateEstimator, StateEstimatorRecord, WorldState,
-            external_estimator::ExternalEstimatorRecord,
         },
         utils::maths::round_precision,
     };
@@ -129,9 +128,7 @@ mod kill_node {
 
     impl Recordable<StateEstimatorRecord> for StateEstimatorTest {
         fn record(&self, _context: &Context) -> StateEstimatorRecord {
-            StateEstimatorRecord::External(ExternalEstimatorRecord {
-                record: serde_json::Value::default(),
-            })
+            StateEstimatorRecord::Plugin(serde_json::Value::default())
         }
     }
 }
@@ -152,9 +149,7 @@ fn kill_node() {
         }),
         state_estimator_bench: vec![BenchStateEstimatorConfig {
             name: "own".to_string(),
-            config: StateEstimatorConfig::External(ExternalEstimatorConfig {
-                config: serde_json::Value::Null,
-            }),
+            config: StateEstimatorConfig::Plugin(serde_json::Value::Null),
         }],
         ..Default::default()
     });
@@ -223,7 +218,6 @@ mod trigger_sensor {
         simulator::SimulatorConfig,
         state_estimators::{
             StateEstimator, StateEstimatorRecord, WorldState,
-            external_estimator::ExternalEstimatorRecord,
         },
         utils::{
             SharedMutex, SharedRwLock,
@@ -301,9 +295,7 @@ mod trigger_sensor {
 
     impl Recordable<StateEstimatorRecord> for StateEstimatorTest {
         fn record(&self, _context: &Context) -> StateEstimatorRecord {
-            StateEstimatorRecord::External(ExternalEstimatorRecord {
-                record: serde_json::Value::default(),
-            })
+            StateEstimatorRecord::Plugin(serde_json::Value::default())
         }
     }
 
@@ -362,9 +354,7 @@ fn trigger_sensor() {
         }),
         state_estimator_bench: vec![BenchStateEstimatorConfig {
             name: "triggered".to_string(),
-            config: StateEstimatorConfig::External(ExternalEstimatorConfig {
-                config: serde_json::Value::Bool(false),
-            }),
+            config: StateEstimatorConfig::Plugin(serde_json::Value::Bool(false)),
         }],
         sensor_manager: SensorManagerConfig {
             sensors: vec![ManagedSensorConfig {
@@ -385,9 +375,7 @@ fn trigger_sensor() {
         navigator: NavigatorConfig::GoTo(GoToConfig::default()),
         state_estimator_bench: vec![BenchStateEstimatorConfig {
             name: "triggering".to_string(),
-            config: StateEstimatorConfig::External(ExternalEstimatorConfig {
-                config: serde_json::Value::Bool(true),
-            }),
+            config: StateEstimatorConfig::Plugin(serde_json::Value::Bool(true)),
         }],
         ..Default::default()
     });

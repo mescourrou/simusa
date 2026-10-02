@@ -147,13 +147,13 @@ For Python integration details, see the [Python Integration Guide](../python/usi
 - More complex dynamics (e.g., aerial robots, underwater vehicles)
 - Hardware-in-the-loop simulations
 
-## Physics Type: `External`
+## Physics Type: `Plugin`
 
 Implement physics via external plugin (Rust ou Python). Use for specific physics engines or hardware in the loop.
 
 ```yaml
 physics:
-  type: External
+  type: Plugin
   config: {}  # Configuration for your plugin
 ```
 

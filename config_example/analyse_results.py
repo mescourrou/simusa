@@ -44,8 +44,8 @@ def analyse_results(records: list, config: dict, additional_param: dict|None):
                     real_pose = perfect_physics["state"]["pose"]
                 if real_pose is None:
                     raise Exception()
-            except: # For external Physics (in python example)
-                state = record["node"][node_type]["physics"]["External"]["state"]
+            except: # For plugin Physics (in python example)
+                state = record["node"][node_type]["physics"]["Plugin"]["state"]
                 if "pose" in state:
                     real_pose = state["pose"][0:3]
                 else:

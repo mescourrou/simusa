@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
+use simusa_py::general::PythonAPI;
 use simusa::context::Context;
 use simusa::controllers::ControllerError;
-use simusa::general::PythonAPI;
 use simusa::info;
-use simusa::navigators::external_navigator::ExternalNavigatorRecord;
 use simusa::navigators::{Navigator, NavigatorRecord};
 use simusa::networking::network::Network;
 use simusa::plugin_api::PluginAPI;
@@ -56,9 +55,7 @@ impl Navigator for MyWonderfulNavigator {
 
 impl Recordable<NavigatorRecord> for MyWonderfulNavigator {
     fn record(&self, _context: &Context) -> NavigatorRecord {
-        NavigatorRecord::External(ExternalNavigatorRecord {
-            record: serde_json::to_value(MyWonderfulNavigatorRecord {}).unwrap(),
-        })
+        NavigatorRecord::Plugin(serde_json::to_value(MyWonderfulNavigatorRecord {}).unwrap())
     }
 }
 
@@ -113,7 +110,7 @@ mod my_rust_plugin {
     #[pymodule_export]
     use super::start;
     #[pymodule_export]
-    use simusa::simusa;
+    use simusa_py::simusa;
 }
 
 #[pyfunction]

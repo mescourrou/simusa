@@ -15,14 +15,14 @@ max_time: 60.
 robots:
   - name: "robot1"
     navigator: 
-      type: External
+      type: Plugin
       config: {}
     controller: 
-      type: External
+      type: Plugin
       config: {}
     state_estimator: 
-      type: External
+      type: Plugin
       config: {}
     physics: 
-      type: External
+      type: Plugin
       config: {}

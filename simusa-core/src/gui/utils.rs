@@ -168,3 +168,36 @@ pub fn text_singleline_with_apply(
         buffer_stack.remove(buffer_key);
     }
 }
+
+
+
+pub fn edit_plugin_config(
+    ui: &mut egui::Ui,
+    plugin_name: &str,
+    unique_key: &str,
+    unique_id: &str,
+    buffer_stack: &mut BTreeMap<String, String>,
+    config: &mut serde_json::Value,
+) {
+    egui::CollapsingHeader::new(plugin_name).show(ui, |ui| {
+        ui.vertical(|ui| {
+            ui.label("Config (JSON):");
+            json_config(
+                ui,
+                &format!("{}-key-{}", &unique_key, &unique_id),
+                &format!("{}-error-key-{}", &unique_key, &unique_id),
+                buffer_stack,
+                config,
+            );
+        });
+    });
+}
+
+pub fn show_plugin_config(ui: &mut egui::Ui, plugin_name: &str, config: &serde_json::Value) {
+    egui::CollapsingHeader::new(plugin_name).show(ui, |ui| {
+        ui.vertical(|ui| {
+            ui.label("Config (JSON):");
+            ui.label(format!("{}", config));
+        });
+    });
+}

@@ -13,7 +13,7 @@ use simusa_com::rfc::{self, RemoteFunctionCall, RemoteFunctionCallHost};
 
 use simusa::{
     constants::TIME_ROUND, context::Context, errors::SimusaResult, internal, logger::InternalLog, node::Node, physics::robot_models::Command, recordable::Recordable, sensors::Observation, state_estimators::{
-        StateEstimator, StateEstimatorRecord, WorldState, external_estimator::ExternalEstimatorRecord,
+        StateEstimator, StateEstimatorRecord, WorldState,
     }, utils::maths::round_precision,
 };
 
@@ -320,14 +320,10 @@ impl PythonStateEstimator {
             "Calling python implementation of record"
         );
         let record_str: String = call_py_method!(self.model, "record", String,);
-        let record = ExternalEstimatorRecord {
-            record: serde_json::Value::from_str(record_str.as_str()).expect(
-                "Impossible to get serde_json::Value from the input serialized python structure",
-            ),
-        };
-        // record.clone()
-        // StateEstimatorRecord::External(PythonStateEstimator::record(&self))
-        StateEstimatorRecord::External(record)
+        let record = serde_json::Value::from_str(record_str.as_str()).expect(
+            "Impossible to get serde_json::Value from the input serialized python structure",
+        );
+        StateEstimatorRecord::Plugin(record)
     }
 
     fn pre_loop_hook(&mut self, node: NodeWrapper, time: f32, context: &Context) {

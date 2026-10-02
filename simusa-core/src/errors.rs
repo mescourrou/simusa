@@ -37,7 +37,7 @@ pub enum SimusaErrorTypes {
     /// An error that occurs during message passing between nodes, modules, etc.
     NetworkError(NetworkError),
     /// An error that occurs during the call to the [`PluginAPI`](crate::plugin_api::PluginAPI).
-    ExternalAPIError,
+    PluginAPIError,
 }
 
 /// Error struct used in Simusa. It contains the type of the error and a detailed message.

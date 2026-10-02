@@ -16,7 +16,7 @@ use simusa_com::rfc::{self, RemoteFunctionCall, RemoteFunctionCallHost};
 
 use simusa::{
     context::Context, controllers::ControllerError, errors::SimusaResult, internal, logger::InternalLog, navigators::{
-        Navigator, NavigatorRecord, external_navigator::ExternalNavigatorRecord,
+        Navigator, NavigatorRecord, 
     }, node::Node, recordable::Recordable, state_estimators::WorldState,
 };
 
@@ -173,11 +173,11 @@ impl PythonNavigator {
             "Calling python implementation of record"
         );
         let record_str: String = call_py_method!(self.model, "record", String,);
-        NavigatorRecord::External(ExternalNavigatorRecord {
-            record: Value::from_str(&record_str).expect(
+        NavigatorRecord::Plugin(
+            Value::from_str(&record_str).expect(
                 "Impossible to get serde_json::Value from the input serialized python structure",
-            ),
-        })
+            )
+        )
     }
 
     fn pre_loop_hook(&mut self, node: NodeWrapper, time: f32, context: &Context) {

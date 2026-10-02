@@ -6,7 +6,7 @@ fn main() {
     Simulator::init_environment();
     println!("Load configuration...");
     let mut simulator = Simulator::from_config_path(
-        Path::new("examples/python_external/config/config.yaml"),
+        Path::new("examples/python_plugin/config/config.yaml"),
         None, //<- plugin API, to load external modules
     )
     .unwrap();

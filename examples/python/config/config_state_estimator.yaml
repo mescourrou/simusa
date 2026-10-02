@@ -36,9 +36,8 @@ robots:
     state_estimator_bench:
       - name: "Filter"
         config: 
-          type: External
-          config:
-            period: 0.2
+          type: Plugin
+          period: 0.2
     sensor_manager:
       sensors:
         - name: "LandmarkSensor"
@@ -61,9 +60,8 @@ robots:
     state_estimator_bench:
       - name: "Filter"
         config: 
-          type: External
-          config:
-            period: 0.2
+          type: Plugin
+          period: 0.2
     sensor_manager:
       sensors:
         - name: "LandmarkSensor"

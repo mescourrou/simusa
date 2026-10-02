@@ -91,13 +91,13 @@ controller:
 
 For Python integration details, see `examples/python/` directory.
 
-## Controller Type: `External`
+## Controller Type: `Plugin`
 
 Implement custom control via the plugin API. Plugins can be written in Rust or Python (via the plugin API). Use this to implement your own control algorithms.
 
 ```yaml
 controller:
-  type: External
+  type: Plugin
   config: {}  # Configuration passed to your plugin
 ```
 

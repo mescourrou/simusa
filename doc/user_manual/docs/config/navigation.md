@@ -106,13 +106,13 @@ navigator:
 
 For Python integration details, see `examples/python/` directory.
 
-## Navigator Type: `External`
+## Navigator Type: `Plugin`
 
 Implement custom navigation via external plugin (Rust or Python). Use this for maximum performance on compute-intensive navigation algorithms.
 
 ```yaml
 navigator:
-  type: External
+  type: Plugin
   config: {}  # Provide configuration for your plugin
 ```
 

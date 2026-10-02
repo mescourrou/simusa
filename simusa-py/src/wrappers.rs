@@ -779,8 +779,8 @@ impl SensorObservationWrapper {
             SensorObservation::Scan(_) => {
                 panic!("ScanObservation cannot be converted to SensorObservationWrapper yet");
             }
-            SensorObservation::External(_) => {
-                panic!("ExternalObservation cannot be converted to SensorObservationWrapper yet");
+            SensorObservation::Plugin(_) => {
+                panic!("PluginObservation cannot be converted to SensorObservationWrapper yet");
             }
         }
     }
@@ -1337,7 +1337,7 @@ impl PluginAPIWrapper {
         Self {}
     }
     /// Return the [`StateEstimator`](crate::state_estimators::StateEstimator) to be used by the
-    /// [`ExternalEstimator`](crate::state_estimators::external_estimator::ExternalEstimator).
+    /// [`PluginEstimator`](crate::state_estimators::external_estimator::PluginEstimator).
     ///
     /// # Arguments
     /// * `config` - Config for the external state estimator. The configuration
@@ -1358,7 +1358,7 @@ impl PluginAPIWrapper {
     }
 
     /// Return the [`Controller`](crate::controllers::Controller) to be used by the
-    /// [`ExternalController`](crate::controllers::external_controller::ExternalController).
+    /// [`PluginController`](crate::controllers::external_controller::PluginController).
     ///
     /// # Arguments
     /// * `config` - Config for the external controller. The configuration
@@ -1379,7 +1379,7 @@ impl PluginAPIWrapper {
     }
 
     /// Return the [`Navigator`](crate::navigators::Navigator) to be used by the
-    /// [`ExternalNavigator`](crate::navigators::external_navigator::ExternalNavigator).
+    /// [`PluginNavigator`](crate::navigators::external_navigator::PluginNavigator).
     ///
     /// # Arguments
     /// * `config` - Config for the external navigator. The configuration
@@ -1400,7 +1400,7 @@ impl PluginAPIWrapper {
     }
 
     /// Return the [`Physics`](crate::physics::Physics) to be used by the
-    /// [`ExternalPhysics`](crate::physics::external_physics::ExternalPhysics).
+    /// [`PluginPhysics`](crate::physics::external_physics::PluginPhysics).
     ///
     /// # Arguments
     /// * `config` - Config for the external physics. The configuration

@@ -41,7 +41,6 @@ mod async_simulator;
 use async_simulator::SimulatorAsyncApiServer;
 pub use async_simulator::{AsyncSimulator, SimulatorAsyncApi};
 
-extern crate confy;
 use config_checker::ConfigCheckable;
 use pyo3::{ffi::c_str, prelude::*};
 use serde_derive::{Deserialize, Serialize};
