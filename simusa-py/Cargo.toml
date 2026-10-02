@@ -9,7 +9,7 @@ readme.workspace = true
 repository.workspace = true
 
 [lib]
-name = "simusa"  # Python imports as 'simusa', Rust uses package name 'simusa-core'
+name = "simusa"  # Python imports as 'simusa', Rust uses package name 'simusa-py'
 crate-type = ["cdylib"]  # cdylib for Python
 doctest = false
 
@@ -24,7 +24,7 @@ simusa-macros = { path = "../simusa-macros", version = "1.9.1" }
 
 # Main dependencies (alphabetical order)
 nalgebra = { version = "0.34.1", features = ["serde-serialize"] }
-pyo3 = { version = "0.27.2", features = ["abi3", "abi3-py310"] }
+pyo3 = { version = "0.27.2", features = ["abi3", "abi3-py310", "generate-import-lib"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_derive = "1.0.228"
 serde_json = { version = "1.0.145", features = ["float_roundtrip"] }

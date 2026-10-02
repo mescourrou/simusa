@@ -15,6 +15,7 @@ classifiers = [
 
 [tool.maturin]
 # Build simusa-py (which exposes 'simusa' Python module)
-manifest-path = "simusa-py/Cargo.toml"
+manifest-path = "Cargo.toml"
 # "extension-module" tells pyo3 we want to build an extension module (skips linking against libpython.so)
 features = ["pyo3/extension-module", "pyo3/abi3", "pyo3/abi3-py310"]
+compatibility = "linux"

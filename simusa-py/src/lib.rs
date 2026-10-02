@@ -114,6 +114,7 @@ pub fn run_gui(_py: Python, _plugin_api: Option<Py<PyAny>>) {
 
 
 #[pymodule]
+#[pyo3(name = "simusa")]
 /// Python module initializer for the `simusa` package.
 pub fn simusa(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SimulatorWrapper>()?;

@@ -10,28 +10,51 @@ stages:
   - upload
   - release
 
-build_rust:
+build_rust_linux:
   rules:
     - if: $CI_COMMIT_TAG                 # Run this job when a tag is created
   stage: build
   image: gitlab.laas.fr:4567/mescourrou/simusa:latest
   script:
-    # - cargo build --verbose
-    # - cargo build --all-features --verbose --release
-    - cargo build -p simusa-cmd --release
-    # - cargo test --verbose
+    - cargo build -p simusa-cmd --release --target x86_64-unknown-linux-gnu
   artifacts:
     when: on_success
     paths:
-      - target/release/simusa-cmd
+      - target/x86_64-unknown-linux-gnu/release/simusa-cmd
   
-build_python:
+build_python_linux:
   rules:
     - if: $CI_COMMIT_TAG                 # Run this job when a tag is created
   stage: build
   image: gitlab.laas.fr:4567/mescourrou/simusa:latest
   script:
-    - maturin build --release
+    - cd simusa-py
+    - maturin build --release --target x86_64-unknown-linux-gnu
+  artifacts:
+    paths:
+      - target/wheels/
+    when: on_success
+
+build_rust_windows:
+  rules:
+    - if: $CI_COMMIT_TAG                 # Run this job when a tag is created
+  stage: build
+  image: gitlab.laas.fr:4567/mescourrou/simusa:latest
+  script:
+    - cargo build -p simusa-cmd --release --target x86_64-pc-windows-gnu
+  artifacts:
+    when: on_success
+    paths:
+      - target/x86_64-pc-windows-gnu/release/simusa-cmd
+  
+build_python_windows:
+  rules:
+    - if: $CI_COMMIT_TAG                 # Run this job when a tag is created
+  stage: build
+  image: gitlab.laas.fr:4567/mescourrou/simusa:latest
+  script:
+    - cd simusa-py
+    - maturin build --release --target x86_64-pc-windows-gnu
   artifacts:
     paths:
       - target/wheels/
@@ -39,7 +62,7 @@ build_python:
 
 doc:
   rules:
-    - if: $CI_COMMIT_TAG                 # Run this job when a tag is created
+    - if: $CI_COMMIT_TAG && $CI_COMMIT_BRANCH == "master"   # Run this job when a tag is created
   stage: build
   image: gitlab.laas.fr:4567/mescourrou/simusa:latest
   before_script:
@@ -67,7 +90,7 @@ tests:
   script:
     - source /env/bin/activate
     - maturin develop
-    - ./test.sh
+    - ./prepare_release.sh
 
 run_tools:
   rules:
@@ -88,10 +111,11 @@ upload:
   stage: upload
   image: curlimages/curl:latest
   rules:
-      - if: $CI_COMMIT_TAG
+      - if: $CI_COMMIT_TAG && $CI_COMMIT_BRANCH == "master"
   script:
       - 'curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file target/wheels/*.whl ${PACKAGE_REGISTRY_URL}/'
-      - 'curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file target/release/simusa-cmd ${PACKAGE_REGISTRY_URL}/simusa'
+      - 'curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file target/x86_64-pc-windows-gnu/release/simusa-cmd ${PACKAGE_REGISTRY_URL}/win/simusa'
+      - 'curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file target/x86_64-unknown-linux-gnu/release/simusa-cmd ${PACKAGE_REGISTRY_URL}/linux/simusa'
       - 'curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file config.schema.json ${PACKAGE_REGISTRY_URL}/config.schema.json'
 
 
@@ -99,7 +123,8 @@ release_job:
   stage: release
   image: registry.gitlab.com/gitlab-org/release-cli:latest
   rules:
-    - if: $CI_COMMIT_TAG                 # Run this job when a tag is created
+    - if: $CI_COMMIT_TAG && $CI_COMMIT_BRANCH == "master"   # Run this job when a tag is created
+    - if: 
   script:
     - echo "running release_job"
   release:                               # See https://docs.gitlab.com/ee/ci/yaml/#release for available properties
@@ -107,11 +132,17 @@ release_job:
     description: '$(git log -1 --pretty=%B | tail -n +3)'
     assets:
       links:
-        - name: Python package
-          url: "${PACKAGE_REGISTRY_URL}/simusa-${CI_COMMIT_TAG}-cp310-abi3-manylinux_2_39_x86_64.whl"
+        - name: Python package Windows
+          url: "${PACKAGE_REGISTRY_URL}/simusa-${CI_COMMIT_TAG}-cp310-abi3-win_amd64.whl"
           link_type: package
-        - name: Command line binary
-          url: "${PACKAGE_REGISTRY_URL}/simusa"
+        - name: Python package Linux
+          url: "${PACKAGE_REGISTRY_URL}/simusa-${CI_COMMIT_TAG}-cp310-abi3-linux_x86_64.whl"
+          link_type: package
+        - name: Command line binary linux
+          url: "${PACKAGE_REGISTRY_URL}/linux/simusa"
+          link_type: package
+        - name: Command line binary windows
+          url: "${PACKAGE_REGISTRY_URL}/win/simusa"
           link_type: package
         - name: Schema JSON
           url: "${PACKAGE_REGISTRY_URL}/config.schema.json"

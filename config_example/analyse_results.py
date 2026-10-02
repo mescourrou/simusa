@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 
+import os
+
 import numpy as np
 import matplotlib.pyplot as plt
 import IPython
@@ -61,4 +63,6 @@ def analyse_results(records: list, config: dict, additional_param: dict|None):
     ax.legend()
     
     if figure_path != "":
+        if not os.path.exists(figure_path):
+            os.makedirs(figure_path)
         f.savefig(f"{figure_path}/Trajectories_all.pdf", bbox_inches='tight')
