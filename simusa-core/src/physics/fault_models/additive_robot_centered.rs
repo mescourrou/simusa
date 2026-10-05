@@ -13,7 +13,7 @@ use simusa_macros::{config_derives, enum_variables};
 
 use crate::{
     context::Context,
-    physics::{fault_models::fault_model::PhysicsFaultModel, robot_models::RobotModelConfig},
+    physics::{fault_models::PhysicsFaultModel, robot_models::RobotModelConfig},
     state_estimators::State,
     utils::{
         SharedMutex,

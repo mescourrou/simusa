@@ -29,8 +29,6 @@ To create a new state estimation strategy, here are the required steps.
 */
 
 pub mod perfect_estimator;
-#[cfg(feature = "python")]
-pub mod python_estimator;
 
 use nalgebra::SVector;
 
@@ -501,10 +499,6 @@ pub enum StateEstimatorConfig {
     Perfect(perfect_estimator::PerfectEstimatorConfig),
     /// Plugin state estimator provided through plugin API.
     Plugin(serde_json::Value),
-    /// Python-backed state estimator.
-    #[check]
-    #[cfg(feature = "python")]
-    Python(python_estimator::PythonEstimatorConfig),
 }
 
 #[cfg(feature = "gui")]
@@ -538,12 +532,6 @@ impl UIComponent for StateEstimatorConfig {
                 "Plugin" => {
                     *self = StateEstimatorConfig::Plugin(serde_json::Value::Null)
                 }
-                #[cfg(feature = "python")]
-                "Python" => {
-                    *self = StateEstimatorConfig::Python(
-                        python_estimator::PythonEstimatorConfig::default(),
-                    )
-                }
                 _ => panic!("Where did you find this value?"),
             };
         }
@@ -557,15 +545,6 @@ impl UIComponent for StateEstimatorConfig {
                 unique_id,
             ),
             StateEstimatorConfig::Plugin(c) => edit_plugin_config(ui, "Plugin State Estimator", "plugin-state-estimator", unique_id, buffer_stack, c),
-            #[cfg(feature = "python")]
-            StateEstimatorConfig::Python(c) => c.show_mut(
-                ui,
-                ctx,
-                buffer_stack,
-                global_config,
-                current_node_name,
-                unique_id,
-            ),
         }
     }
 
@@ -576,8 +555,6 @@ impl UIComponent for StateEstimatorConfig {
         match self {
             StateEstimatorConfig::Perfect(c) => c.show(ui, ctx, unique_id),
             StateEstimatorConfig::Plugin(c) => show_plugin_config(ui, "Plugin State Estimator", c),
-            #[cfg(feature = "python")]
-            StateEstimatorConfig::Python(c) => c.show(ui, ctx, unique_id),
         }
     }
 }
@@ -589,9 +566,6 @@ pub enum StateEstimatorRecord {
     Perfect(perfect_estimator::PerfectEstimatorRecord),
     /// Record for the plugin [`StateEstimator`].
     Plugin(serde_json::Value),
-    /// Record for the [`PythonEstimator`](crate::state_estimators::python_estimator::PythonEstimator).
-    #[cfg(feature = "python")]
-    Python(python_estimator::PythonEstimatorRecord),
 }
 
 #[cfg(feature = "gui")]
@@ -604,12 +578,6 @@ impl UIComponent for StateEstimatorRecord {
                 });
             }
             Self::Plugin(r) => show_plugin_config(ui, "Plugin State Estimator", r),
-            #[cfg(feature = "python")]
-            Self::Python(r) => {
-                egui::CollapsingHeader::new("PythonExternalStateEstimator").show(ui, |ui| {
-                    r.show(ui, ctx, unique_id);
-                });
-            }
         });
     }
 }
@@ -651,16 +619,6 @@ pub fn make_state_estimator_from_config(
             from_config_params.initial_time,
             from_config_params.context,
         ),
-        #[cfg(feature = "python")]
-        StateEstimatorConfig::Python(c) => Box::new(
-            python_estimator::PythonEstimator::from_config(
-                c,
-                from_config_params.global_config,
-                from_config_params.initial_time,
-                from_config_params.context,
-            )
-            .unwrap(),
-        ) as Box<dyn StateEstimator>,
     })
 }
 

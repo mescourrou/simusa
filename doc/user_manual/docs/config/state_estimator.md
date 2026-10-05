@@ -45,23 +45,6 @@ state_estimator:
 - Testing in simulation before adding realistic sensors
 - You want a perfect control loop to evaluate state estimation algorithms with the `bench` setup (`state_estimator_bench` in robots).
 
-## State Estimator Type: `Python`
-
-Implement custom state estimation in Python.
-
-```yaml
-state_estimator:
-  type: Python
-  file: my_estimator.py
-  class_name: MyStateEstimator
-  prediction_period: 0.1
-  # Additional parameters
-  filter_type: kalman                # Your custom parameters
-  noise_level: 0.1
-```
-
-For Python integration details, see the [Python Integration Guide](../python/using_python.md).
-
 ## State Estimator Type: `Plugin`
 
 Implement state estimation via external plugin. Use for maximum performance or proprietary algorithms.
@@ -84,7 +67,6 @@ Use landmark map to provide landmark identity information:
 state_estimator:
   type: Perfect
   prediction_period: 0.1
-  map_path: maps/landmarks.yaml      # Map for landmark observation linking
 ```
 
 ## State Estimation in the Simulation Loop
@@ -102,17 +84,6 @@ state_estimator:
   prediction_period: 0.1
 ```
 
-### Realistic single-robot SLAM
-```yaml
-state_estimator:
-  type: Python
-  file: ekf_slam.py
-  class_name: EKF_SLAM
-  prediction_period: 0.1
-  landmarks_max: 50
-  innovation_threshold: 5.0
-```
-
 ### Multi-robot centralized estimation
 ```yaml
 state_estimator:
@@ -122,19 +93,8 @@ state_estimator:
     - self
     - robot1
     - robot2
-  map_path: maps/landmarks.yaml
 ```
 
-### Decentralized with custom filter
-```yaml
-state_estimator:
-  type: Python
-  file: particle_filter.py
-  class_name: ParticleFilter
-  prediction_period: 0.05  # 20 Hz
-  num_particles: 1000
-  resampling_threshold: 0.5
-```
 
 ## Integration with Sensors
 
@@ -156,9 +116,7 @@ sensor_manager:
 
 # robot2 config
 state_estimator:
-  type: Python
-  file: cooperative_slam.py
-  class_name: CooperativeSLAM
+  type: Plugin
 ```
 
 ---

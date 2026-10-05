@@ -48,16 +48,7 @@ fn main() {
 use std::sync::Arc;
 
 use crate::{
-    context::Context,
-    controllers::Controller,
-    navigators::Navigator,
-    networking::network::Network,
-    physics::Physics,
-    result_analyser::ResultAnalyserTrait,
-    sensors::{Sensor, fault_models::fault_model::FaultModel, sensor_filters::SensorFilter},
-    simulator::SimulatorConfig,
-    state_estimators::StateEstimator,
-    utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
+    context::Context, controllers::Controller, navigators::Navigator, networking::network::Network, physics::{Physics, fault_models::PhysicsFaultModel}, result_analyser::ResultAnalyserTrait, sensors::{Sensor, fault_models::FaultModel, sensor_filters::SensorFilter}, simulator::SimulatorConfig, state_estimators::StateEstimator, utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
 };
 
 /// Trait to link the simulator to the external implementation.
@@ -267,6 +258,32 @@ pub trait PluginAPI: Send + Sync {
         context: &Context,
     ) -> Box<dyn FaultModel> {
         panic!("The given PluginAPI does not provide a sensor fault model");
+    }
+
+    /// Return the [`PhysicsFaultModel`] to be used by the
+    /// [`InternalPhysics`](`crate::physics::internal_physics::InternalPhysics`).
+    ///
+    /// # Arguments
+    /// * `config` - Config for the external sensor fault. The configuration
+    ///   is given using [`serde_json::Value`]. It should be converted by the
+    ///   external plugin to the specific configuration.
+    /// * `global_config` - Full configuration of the simulator.
+    /// * `va_factory` - Factory for Determinists random variables.
+    /// * `initial_time` - Initial time of the simulation.
+    /// * `context` - Context for the simulation, to allow the sensor fault to log.
+    ///
+    /// # Return
+    ///
+    /// Returns the [`FaultModel`] to use.
+    fn get_physics_fault(
+        &self,
+        config: &serde_json::Value,
+        global_config: &SimulatorConfig,
+        va_factory: &Arc<DeterministRandomVariableFactory>,
+        initial_time: f32,
+        context: &Context,
+    ) -> Box<dyn PhysicsFaultModel> {
+        panic!("The given PluginAPI does not provide a physics fault model");
     }
 
     /// Return the [`ResultAnalyserTrait`] to be used by the [`ResultAnalyser`](`crate::result_analyser::ResultAnalyser`).

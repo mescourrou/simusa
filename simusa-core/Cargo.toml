@@ -21,7 +21,6 @@ schema = ["schemars"]  # Enable schemars for schema generation
 force_hard_determinism = []  # Disable features that may introduce non-determinism
 debug_mode = ["simusa-com/debug_mode"]  # Enable heavy debug logs
 monothreaded = []  # Force single-threaded execution
-python = []  # Enable Python bindings
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -79,10 +78,6 @@ wasm-bindgen-futures = "0.4"
 [[example]]
 name = "basic"
 path = "../examples/basic.rs"
-
-[[example]]
-name = "python_plugin"
-path = "../examples/python_plugin.rs"
 
 [[example]]
 name = "gui"

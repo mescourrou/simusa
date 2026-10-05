@@ -11,9 +11,6 @@ pub mod go_to;
 pub mod trajectory;
 pub mod trajectory_follower;
 
-#[cfg(feature = "python")]
-pub mod python_navigator;
-
 use std::sync::{Arc, RwLock};
 
 use config_checker::*;
@@ -41,10 +38,6 @@ pub enum NavigatorConfig {
     TrajectoryFollower(trajectory_follower::TrajectoryFollowerConfig),
     /// Configuration for a plugin [`Navigator`].
     Plugin(serde_json::Value),
-    /// Configuration for [`python_navigator::PythonNavigator`].
-    #[check]
-    #[cfg(feature = "python")]
-    Python(python_navigator::PythonNavigatorConfig),
     /// Configuration for [`go_to::GoTo`].
     #[check]
     GoTo(go_to::GoToConfig),
@@ -81,11 +74,6 @@ impl UIComponent for NavigatorConfig {
                 "Plugin" => {
                     *self = NavigatorConfig::Plugin(serde_json::Value::Null)
                 }
-                #[cfg(feature = "python")]
-                "Python" => {
-                    *self =
-                        NavigatorConfig::Python(python_navigator::PythonNavigatorConfig::default())
-                }
                 "GoTo" => *self = NavigatorConfig::GoTo(go_to::GoToConfig::default()),
                 _ => panic!("Where did you find this value?"),
             };
@@ -100,15 +88,6 @@ impl UIComponent for NavigatorConfig {
                 unique_id,
             ),
             NavigatorConfig::Plugin(c) => edit_plugin_config(ui, "Plugin Navigator", "plugin-navigator", unique_id, buffer_stack, c),
-            #[cfg(feature = "python")]
-            NavigatorConfig::Python(c) => c.show_mut(
-                ui,
-                ctx,
-                buffer_stack,
-                global_config,
-                current_node_name,
-                unique_id,
-            ),
             NavigatorConfig::GoTo(c) => c.show_mut(
                 ui,
                 ctx,
@@ -128,8 +107,6 @@ impl UIComponent for NavigatorConfig {
         match self {
             NavigatorConfig::TrajectoryFollower(c) => c.show(ui, ctx, unique_id),
             NavigatorConfig::Plugin(c) => show_plugin_config(ui, "Plugin Navigator", c),
-            #[cfg(feature = "python")]
-            NavigatorConfig::Python(c) => c.show(ui, ctx, unique_id),
             NavigatorConfig::GoTo(c) => c.show(ui, ctx, unique_id),
         }
     }
@@ -142,9 +119,6 @@ pub enum NavigatorRecord {
     TrajectoryFollower(trajectory_follower::TrajectoryFollowerRecord),
     /// Runtime record for a Plugin [`Navigator`].
     Plugin(serde_json::Value),
-    /// Runtime record for [`PythonNavigator`](python_navigator::PythonNavigator).
-    #[cfg(feature = "python")]
-    Python(python_navigator::PythonNavigatorRecord),
     /// Runtime record for [`GoTo`](go_to::GoTo).
     GoTo(go_to::GoToRecord),
 }
@@ -159,12 +133,6 @@ impl UIComponent for NavigatorRecord {
                 });
             }
             Self::Plugin(r) => show_plugin_config(ui, "Plugin Navigator", r),
-            #[cfg(feature = "python")]
-            Self::Python(r) => {
-                egui::CollapsingHeader::new("PythonNavigator").show(ui, |ui| {
-                    r.show(ui, ctx, unique_id);
-                });
-            }
             Self::GoTo(r) => {
                 egui::CollapsingHeader::new("GoTo").show(ui, |ui| {
                     r.show(ui, ctx, unique_id);
@@ -248,16 +216,6 @@ pub fn make_navigator_from_config(
             from_config_params.initial_time,
             from_config_params.context,
         ),
-        #[cfg(feature = "python")]
-        NavigatorConfig::Python(c) => Box::new(
-            python_navigator::PythonNavigator::from_config(
-                c,
-                from_config_params.global_config,
-                from_config_params.initial_time,
-                from_config_params.context,
-            )
-            .unwrap(),
-        ) as Box<dyn Navigator>,
         NavigatorConfig::GoTo(c) => Box::new(go_to::GoTo::from_config(
             c,
             from_config_params.network,

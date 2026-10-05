@@ -7,8 +7,6 @@ echo "Run example 'basic'"
 cd .. && cargo run --example basic && cd -
 echo "Run example 'plugin_example'"
 cd .. && cargo run -p plugin_example && cd -
-echo "Run example 'python_plugin'"
-cd .. && cargo run --example python_plugin && cd -
 
 cd python
 echo "Run python example 'controller'"

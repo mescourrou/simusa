@@ -85,27 +85,6 @@ do_loop: true        # Forms a square patrol pattern
 
 See the `config_example/paths/path1.yaml` file in the repository for a complete example.
 
-## Navigator Type: `Python`
-
-Implement custom navigation logic in Python. Use this for complex decision-making, learning algorithms, or behaviors not covered by built-in types.
-
-```yaml
-navigator:
-  type: Python
-  file: my_navigator.py              # Python file with navigator class
-  class_name: MyNavigator            # Class name in the file
-  # Additional user-specific parameters here
-  custom_param1: value1              # Your custom configuration
-```
-
-**How it works**:
-1. SiMuSA loads `my_navigator.py` and instantiates the `MyNavigator` class
-2. Your class receives the `config` dict with all parameters (including `custom_param1`)
-3. Each simulation step, your navigator's `get_navigation_command()` method is called
-4. You return target position/velocity for the controller to track
-
-For Python integration details, see `examples/python/` directory.
-
 ## Navigator Type: `Plugin`
 
 Implement custom navigation via external plugin (Rust or Python). Use this for maximum performance on compute-intensive navigation algorithms.
@@ -140,12 +119,10 @@ navigator:
 ```
 
 ### Custom decision making
-Use `Python` type:
+Use `Plugin` type:
 ```yaml
 navigator:
-  type: Python
-  file: smart_navigator.py
-  class_name: SmartNavigator
+  type: Plugin
   decision_threshold: 0.8
   explore_mode: true
 ```

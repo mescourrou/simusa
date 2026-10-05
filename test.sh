@@ -8,10 +8,10 @@ cargo build --release
 cargo nextest run --release
 cargo nextest run --release --all-features
 
-target/release/simusa-cmd config_example/config_2.yaml --no-gui
-target/release/simusa-cmd config_example/config_scenario.yaml --no-gui
-
 cd simusa-py && maturin develop
 cd $CWD
+
+target/release/simusa-cmd config_example/config_2.yaml --no-gui
+target/release/simusa-cmd config_example/config_scenario.yaml --no-gui
 
 cd examples && ./run_examples.sh

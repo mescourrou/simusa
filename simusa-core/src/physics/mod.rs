@@ -7,9 +7,6 @@
 //! or Python-backed physics.
 
 pub mod internal_physics;
-#[cfg(feature = "python")]
-pub mod python_physics;
-
 pub mod robot_models;
 
 pub mod fault_models;
@@ -28,10 +25,6 @@ pub enum PhysicsConfig {
     Internal(internal_physics::InternalPhysicConfig),
     /// Plugin-provided physics implementation.
     Plugin(serde_json::Value),
-    /// Python-backed physics implementation.
-    #[check]
-    #[cfg(feature = "python")]
-    Python(python_physics::PythonPhysicsConfig),
 }
 
 #[cfg(feature = "gui")]
@@ -64,10 +57,6 @@ impl UIComponent for PhysicsConfig {
                 "Plugin" => {
                     *self = PhysicsConfig::Plugin(serde_json::Value::Null)
                 }
-                #[cfg(feature = "python")]
-                "Python" => {
-                    *self = PhysicsConfig::Python(python_physics::PythonPhysicsConfig::default())
-                }
                 _ => panic!("Where did you find this value?"),
             };
         }
@@ -81,15 +70,6 @@ impl UIComponent for PhysicsConfig {
                 unique_id,
             ),
             PhysicsConfig::Plugin(c) => edit_plugin_config(ui, "Plugin Physics", "plugin-physics", unique_id, buffer_stack, c),
-            #[cfg(feature = "python")]
-            PhysicsConfig::Python(c) => c.show_mut(
-                ui,
-                ctx,
-                buffer_stack,
-                global_config,
-                current_node_name,
-                unique_id,
-            ),
         }
     }
 
@@ -100,8 +80,6 @@ impl UIComponent for PhysicsConfig {
         match self {
             PhysicsConfig::Internal(c) => c.show(ui, ctx, unique_id),
             PhysicsConfig::Plugin(c) => show_plugin_config(ui, "Plugin Physics", c),
-            #[cfg(feature = "python")]
-            PhysicsConfig::Python(c) => c.show(ui, ctx, unique_id),
         }
     }
 }
@@ -113,9 +91,6 @@ pub enum PhysicsRecord {
     Internal(internal_physics::InternalPhysicsRecord),
     /// Record emitted by plugin physics.
     Plugin(serde_json::Value),
-    /// Record emitted by Python physics.
-    #[cfg(feature = "python")]
-    Python(python_physics::PythonPhysicsRecord),
 }
 
 impl PhysicsRecord {
@@ -125,8 +100,6 @@ impl PhysicsRecord {
     pub fn pose(&self) -> [f32; 3] {
         match self {
             Self::Plugin(_) => [0., 0., 0.], // TODO: Find a way to get info from plugin record
-            #[cfg(feature = "python")]
-            Self::Python(_) => [0., 0., 0.], // TODO: Find a way to get info from external record
             Self::Internal(p) => p.state.pose,
         }
     }
@@ -142,12 +115,6 @@ impl UIComponent for PhysicsRecord {
                 });
             }
             Self::Plugin(r) => show_plugin_config(ui, "Plugin Physics", r),
-            #[cfg(feature = "python")]
-            Self::Python(r) => {
-                egui::CollapsingHeader::new("ExternalPythonPhysics").show(ui, |ui| {
-                    r.show(ui, ctx, unique_id);
-                });
-            }
         });
     }
 }
@@ -221,11 +188,8 @@ pub fn make_physics_from_config(
     Ok(Arc::new(RwLock::new(match &config {
         PhysicsConfig::Internal(c) => Box::new(internal_physics::InternalPhysics::from_config(
             c,
-            from_config_args.node_name,
-            from_config_args.va_factory,
-            from_config_args.initial_time,
-            from_config_args.context,
-        )) as Box<dyn Physics>,
+            from_config_args
+        )?) as Box<dyn Physics>,
         PhysicsConfig::Plugin(c) => from_config_args.plugin_api.as_ref().ok_or_else(|| {
             SimusaError::new(
                 SimusaErrorTypes::PluginAPIError,
@@ -238,16 +202,6 @@ pub fn make_physics_from_config(
             from_config_args.network,
             from_config_args.initial_time,
             from_config_args.context,
-        ),
-        #[cfg(feature = "python")]
-        PhysicsConfig::Python(c) => Box::new(
-            python_physics::PythonPhysics::from_config(
-                c,
-                from_config_args.global_config,
-                from_config_args.initial_time,
-                from_config_args.context,
-            )
-            .unwrap(),
         ),
     })))
 }

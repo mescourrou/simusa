@@ -4,15 +4,20 @@ use serde::{Deserialize, Serialize};
 use simusa::context::Context;
 use simusa::controllers::{Controller, ControllerError, ControllerRecord};
 use simusa::errors::SimusaResult;
+use simusa::gui::Drawable;
 use simusa::info;
 use simusa::navigators::{Navigator, NavigatorRecord};
 use simusa::networking::network::Network;
 use simusa::node::Node;
+use simusa::physics::fault_models::PhysicsFaultModel;
 use simusa::physics::robot_models::unicycle::UnicycleCommand;
 use simusa::physics::robot_models::Command;
 use simusa::physics::{Physics, PhysicsRecord};
 use simusa::plugin_api::PluginAPI;
 use simusa::recordable::Recordable;
+use simusa::result_analyser::ResultAnalyserTrait;
+use simusa::sensors::fault_models::FaultModel;
+use simusa::sensors::sensor_filters::SensorFilter;
 use simusa::sensors::{Observation, Sensor, SensorObservation, SensorRecord};
 use simusa::simulator::{Simulator, SimulatorConfig};
 use simusa::state_estimators::{
@@ -294,6 +299,201 @@ impl Recordable<SensorRecord> for MyWonderfulSensor {
     }
 }
 
+///////////////////////////////////
+/// PHYSICS FAULT TEMPLATE
+///////////////////////////////////
+
+#[derive(Debug, Serialize, Deserialize)]
+struct MyWonderfulPhysicsFaultConfig {}
+
+#[derive(Debug)]
+pub struct MyWonderfulPhysicsFault {}
+
+impl MyWonderfulPhysicsFault {
+    pub fn from_config(_config: MyWonderfulPhysicsFaultConfig, _initial_time: f32) -> Self {
+        Self {}
+    }
+}
+
+impl PhysicsFaultModel for MyWonderfulPhysicsFault {
+    fn post_init(&mut self, _node: &mut simusa::node::Node, context: &Context) -> SimusaResult<()> {
+        Ok(())
+    }
+
+    fn add_faults(&self, time: f32, state: &mut State, context: &Context) {
+        state.pose.x += 0.1;
+    }
+}
+
+///////////////////////////////////
+/// SENSOR FAULT TEMPLATE
+///////////////////////////////////
+
+#[derive(Debug, Serialize, Deserialize)]
+struct MyWonderfulSensorFaultConfig {}
+
+#[derive(Debug)]
+pub struct MyWonderfulSensorFault {}
+
+impl MyWonderfulSensorFault {
+    pub fn from_config(_config: MyWonderfulSensorFaultConfig, _initial_time: f32) -> Self {
+        Self {}
+    }
+}
+
+impl FaultModel for MyWonderfulSensorFault {
+    fn post_init(&mut self, _node: &mut simusa::node::Node, context: &Context) -> SimusaResult<()> {
+        Ok(())
+    }
+
+    fn add_faults(
+        &mut self,
+        time: f32,
+        seed: f32,
+        obs_list: &mut Vec<SensorObservation>,
+        obs_type: SensorObservation,
+        environment: &Arc<simusa::environment::Environment>,
+        context: &Context,
+    )
+    {
+        // Add your fault here, for example, remove the last observation
+        obs_list.pop();
+    }
+}
+
+///////////////////////////////////
+/// SENSOR FILTER TEMPLATE
+///////////////////////////////////
+
+#[derive(Debug, Serialize, Deserialize)]
+struct MyWonderfulSensorFilterConfig {}
+
+#[derive(Debug)]
+pub struct MyWonderfulSensorFilter {}
+
+impl MyWonderfulSensorFilter {
+    pub fn from_config(_config: MyWonderfulSensorFilterConfig, _initial_time: f32) -> Self {
+        Self {}
+    }
+}
+
+impl SensorFilter for MyWonderfulSensorFilter {
+    fn post_init(&mut self, _node: &mut simusa::node::Node, context: &Context) -> SimusaResult<()> {
+        Ok(())
+    }
+
+    fn filter(
+        &self,
+        time: f32,
+        observation: SensorObservation,
+        observer_state: &State,
+        observee_state: Option<&State>,
+        context: &Context,
+    ) -> Option<SensorObservation>
+    {
+        // Add you filter here, for example, keep only GNSS
+        match observation {
+            SensorObservation::GNSS(_) => Some(observation),
+            _ => None,
+        }
+        
+    }
+}
+
+///////////////////////////////////
+/// DRAWABLE TEMPLATE
+///////////////////////////////////
+pub struct MyWonderfulDrawable {
+    thickness: f32,
+}
+
+impl Drawable for MyWonderfulDrawable {
+    fn draw(
+        &self,
+        ui: &mut egui::Ui,
+        viewport: &Rect,
+        painter_info: &PainterInfo,
+        scale: f32,
+        time: f32,
+    ) -> Result<Vec<Shape>, Vec2>
+    {
+        Ok(vec![Shape::line_segment(
+            vec![
+                pos2(viewport.left(), viewport.top()),
+                pos2(viewport.right(), viewport.bottom()),
+            ],
+            Stroke::new(self.thickness, Color32::from_rgb(255, 0, 0)),
+        )])
+    }
+
+    fn react(
+        &mut self,
+        ui: &mut egui::Ui,
+        ctx: &egui::Context,
+        response: &Response,
+        painter_info: &PainterInfo,
+        scale: f32,
+        time: f32,
+    )
+    {
+        // Manage clicks, drags, etc. on the drawable here
+    }
+
+    fn name(&self) -> Option<String> {
+        Some("Horrible line".to_string())
+    }
+
+    fn associated_node_name(&self) -> Option<String> {
+        Some("node1".to_string()) // Name of the robot/node if specific to a robot, otherwise None (for global drawables)
+    }
+
+    fn show_params_mut(&mut self, ui: &mut egui::Ui, unique_id: &str) {
+        // Show parameters of the drawable here, for example, a color picker
+        ui.horizontal(|ui| {
+            ui.add(egui::Slider::new(&mut self.thickness, 0.0..=10.0).text("Line thickness"));
+        });
+    }
+
+    // You can choose only one of the four methods below to implement, depending on your needs.
+    fn add_computation_unit_record(&mut self, time: f32, record: simusa::node::node_factory::ComputationUnitRecord) {
+        
+    }
+
+    fn add_map_record(&mut self, time: f32, record: simusa::environment::map::MapRecord) {
+        
+    }
+
+    fn add_robot_record(&mut self, time: f32, record: simusa::node::node_factory::RobotRecord) {
+        
+    }
+
+    fn add_scenario_record(&mut self, time: f32, record: simusa::scenario::config::EventRecord) {
+        
+    }
+}
+
+///////////////////////////////////
+/// RESULT ANALYSER TEMPLATE
+///////////////////////////////////
+#[derive(Debug, Serialize, Deserialize)]
+struct MyWonderfulResultAnalyserConfig {}
+
+#[derive(Debug)]
+pub struct MyWonderfulResultAnalyser {}
+
+impl MyWonderfulResultAnalyser {
+    pub fn from_config(_config: MyWonderfulResultAnalyserConfig, _initial_time: f32) -> Self {
+        Self {}
+    }
+}
+
+impl ResultAnalyserTrait for MyWonderfulResultAnalyser {
+    fn analyse_results(&mut self, results: &simusa::simulator::Results, context: &Context) -> SimusaResult<()> {
+        // Perform the analysis here
+        Ok(())
+    }
+}
+
 struct MyWonderfulPlugin {}
 
 impl PluginAPI for MyWonderfulPlugin {
@@ -355,10 +555,6 @@ impl PluginAPI for MyWonderfulPlugin {
             serde_json::from_value(config.clone()).unwrap(),
             initial_time,
         ))
-
-        // Example: use already existing state estimator (PythonEstimator here)
-        // let config = serde_json::from_value(config.clone()).unwrap();
-        // Box::new(PythonEstimator::from_config(&config, global_config).unwrap())
     }
 
     fn get_sensor(
@@ -375,6 +571,69 @@ impl PluginAPI for MyWonderfulPlugin {
             initial_time,
         ))
     }
+
+    fn get_physics_fault(
+        &self,
+        config: &serde_json::Value,
+        global_config: &SimulatorConfig,
+        va_factory: &Arc<DeterministRandomVariableFactory>,
+        initial_time: f32,
+        context: &Context,
+    ) -> Box<dyn simusa::physics::fault_models::PhysicsFaultModel>
+    {
+        Box::new(MyWonderfulPhysicsFault::from_config(
+            serde_json::from_value(config.clone()).unwrap(),
+            initial_time,
+        ))
+    }
+
+    fn get_sensor_fault(
+        &self,
+        config: &serde_json::Value,
+        global_config: &SimulatorConfig,
+        va_factory: &Arc<DeterministRandomVariableFactory>,
+        initial_time: f32,
+        context: &Context,
+    ) -> Box<dyn simusa::sensors::fault_models::FaultModel>
+    {
+        Box::new(MyWonderfulSensorFault::from_config(
+            serde_json::from_value(config.clone()).unwrap(),
+            initial_time,
+        ))
+    }
+
+    fn get_sensor_filter(
+        &self,
+        config: &serde_json::Value,
+        global_config: &SimulatorConfig,
+        va_factory: &Arc<DeterministRandomVariableFactory>,
+        initial_time: f32,
+        context: &Context,
+    ) -> Box<dyn simusa::sensors::sensor_filters::SensorFilter>
+    {
+        Box::new(MyWonderfulSensorFilter::from_config(
+            serde_json::from_value(config.clone()).unwrap(),
+            initial_time,
+        ))
+    }
+
+    fn get_drawables(&self, global_config: &SimulatorConfig) -> Vec<Box<dyn simusa::gui::Drawable>> {
+        vec![Box::new(MyWonderfulDrawable { thickness: 2.0 })]
+    }
+
+    fn get_result_analyser(
+        &self,
+        config: &serde_json::Value,
+        global_config: &SimulatorConfig,
+        context: &Context,
+    ) -> Box<dyn simusa::result_analyser::ResultAnalyserTrait>
+    {
+        Box::new(MyWonderfulResultAnalyser::from_config(
+            serde_json::from_value(config.clone()).unwrap(),
+            0.0,
+        ))
+    }
+
 }
 
 fn main() {

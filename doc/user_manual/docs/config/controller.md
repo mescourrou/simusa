@@ -71,26 +71,6 @@ robot_model:
 
 **When to use**: Omnidirectional robots, mecanum-wheeled robots
 
-## Controller Type: `Python`
-
-Custom controller implemented in a single Python file and class. Use this for quick custom implementations or algorithms you want to script.
-
-```yaml
-controller:
-  type: Python
-  file: my_controller.py
-  class_name: MyController
-  # Additional user-specific parameters here
-```
-
-**How it works**:
-1. SiMuSA loads `my_controller.py` and instantiates `MyController`
-2. Your class receives the config dict with all parameters
-3. Each simulation step, your methods are called to compute control
-4. You return motor commands
-
-For Python integration details, see `examples/python/` directory.
-
 ## Controller Type: `Plugin`
 
 Implement custom control via the plugin API. Plugins can be written in Rust or Python (via the plugin API). Use this to implement your own control algorithms.

@@ -608,32 +608,6 @@ robots:
 
 ## Advanced Techniques
 
-### Using Python Components
-
-For custom algorithms not built-in, use Python:
-
-```yaml
-navigator:
-  type: Python
-  file: my_navigator.py
-  class_name: CustomNavigator
-
-controller:
-  type: Python
-  file: my_controller.py
-  class_name: CustomController
-
-physics:
-  type: Python
-  file: my_physics.py
-  class_name: CustomPhysics
-
-state_estimator:
-  type: Python
-  file: my_estimator.py
-  class_name: CustomEstimator
-```
-
 ### Scenario-Based Testing
 
 Create complex test scenarios:
@@ -686,31 +660,30 @@ Use custom Python scripts for post-simulation analysis:
 
 ```yaml
 results:
-  result_path: simulation_results
-  analyse_script: analyze_results.py  # Your analysis script
+  analyser:
+    type: Python
+    show_figures: true
+    script_path: "analyse_results.py"
+    function_name: "analyse_results"
+    additionnal_params:
+      figures_path: "figures"
 ```
 
-The analysis script should contain a function with signature:
+The analysis script should contain a function with signature (the name can be changed):
 ```python
-def analyse(records: list, config: dict, figure_path: str, figure_type: str, additionnal_param: dict|None) -> None:
+def analyse_results(records: list, config: dict, additional_param: dict|None):
   # Your analysis code here
 ```
+
+If the file does not exist, a template one is generated.
 
 Where:
 - `records`: Simulation results data, with the same structure as the `records` list of `results.json`
 - `config`: The configuration dictionary used for the simulation
-- `figure_path`: Path to save generated figures (from `results.result_path` config)
-- `figure_type`: File type for figures (e.g., "png", "pdf"), should be supported by matplotlib
-- `python_params`: Any additional parameters you may want to pass (can be `None`). These can be set in the `results` configuration as:
-```yaml
-results:
-  analyse_script: analyze_results.py
-  python_params:
-    param1: value1
-    param2: value2
-```
+- `additional_params`: Any additional parameters you may want to pass (can be `None`). These can be set in the `results` configuration such as the `figures_path` above.
 
-See `analyse_results.py` in the `python_scripts/` folder for an example implementation.
+
+See `analyse_results.py` in the `config_example/` folder for an example implementation.
 
 ---
 

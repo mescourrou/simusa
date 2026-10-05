@@ -10,20 +10,14 @@ use std::sync::{Arc, Mutex};
 use crate::{gui::UIComponent, simulator::SimulatorConfig};
 
 use crate::{
-    context::Context,
-    error, internal,
-    logger::InternalLog,
-    physics::{
-        fault_models::fault_model::{
+    context::Context, error, errors::SimusaResult, internal, logger::InternalLog, node::node_factory::FromConfigArguments, physics::{
+        fault_models::{
             PhysicsFaultModel, PhysicsFaultModelConfig, make_physics_fault_model_from_config,
         },
         robot_models::{
             Command, RobotModel, RobotModelConfig, make_model_from_config, unicycle::UnicycleConfig,
         },
-    },
-    recordable::Recordable,
-    state_estimators::{State, StateConfig, StateRecord},
-    utils::{SharedMutex, determinist_random_variable::DeterministRandomVariableFactory},
+    }, recordable::Recordable, state_estimators::{State, StateConfig, StateRecord}, utils::{SharedMutex, determinist_random_variable::DeterministRandomVariableFactory},
 };
 use config_checker::*;
 use serde_derive::{Deserialize, Serialize};
@@ -170,17 +164,14 @@ impl InternalPhysics {
     /// * `initial_time` - Initial time of the node.
     pub fn from_config(
         config: &InternalPhysicConfig,
-        robot_name: &String,
-        va_factory: &Arc<DeterministRandomVariableFactory>,
-        initial_time: f32,
-        _context: &Context,
-    ) -> Self {
+        from_config_params: &FromConfigArguments,
+    ) -> SimusaResult<Self> {
         let model = make_model_from_config(&config.model);
         let current_command = model.default_command();
-        InternalPhysics {
+        Ok(InternalPhysics {
             model,
-            state: State::from_config(&config.initial_state, va_factory),
-            last_time_update: initial_time,
+            state: State::from_config(&config.initial_state, from_config_params.va_factory),
+            last_time_update: from_config_params.initial_time,
             current_command,
             faults: Arc::new(Mutex::new(
                 config
@@ -189,15 +180,13 @@ impl InternalPhysics {
                     .map(|f| {
                         make_physics_fault_model_from_config(
                             f,
+                            from_config_params,
                             config.model.clone(),
-                            robot_name,
-                            va_factory,
-                            initial_time,
                         )
                     })
-                    .collect(),
+                    .collect::<Result<Vec<_>, _>>()?,
             )),
-        }
+        })
     }
 
     /// Compute the state to the given `time`, using `self.command`.

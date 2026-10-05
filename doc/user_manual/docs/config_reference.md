@@ -20,16 +20,16 @@ Your configuration file controls each of these components for every robot and co
 
 **Each robot has configuration for:**
 
-- [Navigation Configuration](config/navigation.md) - GoTo, TrajectoryFollower, Python, Plugin
+- [Navigation Configuration](config/navigation.md) - GoTo, TrajectoryFollower, Plugin
   - How robots choose targets and plan paths
 
-- [Controller Configuration](config/controller.md) - PID, Python, Plugin
+- [Controller Configuration](config/controller.md) - PID, Plugin
   - How robots convert targets into motor commands
 
-- [Physics Configuration](config/physics.md) - Internal, Python, Plugin
+- [Physics Configuration](config/physics.md) - Internal, Plugin
   - How robots move (unicycle, holonomic, bicycle)
 
-- [State Estimator Configuration](config/state_estimator.md) - Perfect, Python, Plugin
+- [State Estimator Configuration](config/state_estimator.md) - Perfect, Plugin
   - How robots estimate their state from sensors
 
 - [Sensor Manager Configuration](config/sensors.md) - RobotSensor, OrientedLandmarkSensor, SpeedSensor, etc.

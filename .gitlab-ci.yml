@@ -124,7 +124,6 @@ release_job:
   image: registry.gitlab.com/gitlab-org/release-cli:latest
   rules:
     - if: $CI_COMMIT_TAG && $CI_COMMIT_BRANCH == "master"   # Run this job when a tag is created
-    - if: 
   script:
     - echo "running release_job"
   release:                               # See https://docs.gitlab.com/ee/ci/yaml/#release for available properties

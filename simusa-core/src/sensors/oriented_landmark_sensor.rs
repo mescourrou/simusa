@@ -5,7 +5,7 @@
 //! It supports configurable filters through
 //! [`OrientedLandmarkSensorFilterConfig`] and fault model pipelines configured by [`OrientedLandmarkSensorFaultModelConfig`].
 
-use super::fault_models::fault_model::FaultModel;
+use super::fault_models::FaultModel;
 use super::{Sensor, SensorObservation, SensorRecord};
 
 use crate::constants::TIME_ROUND;
@@ -22,11 +22,7 @@ use crate::sensors::fault_models::misassociation::{
     MisassociationFault, MisassociationFaultConfig,
 };
 use crate::sensors::fault_models::misdetection::{MisdetectionFault, MisdetectionFaultConfig};
-#[cfg(feature = "python")]
-use crate::sensors::fault_models::python_fault_model::{PythonFaultModel, PythonFaultModelConfig};
 use crate::sensors::sensor_filters::SensorFilter;
-#[cfg(feature = "python")]
-use crate::sensors::sensor_filters::python_filter::{PythonFilter, PythonFilterConfig};
 use crate::sensors::sensor_filters::range_filter::{RangeFilter, RangeFilterConfig};
 use crate::sensors::sensor_filters::string_filter::{StringFilter, StringFilterConfig};
 use crate::simulator::SimulatorConfig;
@@ -105,10 +101,6 @@ pub enum OrientedLandmarkSensorFaultModelConfig {
     /// Plugin-provided external fault model.
     #[plugin("OrientedLandmarkSensorFaultModel", "oriented-landmark-sensor-fault-model")]
     Plugin(serde_json::Value),
-    /// Python-implemented fault model.
-    #[cfg(feature = "python")]
-    #[check]
-    Python(PythonFaultModelConfig),
 }
 
 impl Default for OrientedLandmarkSensorFaultModelConfig {
@@ -136,9 +128,6 @@ pub enum OrientedLandmarkSensorFaultModelType {
     Misassociation(MisassociationFault),
     /// Instantiated plugin fault model.
     Plugin(Box<dyn FaultModel>),
-    /// Instantiated Python fault model.
-    #[cfg(feature = "python")]
-    Python(PythonFaultModel),
 }
 
 impl OrientedLandmarkSensorFaultModelType {
@@ -150,8 +139,6 @@ impl OrientedLandmarkSensorFaultModelType {
         context: &Context,
     ) -> crate::errors::SimusaResult<()> {
         match self {
-            #[cfg(feature = "python")]
-            Self::Python(f) => f.post_init(node, initial_time, context),
             Self::Plugin(f) => f.post_init(node, initial_time, context),
             Self::AdditiveRobotCentered(_)
             | Self::AdditiveObservationCentered(_)
@@ -192,10 +179,6 @@ pub enum OrientedLandmarkSensorFilterConfig {
     /// String pattern filtering on observed object labels: excludes observations matching configured regexp patterns.
     #[check]
     Label(StringFilterConfig),
-    /// Python-based custom filtering: delegates exclusion logic to user-defined Python methods.
-    #[check]
-    #[cfg(feature = "python")]
-    Python(PythonFilterConfig),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
     #[plugin("OrientedLandmarkSensorFilter", "oriented-landmark-sensor-filter")]
     Plugin(serde_json::Value),
@@ -216,9 +199,6 @@ pub enum OrientedLandmarkSensorFilterType {
     Id(StringFilter),
     /// Instantiated string filter for observed object labels.
     Label(StringFilter),
-    /// Instantiated Python filter for Oriented Landmark sensor observations.
-    #[cfg(feature = "python")]
-    Python(PythonFilter),
     /// Instantiated plugin filter for Oriented Landmark sensor observations.
     Plugin(Box<dyn SensorFilter>),
 }
@@ -232,8 +212,6 @@ impl OrientedLandmarkSensorFilterType {
         context: &Context,
     ) -> crate::errors::SimusaResult<()> {
         match self {
-            #[cfg(feature = "python")]
-            Self::Python(f) => f.post_init(node, initial_time, context),
             Self::Plugin(f) => f.post_init(node, initial_time, context),
             Self::Range(_) | Self::Id(_) | Self::Label(_) => Ok(()),
         }
@@ -582,15 +560,6 @@ impl OrientedLandmarkSensor {
                         )
                     })?.get_sensor_fault(c, global_config, va_factory, initial_time, context))
                 }
-                #[cfg(feature = "python")]
-                OrientedLandmarkSensorFaultModelConfig::Python(c) => {
-                    OrientedLandmarkSensorFaultModelType::Python(PythonFaultModel::from_config(
-                        c,
-                        global_config,
-                        initial_time,
-                        context,
-                    )?)
-                }
             });
         }
 
@@ -621,15 +590,6 @@ impl OrientedLandmarkSensor {
                             "Plugin API not set!".to_string(),
                         )
                     })?.get_sensor_filter(c, global_config, va_factory, initial_time, context))
-                }
-                #[cfg(feature = "python")]
-                OrientedLandmarkSensorFilterConfig::Python(c) => {
-                    OrientedLandmarkSensorFilterType::Python(PythonFilter::from_config(
-                        c,
-                        global_config,
-                        initial_time,
-                        context,
-                    )?)
                 }
             });
         }
@@ -722,10 +682,6 @@ impl Sensor for OrientedLandmarkSensor {
                         OrientedLandmarkSensorFilterType::Plugin(f) => {
                             f.filter(time, obs, state, None, context)
                         }
-                        #[cfg(feature = "python")]
-                        OrientedLandmarkSensorFilterType::Python(f) => {
-                            f.filter(time, obs, state, None, context)
-                        }
                         OrientedLandmarkSensorFilterType::Range(f) => {
                             if let SensorObservation::OrientedLandmark(obs) = obs {
                                 if f.match_exclusion(
@@ -795,17 +751,6 @@ impl Sensor for OrientedLandmarkSensor {
                 new_obs.push(observation); // Not adding directly to observation_list to apply faults only once
                 for fault_model in self.faults.iter_mut() {
                     match fault_model {
-                        #[cfg(feature = "python")]
-                        OrientedLandmarkSensorFaultModelType::Python(f) => f.add_faults(
-                            time,
-                            time + landmark_seed,
-                            &mut new_obs,
-                            SensorObservation::OrientedLandmark(
-                                OrientedLandmarkObservation::default(),
-                            ),
-                            node.environment(),
-                            context,
-                        ),
                         OrientedLandmarkSensorFaultModelType::Plugin(f) => f.add_faults(
                             time,
                             time + landmark_seed,

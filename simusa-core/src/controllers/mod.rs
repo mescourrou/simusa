@@ -7,8 +7,6 @@
 //! [`ControllerConfig`] and [`ControllerRecord`].
 
 pub mod pid;
-#[cfg(feature = "python")]
-pub mod python_controller;
 
 use crate::{
     context::Context, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, node::node_factory::FromConfigArguments, physics::{PhysicsConfig, robot_models::Command}, recordable::Recordable, utils::SharedRwLock,
@@ -58,10 +56,6 @@ pub enum ControllerConfig {
     PID(pid::PIDConfig),
     /// Configuration for a plugin [`Controller`].
     Plugin(serde_json::Value),
-    #[check]
-    /// Configuration for [`PythonController`](python_controller::PythonControllerConfig).
-    #[cfg(feature = "python")]
-    Python(python_controller::PythonControllerConfig),
 }
 
 #[cfg(feature = "gui")]
@@ -91,12 +85,6 @@ impl UIComponent for ControllerConfig {
                 "Plugin" => {
                     *self = ControllerConfig::Plugin(serde_json::Value::Null)
                 }
-                #[cfg(feature = "python")]
-                "Python" => {
-                    *self = ControllerConfig::Python(
-                        python_controller::PythonControllerConfig::default(),
-                    )
-                }
                 _ => panic!("Where did you find this value?"),
             };
         }
@@ -110,15 +98,6 @@ impl UIComponent for ControllerConfig {
                 unique_id,
             ),
             ControllerConfig::Plugin(c) => edit_plugin_config(ui, "Plugin Controller", "plugin-controller", unique_id, buffer_stack, c),
-            #[cfg(feature = "python")]
-            ControllerConfig::Python(c) => c.show_mut(
-                ui,
-                ctx,
-                buffer_stack,
-                global_config,
-                current_node_name,
-                unique_id,
-            ),
         }
     }
 
@@ -129,8 +108,6 @@ impl UIComponent for ControllerConfig {
         match self {
             ControllerConfig::PID(c) => c.show(ui, ctx, unique_id),
             ControllerConfig::Plugin(c) => show_plugin_config(ui, "Plugin Controller", c),
-            #[cfg(feature = "python")]
-            ControllerConfig::Python(c) => c.show(ui, ctx, unique_id),
         }
     }
 }
@@ -142,9 +119,6 @@ pub enum ControllerRecord {
     PID(pid::PIDRecord),
     /// Runtime record for a plugin [`Controller`].
     Plugin(serde_json::Value),
-    /// Runtime record for [`python_controller::PythonController`].
-    #[cfg(feature = "python")]
-    Python(python_controller::PythonControllerRecord),
 }
 
 #[cfg(feature = "gui")]
@@ -157,12 +131,6 @@ impl UIComponent for ControllerRecord {
                 });
             }
             Self::Plugin(r) => show_plugin_config(ui, "Plugin Controller", r),
-            #[cfg(feature = "python")]
-            Self::Python(r) => {
-                egui::CollapsingHeader::new("ExternalPythonController").show(ui, |ui| {
-                    r.show(ui, ctx, unique_id);
-                });
-            }
         });
     }
 }
@@ -243,15 +211,5 @@ pub fn make_controller_from_config(
             from_config_params.initial_time,
             from_config_params.context,
         ),
-        #[cfg(feature = "python")]
-        ControllerConfig::Python(c) => Box::new(
-            python_controller::PythonController::from_config(
-                c,
-                from_config_params.global_config,
-                from_config_params.initial_time,
-                from_config_params.context,
-            )
-            .unwrap(),
-        ) as Box<dyn Controller>,
     })))
 }

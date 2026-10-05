@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use super::fault_models::fault_model::FaultModel;
+use super::fault_models::FaultModel;
 use super::{Sensor, SensorObservation, SensorRecord};
 
 use crate::constants::TIME_ROUND;
@@ -20,11 +20,7 @@ use crate::internal;
 use crate::plugin_api::PluginAPI;
 use crate::recordable::Recordable;
 use crate::sensors::fault_models::additive::{AdditiveFault, AdditiveFaultConfig};
-#[cfg(feature = "python")]
-use crate::sensors::fault_models::python_fault_model::{PythonFaultModel, PythonFaultModelConfig};
 use crate::sensors::sensor_filters::SensorFilter;
-#[cfg(feature = "python")]
-use crate::sensors::sensor_filters::python_filter::{PythonFilter, PythonFilterConfig};
 use crate::sensors::sensor_filters::range_filter::{RangeFilter, RangeFilterConfig};
 use crate::simulator::SimulatorConfig;
 use crate::state_estimators::{State, StateRecord};
@@ -62,9 +58,6 @@ enum_variables!(
 pub enum SpeedSensorFaultModelConfig {
     /// Additive perturbation fault model.
     Additive(AdditiveFaultConfig<SpeedSensorVariablesFaults, SpeedSensorVariables>),
-    /// Python-implemented custom fault model.
-    #[cfg(feature = "python")]
-    Python(PythonFaultModelConfig),
     /// Plugin-provided external fault model.
     #[plugin("SpeedSensorFaultModel", "speed-sensor-fault-model")]
     Plugin(serde_json::Value),
@@ -83,9 +76,6 @@ impl Default for SpeedSensorFaultModelConfig {
 pub enum SpeedSensorFaultModelType {
     /// Instantiated additive fault model.
     Additive(AdditiveFault<SpeedSensorVariablesFaults, SpeedSensorVariables>),
-    /// Instantiated Python fault model.
-    #[cfg(feature = "python")]
-    Python(PythonFaultModel),
     /// Instantiated plugin fault model.
     Plugin(Box<dyn FaultModel>),
 }
@@ -105,8 +95,6 @@ impl SpeedSensorFaultModelType {
     ) -> SimusaResult<()> {
         match self {
             Self::Additive(_) => Ok(()),
-            #[cfg(feature = "python")]
-            Self::Python(f) => f.post_init(node, initial_time, context),
             Self::Plugin(f) => f.post_init(node, initial_time, context),
         }
     }
@@ -136,10 +124,6 @@ pub enum SpeedSensorFilterConfig {
     /// Range-based filtering on enumerated variables: excludes observations where numeric values fall outside specified bounds.
     #[check]
     Range(RangeFilterConfig<SpeedSensorVariablesFilter>),
-    /// String pattern filtering on observed object unique id (name for nodes, id for landmarks): excludes observations matching configured regexp patterns.
-    #[check]
-    #[cfg(feature = "python")]
-    Python(PythonFilterConfig),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
     #[plugin("SpeedSensorFilter", "speed-sensor-filter")]
     Plugin(serde_json::Value),
@@ -156,9 +140,6 @@ impl Default for SpeedSensorFilterConfig {
 pub enum SpeedSensorFilterType {
     /// Instantiated range filter for Speed sensor variables.
     Range(RangeFilter<SpeedSensorVariablesFilter>),
-    /// Instantiated Python filter for Speed sensor observations.
-    #[cfg(feature = "python")]
-    Python(PythonFilter),
     /// Instantiated plugin filter for Speed sensor observations.
     Plugin(Box<dyn SensorFilter>),
 }
@@ -172,8 +153,6 @@ impl SpeedSensorFilterType {
         context: &Context,
     ) -> crate::errors::SimusaResult<()> {
         match self {
-            #[cfg(feature = "python")]
-            Self::Python(f) => f.post_init(node, initial_time, context),
             Self::Plugin(f) => f.post_init(node, initial_time, context),
             Self::Range(_) => Ok(()),
         }
@@ -407,10 +386,6 @@ impl SpeedSensor {
                 SpeedSensorFaultModelConfig::Additive(c) => SpeedSensorFaultModelType::Additive(
                     AdditiveFault::from_config(c, va_factory, initial_time, context),
                 ),
-                #[cfg(feature = "python")]
-                SpeedSensorFaultModelConfig::Python(c) => SpeedSensorFaultModelType::Python(
-                    PythonFaultModel::from_config(c, global_config, initial_time, context)?,
-                ),
                 SpeedSensorFaultModelConfig::Plugin(c) => {
                     SpeedSensorFaultModelType::Plugin(plugin_api.as_ref().ok_or_else(|| {
                         SimusaError::new(
@@ -428,10 +403,6 @@ impl SpeedSensor {
                 SpeedSensorFilterConfig::Range(c) => {
                     SpeedSensorFilterType::Range(RangeFilter::from_config(c, initial_time, context))
                 }
-                #[cfg(feature = "python")]
-                SpeedSensorFilterConfig::Python(c) => SpeedSensorFilterType::Python(
-                    PythonFilter::from_config(c, global_config, initial_time, context)?,
-                ),
                 SpeedSensorFilterConfig::Plugin(c) => {
                     SpeedSensorFilterType::Plugin(plugin_api.as_ref().ok_or_else(|| {
                         SimusaError::new(
@@ -514,8 +485,6 @@ impl Sensor for SpeedSensor {
         for filter in self.filters.iter() {
             if let Some(obs) = keep_observation {
                 keep_observation = match filter {
-                    #[cfg(feature = "python")]
-                    SpeedSensorFilterType::Python(f) => f.filter(time, obs, state, None, context),
                     SpeedSensorFilterType::Plugin(f) => f.filter(time, obs, state, None, context),
                     SpeedSensorFilterType::Range(f) => {
                         if let SensorObservation::Speed(obs) = obs {
@@ -547,15 +516,6 @@ impl Sensor for SpeedSensor {
             observation_list.push(obs);
             for fault_model in self.faults.iter_mut() {
                 match fault_model {
-                    #[cfg(feature = "python")]
-                    SpeedSensorFaultModelType::Python(f) => f.add_faults(
-                        time,
-                        time,
-                        &mut observation_list,
-                        SensorObservation::Speed(SpeedObservation::default()),
-                        node.environment(),
-                        context,
-                    ),
                     SpeedSensorFaultModelType::Plugin(f) => f.add_faults(
                         time,
                         time,
