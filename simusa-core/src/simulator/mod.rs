@@ -7,8 +7,6 @@ the simulator can be used as follows:
 use std::path::Path;
 use simusa::simulator::Simulator;
 
-// Initialize the environment
-Simulator::init_environment();
 println!("Load configuration...");
 let mut simulator = Simulator::from_config_path(
     Path::new("config_example/config.yaml"),
@@ -42,7 +40,6 @@ use async_simulator::SimulatorAsyncApiServer;
 pub use async_simulator::{AsyncSimulator, SimulatorAsyncApi};
 
 use config_checker::ConfigCheckable;
-use pyo3::{ffi::c_str, prelude::*};
 use serde_derive::{Deserialize, Serialize};
 
 use simusa_com::pub_sub::{PathBroker, PathMultiClient};
@@ -219,7 +216,6 @@ pub type SimusaBrokerMultiClient = PathMultiClient<Envelope, String>;
 ///   [`Simulator::run`].
 ///
 /// Optionnal steps are the following:
-/// * Initialize the environment with [`Simulator::init_environment`]. It initialize the logging environment.
 /// * Use [`Simulator::show`] to print in the console the configuration loaded.
 /// * Compute the results with [`Simulator::compute_results`].
 /// * Get the records with [`Simulator::get_records`], providing the full list of all [`Record`]s.
@@ -230,8 +226,6 @@ pub type SimusaBrokerMultiClient = PathMultiClient<Envelope, String>;
 /// use simusa::simulator::Simulator;
 /// use std::path::Path;
 ///
-/// // Initialize the environment, essentially the logging part
-/// Simulator::init_environment();
 /// info!("Load configuration...");
 /// let mut simulator = Simulator::from_config_path(
 ///     Path::new("config_example/config.yaml"), //<- configuration path
@@ -561,14 +555,6 @@ impl Simulator {
     /// Return a clone of the currently loaded configuration.
     pub fn config(&self) -> SimulatorConfig {
         self.config.clone()
-    }
-
-    /// Initialize the simulator environment.
-    /// - initialize Python interpreter, to be able to run Python scripts in the simulator (for results analysis, or for Python nodes).
-    pub fn init_environment() {
-        // env_logger::init();
-
-        Python::initialize();
     }
 
     fn init_log(&mut self, log_config: &LoggerConfig) -> SimusaResult<()> {

@@ -31,8 +31,6 @@ pub fn run_gui(
     plugin_api: Option<Arc<dyn PluginAPI>>,
     load_results: bool,
 ) {
-    // Initialize the environment, essentially the logging part
-    Simulator::init_environment();
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

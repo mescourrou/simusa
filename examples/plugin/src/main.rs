@@ -378,9 +378,6 @@ impl PluginAPI for MyWonderfulPlugin {
 }
 
 fn main() {
-    // Initialize the environment
-    Simulator::init_environment();
-
     let my_plugin = MyWonderfulPlugin {};
 
     println!("Load configuration...");

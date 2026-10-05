@@ -22,8 +22,6 @@ fn doit(args: Cli) -> SimusaResult<()> {
             println!("If no gui is used, provide a config path!");
             return Ok(());
         }
-        // Initialize the environment
-        Simulator::init_environment();
         println!("Load configuration...");
         let mut simulator = Simulator::from_config_path(
             Path::new(&args.config_path.unwrap()),

@@ -48,7 +48,7 @@ use simusa::{
     warning,
 };
 
-use crate::{controllers::ControllerWrapper, general::PythonAPI, navigators::NavigatorWrapper, networking::MessageTypesWrapper, physics::PhysicsWrapper, state_estimators::StateEstimatorWrapper};
+use crate::{controllers::ControllerWrapper, general::PythonAPI, messages::MessageFlagWrapper, navigators::NavigatorWrapper, networking::MessageTypesWrapper, physics::PhysicsWrapper, state_estimators::StateEstimatorWrapper};
 
 #[derive(Clone, Debug)]
 #[pyclass(get_all, set_all)]
@@ -1116,7 +1116,7 @@ impl NodeWrapper {
         to: String,
         message: MessageTypesWrapper,
         time: f32,
-        flags: Vec<MessageFlag>,
+        flags: Vec<MessageFlagWrapper>,
     ) -> PyResult<()> {
         if let Some(network) = self.network.as_ref().and_then(|n| n.upgrade()) {
             let msg = message.to_rust(&self.context);
@@ -1125,7 +1125,7 @@ impl NodeWrapper {
                 from: self.name.clone(),
                 message: msg,
                 timestamp: time,
-                message_flags: flags,
+                message_flags: flags.iter().map(|m| m.to_rust()).collect(),
             };
             network
                 .write()
@@ -1241,7 +1241,7 @@ impl MultiClientWrapper {
         to: String,
         message: MessageTypesWrapper,
         time: f32,
-        flags: Vec<MessageFlag>,
+        flags: Vec<MessageFlagWrapper>,
     ) -> PyResult<()> {
         let msg = message.to_rust(&self.context);
         let key = PathKey::from_str(to.as_str()).unwrap();
@@ -1249,7 +1249,7 @@ impl MultiClientWrapper {
             from: self.client.node_id().to_string(),
             message: msg,
             timestamp: time,
-            message_flags: flags,
+            message_flags: flags.iter().map(|m| m.to_rust()).collect(),
         };
         self.client.send(&key, msg, time);
         Ok(())
@@ -1448,8 +1448,6 @@ impl SimulatorWrapper {
         config_path: String,
         plugin_api: Option<Py<PyAny>>,
     ) -> PyResult<SimulatorWrapper> {
-        Simulator::init_environment();
-
         let python_api = plugin_api.map(|api| Arc::new(PythonAPI::new(api)) as Arc<dyn PluginAPI>);
 
         let simulator =

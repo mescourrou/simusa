@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use ::simusa::{navigators::go_to::GoToMessage, networking::network::MessageFlag, plugin_api::PluginAPI, sensors::sensor_manager::SensorTriggerMessage};
 
-use crate::{controllers::ControllerWrapper, navigators::NavigatorWrapper, networking::MessageTypesWrapper, physics::PhysicsWrapper, result_analyser::ResultAnalyser, state_estimators::StateEstimatorWrapper, wrappers::{CommandWrapper, ControllerErrorWrapper, DisplacementObservationWrapper, GNSSObservationWrapper, MultiClientWrapper, NodeWrapper, ObservationWrapper, OrientedLandmarkObservationWrapper, OrientedRobotObservationWrapper, PluginAPIWrapper, Pose, SensorObservationWrapper, SimulatorWrapper, SpeedObservationWrapper, StateWrapper, UnicycleCommandWrapper, Vec2, Vec3, WorldStateWrapper}};
+use crate::{controllers::ControllerWrapper, messages::{GoToMessageWrapper, MessageFlagWrapper, SensorTriggerMessageWrapper}, navigators::NavigatorWrapper, networking::MessageTypesWrapper, physics::PhysicsWrapper, result_analyser::ResultAnalyser, state_estimators::StateEstimatorWrapper, wrappers::{CommandWrapper, ControllerErrorWrapper, DisplacementObservationWrapper, GNSSObservationWrapper, MultiClientWrapper, NodeWrapper, ObservationWrapper, OrientedLandmarkObservationWrapper, OrientedRobotObservationWrapper, PluginAPIWrapper, Pose, SensorObservationWrapper, SimulatorWrapper, SpeedObservationWrapper, StateWrapper, UnicycleCommandWrapper, Vec2, Vec3, WorldStateWrapper}};
 
 
 pub mod controllers;
@@ -12,6 +12,7 @@ pub mod physics;
 pub mod state_estimators;
 pub mod utils;
 pub mod wrappers;
+pub mod messages;
 mod result_analyser;
 
 /// Run the GUI of the simulator. This function will block until the GUI is closed but
@@ -141,10 +142,10 @@ pub fn simusa(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<NavigatorWrapper>()?;
     m.add_class::<NodeWrapper>()?;
     m.add_class::<MultiClientWrapper>()?;
-    m.add_class::<MessageFlag>()?;
+    m.add_class::<MessageFlagWrapper>()?;
     m.add_class::<MessageTypesWrapper>()?;
-    m.add_class::<GoToMessage>()?;
-    m.add_class::<SensorTriggerMessage>()?;
+    m.add_class::<GoToMessageWrapper>()?;
+    m.add_class::<SensorTriggerMessageWrapper>()?;
     m.add_function(wrap_pyfunction!(run_gui, m)?)?;
 
     let internal_module = PyModule::new(m.py(), "_internal")?;

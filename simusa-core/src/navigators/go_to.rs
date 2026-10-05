@@ -29,30 +29,18 @@ extern crate nalgebra as na;
 
 use config_checker::*;
 use nalgebra::SVector;
-use pyo3::{pyclass, pymethods};
 use serde_derive::{Deserialize, Serialize};
 use simusa_com::pub_sub::{MultiClientTrait, PathKey};
 use simusa_macros::config_derives;
 
 #[config_derives]
 #[derive(Default)]
-#[pyclass(get_all, set_all)]
 /// Runtime message used to update the target point of a [`GoTo`] navigator.
 pub struct GoToMessage {
     /// Target point in world coordinates `[x, y]`.
     ///
     /// `None` clears the current target.
     pub target_point: Option<[f32; 2]>,
-}
-
-#[pymethods]
-impl GoToMessage {
-    /// Creates a new [`GoToMessage`] from an optional target point.
-    #[new]
-    #[pyo3(signature = (list=None))]
-    pub fn new(list: Option<[f32; 2]>) -> Self {
-        Self { target_point: list }
-    }
 }
 
 /// Configuration of the [`GoTo`] strategy.

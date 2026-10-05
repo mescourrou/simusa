@@ -200,6 +200,11 @@ class GoToMessage:
     def __init__(self, target:Tuple[float, float]|None=None):
         self.target_point: Tuple[float, float]|None
 
+class SensorFrameMessage:
+    def __init__(self, frame:Tuple[float, float, float], sensor_name:str):
+        self.frame: Tuple[float, float, float]
+        self.sensor_name: str
+
 class SensorTriggerMessage:
     def __init__(self):
         pass
@@ -216,9 +221,34 @@ class MessageTypes(Enum):
     String: str
     GoTo: GoToMessage
     SensorTrigger: SensorTriggerMessage
+    Observations: List[Observation]
+    SensorFrame: SensorFrameMessage
+    Event: str
+    Custom: List[bytes]
 
     def __init__(self):
         self.kind: str
+
+    def from_goto(cmd: GoToMessage) -> MessageTypes:
+        raise NotImplementedError()
+
+    def from_sensor_trigger(cmd: SensorTriggerMessage) -> MessageTypes:
+        raise NotImplementedError()
+
+    def from_sensor_frame(cmd: SensorFrameMessage) -> MessageTypes:
+        raise NotImplementedError()
+
+    def from_string(cmd: str) -> MessageTypes:
+        raise NotImplementedError()
+
+    def from_observations(cmd: List[Observation]) -> MessageTypes:
+        raise NotImplementedError()
+
+    def from_event(cmd: str) -> MessageTypes:
+        raise NotImplementedError()
+
+    def from_custom(cmd: List[bytes]) -> MessageTypes:
+        raise NotImplementedError()
 
     def as_goto(self) -> GoToMessage | None:
         raise NotImplementedError()
@@ -226,11 +256,21 @@ class MessageTypes(Enum):
     def as_sensor_trigger(self) -> SensorTriggerMessage | None: 
         raise NotImplementedError()
 
-    def from_goto(cmd: GoToMessage) -> MessageTypes:
+    def as_sensor_frame(self) -> SensorFrameMessage | None: 
+            raise NotImplementedError()
+
+    def as_string(self) -> str | None:
         raise NotImplementedError()
 
-    def from_sensor_trigger(cmd: SensorTriggerMessage) -> MessageTypes:
+    def as_observations(self) -> List[Observation] | None:
         raise NotImplementedError()
+
+    def as_event(self) -> str | None:
+        raise NotImplementedError()
+
+    def as_custom(self) -> List[bytes] | None:
+        raise NotImplementedError()
+
 
 class Envelope:
     def __init__(self):

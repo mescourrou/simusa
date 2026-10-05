@@ -115,9 +115,6 @@ mod my_rust_plugin {
 
 #[pyfunction]
 fn start(python_api: Py<PyAny>) {
-    // Initialize the environment
-    Simulator::init_environment();
-
     let my_plugin = MyWonderfulPlugin {
         python_api: PythonAPI::new(python_api),
     };

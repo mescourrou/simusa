@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{ToTokens, format_ident, quote};
-use syn::{Data, DeriveInput, Lit, LitStr, Token, parse::Parse, parse_macro_input, punctuated::Punctuated, spanned::Spanned};
+use syn::{Data, DeriveInput, LitStr, Token, parse::Parse, parse_macro_input, punctuated::Punctuated, spanned::Spanned};
 
 #[proc_macro_derive(ToVec)]
 pub fn derive_tovec(item: TokenStream) -> TokenStream {

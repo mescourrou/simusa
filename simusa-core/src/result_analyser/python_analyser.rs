@@ -4,13 +4,11 @@ use std::{ffi::{CStr, CString}, fs, io::{BufReader, BufWriter, Read, Write}, net
 
 #[cfg(feature = "gui")]
 use egui::CollapsingHeader;
-use egui::Key::L;
-use pyo3::{ffi::c_str, prelude::*};
 use serde::{Deserialize, Serialize};
 use simusa_macros::config_derives;
 
 use crate::{
-    context::Context, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, info, internal, logger::InternalLog, networking::NetworkError, plugin_api::PluginAPI, result_analyser::ResultAnalyserTrait, simulator::Results, warning,
+    VERSION, context::Context, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, info, internal, logger::InternalLog, networking::NetworkError, plugin_api::PluginAPI, result_analyser::ResultAnalyserTrait, simulator::Results, warning,
 };
 
 
@@ -233,7 +231,7 @@ except ImportError as e:
         raise e
 
 simusa._internal.ResultAnalyser().run_server('localhost', {2}, '{3}')
-            ", env!("CARGO_PKG_VERSION"), python_distrib, self.config.port, context.get_loglevel().to_string()))
+            ", VERSION, python_distrib, self.config.port, context.get_loglevel().to_string()))
             .envs(std::env::vars())
             .spawn()
             .map_err(|e| {

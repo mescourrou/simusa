@@ -13,7 +13,6 @@
 
 extern crate confy;
 use core::f32;
-use pyo3::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 use simusa_com::pub_sub::{MultiClientTrait, PathKey};
 use simusa_macros::config_derives;
@@ -323,39 +322,17 @@ impl ManagedSensor {
 /// The message is empty for now, but it could be extended in the future to include additional information about the trigger (e.g. time to trigger, dynamic sensor parameters, etc.).
 #[derive(Default)]
 #[config_derives]
-#[pyclass(get_all, set_all)]
 pub struct SensorTriggerMessage {}
 
-#[pymethods]
-impl SensorTriggerMessage {
-    /// Creates an empty trigger message.
-    #[new]
-    pub fn new() -> Self {
-        Self {}
-    }
-}
 
 /// Message used to set the frame of a sensor through the internal network.
 #[derive(Default)]
 #[config_derives]
-#[pyclass(get_all, set_all)]
 pub struct SensorFrameMessage {
     /// New frame
     pub frame: [f32; 3],
     /// Name of the sensor (should already be created in the node)
     pub sensor_name: String,
-}
-
-#[pymethods]
-impl SensorFrameMessage {
-    /// Creates an empty frame message.
-    #[new]
-    pub fn new() -> Self {
-        Self {
-            frame: [0.0, 0.0, 0.0],
-            sensor_name: String::new(),
-        }
-    }
 }
 
 /// Sensor manager which manages all the node's [`Sensor`]s.

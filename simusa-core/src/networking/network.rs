@@ -18,7 +18,6 @@ use std::fmt;
 use std::str::FromStr;
 
 use config_checker::*;
-use pyo3::pyclass;
 use serde_derive::{Deserialize, Serialize};
 use simusa_com::pub_sub::{BrokerTrait, BrokerTraitExtended, PathKey};
 use simusa_macros::config_derives;
@@ -120,7 +119,6 @@ impl UIComponent for NetworkConfig {
 
 /// Transmission mode for messages.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-#[pyclass(get_all, set_all, eq, eq_int)]
 pub enum MessageFlag {
     /// Bypass regular timing and treat the message as instantaneous.
     God,

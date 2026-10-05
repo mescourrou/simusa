@@ -14,7 +14,7 @@ use simusa::{
     },
 };
 
-use crate::wrappers::ObservationWrapper;
+use crate::{messages::{GoToMessageWrapper, SensorFrameMessageWrapper, SensorTriggerMessageWrapper}, wrappers::ObservationWrapper};
 
 #[derive(Clone, Debug, EnumToString)]
 #[pyclass]
@@ -24,13 +24,13 @@ pub enum MessageTypesWrapper {
     /// Arbitrary UTF-8 textual payload.
     String(String),
     /// Navigation payload used by [`GoToMessage`].
-    GoTo(GoToMessage),
+    GoTo(GoToMessageWrapper),
     /// Sensor event payload used by [`SensorTriggerMessage`].
-    SensorTrigger(SensorTriggerMessage),
+    SensorTrigger(SensorTriggerMessageWrapper),
     /// A list of observations, each wrapped in an [`ObservationWrapper`].
     Observations(Vec<ObservationWrapper>),
     /// Setting the frame of a sensor, used by [`SensorManager`](crate::sensors::sensor_manager::SensorManager).
-    SensorFrame(SensorFrameMessage),
+    SensorFrame(SensorFrameMessageWrapper),
     /// An event record serialized as a JSON string.
     Event(String),
     /// Custom binary payload.
@@ -40,19 +40,19 @@ pub enum MessageTypesWrapper {
 impl MessageTypesWrapper {
     /// Creates a [`MessageTypes::GoTo`] from a [`GoToMessage`].
     #[staticmethod]
-    pub fn from_goto(message: GoToMessage) -> Self {
+    pub fn from_goto(message: GoToMessageWrapper) -> Self {
         MessageTypesWrapper::GoTo(message)
     }
 
     /// Creates a [`MessageTypes::SensorTrigger`] from a [`SensorTriggerMessage`].
     #[staticmethod]
-    pub fn from_sensor_trigger(message: SensorTriggerMessage) -> Self {
+    pub fn from_sensor_trigger(message: SensorTriggerMessageWrapper) -> Self {
         MessageTypesWrapper::SensorTrigger(message)
     }
 
     /// Creates a [`MessageTypes::SensorFrame`] from a [`SensorFrameMessage`].
     #[staticmethod]
-    pub fn from_sensor_frame(message: SensorFrameMessage) -> Self {
+    pub fn from_sensor_frame(message: SensorFrameMessageWrapper) -> Self {
         MessageTypesWrapper::SensorFrame(message)
     }
 
@@ -68,6 +68,12 @@ impl MessageTypesWrapper {
         MessageTypesWrapper::Observations(observations)
     }
 
+    /// Creates a [`MessageTypes::Event`] from a string.
+    #[staticmethod]
+    pub fn from_event(message: String) -> Self {
+        MessageTypesWrapper::Event(message)
+    }
+
     /// Creates a [`MessageTypes::Custom`] from binary data.
     #[staticmethod]
     pub fn from_custom(data: Vec<u8>) -> Self {
@@ -75,7 +81,7 @@ impl MessageTypesWrapper {
     }
 
     /// Returns the contained [`GoToMessage`] when this value is [`MessageTypes::GoTo`].
-    pub fn as_goto(&self) -> Option<GoToMessage> {
+    pub fn as_goto(&self) -> Option<GoToMessageWrapper> {
         match self {
             MessageTypesWrapper::GoTo(msg) => Some(msg.clone()),
             _ => None,
@@ -83,7 +89,7 @@ impl MessageTypesWrapper {
     }
 
     /// Returns the contained [`SensorFrameMessage`] when this value is [`MessageTypes::SensorFrame`].
-    pub fn as_sensor_frame(&self) -> Option<SensorFrameMessage> {
+    pub fn as_sensor_frame(&self) -> Option<SensorFrameMessageWrapper> {
         match self {
             MessageTypesWrapper::SensorFrame(msg) => Some(msg.clone()),
             _ => None,
@@ -92,7 +98,7 @@ impl MessageTypesWrapper {
 
     /// Returns the contained [`SensorTriggerMessage`] when this value is
     /// [`MessageTypes::SensorTrigger`].
-    pub fn as_sensor_trigger(&self) -> Option<SensorTriggerMessage> {
+    pub fn as_sensor_trigger(&self) -> Option<SensorTriggerMessageWrapper> {
         match self {
             MessageTypesWrapper::SensorTrigger(msg) => Some(msg.clone()),
             _ => None,
@@ -143,8 +149,8 @@ impl MessageTypesWrapper {
     pub fn to_rust(&self, context: &Context) -> MessageType {
         match self {
             MessageTypesWrapper::String(s) => MessageType::String(s.clone()),
-            MessageTypesWrapper::GoTo(msg) => MessageType::GoTo(msg.clone()),
-            MessageTypesWrapper::SensorTrigger(msg) => MessageType::SensorTrigger(msg.clone()),
+            MessageTypesWrapper::GoTo(msg) => MessageType::GoTo(msg.to_rust()),
+            MessageTypesWrapper::SensorTrigger(msg) => MessageType::SensorTrigger(msg.to_rust()),
             MessageTypesWrapper::Observations(observations) => MessageType::Observations(
                 observations
                     .iter()
@@ -152,7 +158,7 @@ impl MessageTypesWrapper {
                     .map(|o| o.record(context))
                     .collect(),
             ),
-            MessageTypesWrapper::SensorFrame(msg) => MessageType::SensorFrame(msg.clone()),
+            MessageTypesWrapper::SensorFrame(msg) => MessageType::SensorFrame(msg.to_rust()),
             MessageTypesWrapper::Event(event) => MessageType::Event(
                 serde_json::from_str(event).expect("Failed to parse EventRecord from JSON string"),
             ),
@@ -164,9 +170,9 @@ impl MessageTypesWrapper {
     pub fn from_rust(msg: &MessageType) -> Self {
         match msg {
             MessageType::String(s) => MessageTypesWrapper::String(s.clone()),
-            MessageType::GoTo(msg) => MessageTypesWrapper::GoTo(msg.clone()),
-            MessageType::SensorTrigger(msg) => MessageTypesWrapper::SensorTrigger(msg.clone()),
-            MessageType::SensorFrame(msg) => MessageTypesWrapper::SensorFrame(msg.clone()),
+            MessageType::GoTo(msg) => MessageTypesWrapper::GoTo(GoToMessageWrapper::from_rust(&msg)),
+            MessageType::SensorTrigger(msg) => MessageTypesWrapper::SensorTrigger(SensorTriggerMessageWrapper::from_rust(&msg)),
+            MessageType::SensorFrame(msg) => MessageTypesWrapper::SensorFrame(SensorFrameMessageWrapper::from_rust(&msg)),
             MessageType::Observations(observations) => MessageTypesWrapper::Observations(
                 observations
                     .iter()

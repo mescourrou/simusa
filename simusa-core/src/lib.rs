@@ -21,7 +21,6 @@
 //! use std::path::Path;
 //! use simusa::simulator::Simulator;
 //!
-//! Simulator::init_environment();
 //! let mut simulator = Simulator::from_config_path(
 //!     Path::new("config_example/config.yaml"),
 //!     None,
@@ -30,8 +29,6 @@
 //! simulator.run().unwrap();
 //! simulator.compute_results().unwrap();
 //! ```
-
-use pyo3::prelude::*;
 
 pub use simusa_com;
 

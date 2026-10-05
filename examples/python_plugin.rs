@@ -2,8 +2,6 @@ use simusa::simulator::Simulator;
 use std::path::Path;
 
 fn main() {
-    // Initialize the environment
-    Simulator::init_environment();
     println!("Load configuration...");
     let mut simulator = Simulator::from_config_path(
         Path::new("examples/python_plugin/config/config.yaml"),

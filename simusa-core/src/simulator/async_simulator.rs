@@ -8,8 +8,6 @@ use std::{
     sync::{Arc, Mutex, RwLock, mpsc},
 };
 
-use pyo3::Python;
-
 use crate::{
     api::async_api::{
         AsyncApi, AsyncApiLoadConfigRequest, AsyncApiRunRequest, AsyncApiRunner, PluginAsyncAPI,
@@ -46,8 +44,6 @@ impl AsyncSimulator {
         config: SimulatorConfig,
         plugin_api: &Option<Arc<dyn PluginAPI>>,
     ) -> SimusaResult<AsyncSimulator> {
-        Simulator::init_environment();
-
         let server = Arc::new(Mutex::new(AsyncApiRunner::new()));
         let context = server
             .lock()
@@ -146,15 +142,15 @@ impl AsyncSimulator {
         if let Some(plugin_api) = plugin_api {
             while self.api.run.try_get_result().is_none() {
                 plugin_api.check_requests(&self.context);
-                if Python::attach(|py| py.check_signals()).is_err() {
-                    break;
-                }
+                // if Python::attach(|py| py.check_signals()).is_err() {
+                //     break;
+                // }
             }
         } else {
             while self.api.run.try_get_result().is_none() {
-                if Python::attach(|py| py.check_signals()).is_err() {
-                    break;
-                }
+                // if Python::attach(|py| py.check_signals()).is_err() {
+                //     break;
+                // }
             }
         }
     }
