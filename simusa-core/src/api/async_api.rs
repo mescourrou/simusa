@@ -265,7 +265,7 @@ impl AsyncApiRunner {
             thread::spawn(move || {
                 while !*stopping.read().unwrap() {
                     compute_results.recv_closure_mut(|_| {
-                        let simulator = simulator_arc.lock().unwrap();
+                        let mut simulator = simulator_arc.lock().unwrap();
                         need_reset = true;
                         simulator.compute_results()
                     });

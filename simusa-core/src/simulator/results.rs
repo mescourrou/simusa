@@ -176,7 +176,7 @@ impl UIComponent for ResultConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 /// Persisted simulation output containing config and produced records.
 pub struct Results {
     /// Simulator configuration used to produce these results.

@@ -120,7 +120,7 @@ impl ResultAnalyser {
         })
     }
 
-    pub fn analyse_results(&self, results: &Results, context: &Context) -> SimusaResult<()> {
+    pub fn analyse_results(&mut self, results: &Results, context: &Context) -> SimusaResult<()> {
         match self {
             ResultAnalyser::Python(analyser) => analyser.analyse_results(results, context),
             ResultAnalyser::Plugin(analyser) => analyser.analyse_results(results, context),
@@ -129,5 +129,5 @@ impl ResultAnalyser {
 }
 
 pub trait ResultAnalyserTrait: std::fmt::Debug + std::marker::Send + std::marker::Sync {
-    fn analyse_results(&self, results: &Results, context: &Context) -> SimusaResult<()>;
+    fn analyse_results(&mut self, results: &Results, context: &Context) -> SimusaResult<()>;
 }

@@ -1912,9 +1912,9 @@ impl Simulator {
     }
 
     /// Compute configured post-processing results from in-memory records.
-    pub fn compute_results(&self) -> SimusaResult<()> {
-        if let Some(analyser) = &self.result_analyser {
-            let results = self.get_records(false);
+    pub fn compute_results(&mut self) -> SimusaResult<()> {
+        let results = self.get_records(false);
+        if let Some(analyser) = &mut self.result_analyser {
             analyser.analyse_results(
                 &Results {
                     records: results,

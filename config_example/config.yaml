@@ -12,9 +12,11 @@ results:
   result_path: "results.json"
   analyser:
     type: Python
-    show_figures: false # Disabled for automatic testing
+    show_figures: true # Disabled for automatic testing
     script_path: "analyse_results.py"
     function_name: "analyse_results"
+    additionnal_params:
+      figures_path: "figures"
 max_time: 60.0
 time_analysis:
   exporter:

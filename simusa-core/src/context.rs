@@ -123,6 +123,10 @@ impl Context {
         self.current_sim_time.as_ref().map(|x| *x.read().unwrap())
     }
 
+    pub fn get_loglevel(&self) -> LogLevel {
+        self.enabled_loglevel.read().unwrap().clone()
+    }
+
     /// Creates a new context with the same properties as the current one, but with an additional call added to the callstack.
     /// This can be used to track the execution flow across different function calls and modules, providing more detailed logging information.
     pub fn new_callstack_level<S: ToString + ?Sized>(&self, call: &S) -> Self {

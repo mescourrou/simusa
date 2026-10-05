@@ -140,6 +140,8 @@ pub enum InternalLog {
     Environment,
     /// Detailed environment logs.
     EnvironmentDetailed,
+
+    ExternalNetwork,
 }
 
 /// Logger configuration applied at simulator startup.

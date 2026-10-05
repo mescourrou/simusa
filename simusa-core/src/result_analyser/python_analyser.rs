@@ -1,39 +1,18 @@
 #[cfg(feature = "gui")]
 use std::collections::BTreeMap;
-use std::{ffi::{CStr, CString}, fs, io::Write, sync::Arc};
+use std::{ffi::{CStr, CString}, fs, io::{BufReader, BufWriter, Read, Write}, net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream}, process::Stdio, sync::Arc, time::Duration};
 
 #[cfg(feature = "gui")]
 use egui::CollapsingHeader;
+use egui::Key::L;
 use pyo3::{ffi::c_str, prelude::*};
+use serde::{Deserialize, Serialize};
 use simusa_macros::config_derives;
 
 use crate::{
-    context::Context,
-    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
-    info,
-    plugin_api::PluginAPI,
-    result_analyser::ResultAnalyserTrait,
-    simulator::Results,
-    warning,
+    context::Context, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, info, internal, logger::InternalLog, networking::NetworkError, plugin_api::PluginAPI, result_analyser::ResultAnalyserTrait, simulator::Results, warning,
 };
 
-const CONVERT_TO_DICT: &CStr = cr#"
-import json
-class NoneDict(dict):
-    """ dict subclass that returns a value of None for missing keys instead
-        of raising a KeyError. Note: doesn't add item to dictionary.
-    """
-    def __missing__(self, key):
-        return None
-
-
-def converter(decoded_dict):
-    """ Convert any None values in decoded dict into empty NoneDict's. """
-    return {k: NoneDict() if v is None else v for k,v in decoded_dict.items()}
-
-def convert(records):
-    return json.loads(records, object_hook=converter)
-"#;
 
 #[cfg(feature = "gui")]
 use crate::{
@@ -59,6 +38,8 @@ pub struct PythonResultAnalyserConfig {
     /// Arbitrary parameters forwarded to the analysis script (additional_params in the script entry point).
     /// This can be used to forward any custom configuration to the analysis script without having to add it to the simulator configuration.
     pub additionnal_params: serde_json::Value,
+
+    pub port: u16,
 }
 
 impl Default for PythonResultAnalyserConfig {
@@ -68,6 +49,7 @@ impl Default for PythonResultAnalyserConfig {
             script_path: "analyse_results.py".to_string(),
             function_name: "analyse_results".to_string(),
             additionnal_params: serde_json::Value::default(),
+            port: 54600,
         }
     }
 }
@@ -133,9 +115,10 @@ impl UIComponent for PythonResultAnalyserConfig {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct PythonResultAnalyser {
     config: PythonResultAnalyserConfig,
+    command: Option<std::process::Child>,
 }
 
 impl PythonResultAnalyser {
@@ -146,107 +129,162 @@ impl PythonResultAnalyser {
         _context: &Context,
     ) -> Self {
         let config = PythonResultAnalyserConfig {
-            script_path: global_config
-                .base_path
+            script_path: fs::canonicalize(&global_config.base_path).unwrap()
                 .join(&config.script_path)
                 .to_str()
                 .unwrap()
                 .to_string(),
             ..config.clone()
         };
-        Self { config }
+        Self {
+            config,
+            command: None,
+        }
+    }
+
+
+    fn send_request(&self, frame: ResultAnalyserFrame, context: &Context) -> SimusaResult<()> {
+        let mut connection = None;
+        for _ in 0..10 {
+            if let Ok(conn) = TcpStream::connect(
+                &SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), self.config.port)
+            ) {
+                connection = Some(conn);
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(500));
+        }
+        let connection = connection.ok_or_else(|| {
+            SimusaError::new(
+                SimusaErrorTypes::NetworkError(NetworkError::Other),
+                "Impossible to connect to result analyser server".into(),
+            )
+        })?;
+        let mut reader = BufReader::new(connection.try_clone().unwrap());
+        let mut writer = BufWriter::new(connection);
+        internal!(
+            context, 
+            InternalLog::ExternalNetwork,
+            "Sending results to result analyser server at port {}", self.config.port);
+
+        let buf = serde_json::to_vec(&frame).map_err(|e| {
+            SimusaError::new(
+                SimusaErrorTypes::NetworkError(NetworkError::Other),
+                format!("Impossible to serialize results for result analyser server: {}", e),
+            )
+        })?;
+        writer.write(&buf.len().to_be_bytes());
+        writer.write_all(&buf).map_err(|e| {
+            SimusaError::new(
+                SimusaErrorTypes::NetworkError(NetworkError::Other),
+                format!("Impossible to send results to result analyser server: {}", e),
+            )
+        })?;
+        writer.flush().unwrap();
+
+        internal!(context, InternalLog::ExternalNetwork, "Waiting for result analyser server response...");
+
+        let mut buf = Vec::new();
+        // reader.tim set_read_timeout(None).map_err(|e| {
+        //     SimusaError::new(
+        //         SimusaErrorTypes::NetworkError(NetworkError::Other),
+        //         format!("Impossible to set read timeout for result analyser server: {}", e),
+        //     )
+        // })?;
+        reader.read(&mut buf).map_err(|e| {
+            SimusaError::new(
+                SimusaErrorTypes::NetworkError(NetworkError::Other),
+                format!("Impossible to read from result analyser server: {}", e),
+            )
+        })?;
+        Ok(())
     }
 }
 
 impl ResultAnalyserTrait for PythonResultAnalyser {
-    fn analyse_results(&self, results: &Results, context: &Context) -> SimusaResult<()> {
+    fn analyse_results(&mut self, results: &Results, context: &Context) -> SimusaResult<()> {
         info!(context, "Starting Python Result Analyser");
+        if self.command.is_some() {
+            return Err(SimusaError::new(
+                SimusaErrorTypes::NetworkError(NetworkError::Other),
+                "Result analyser server is already running".into(),
+            ));
+        }
+#[cfg(target_os = "windows")]
+        let python_distrib = "win_amd64";
+#[cfg(target_os = "linux")]
+        let python_distrib = "linux_x86_64";
+#[cfg(target_os = "macos")]
+        let python_distrib = "manylinux_2_39_x86_64";
 
-        let json_results = serde_json::to_string(&results.records)
-            .expect("Error during converting results to json");
-        let json_config =
-            serde_json::to_string(&results.config).expect("Error during converting config to json");
+        self.command = Some(std::process::Command::new("python3")
+            .arg("-c")
+            .arg(format!("
+try:
+    import simusa
+except ImportError as e:
+    answer = input('simusa python module is not installed, do you accept to install it now? (Y/n) ')
+    if answer.lower() == 'y' or answer == '':
+        import subprocess
+        import sys
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'https://gitlab.laas.fr/api/v4/projects/2945/packages/generic/simusa/{0}/simusa-{0}-cp310-abi3-{1}.whl'])
+        import simusa
+    else:
+        raise e
 
-        let show_figure_py = cr#"
-import matplotlib.pyplot as plt
+simusa._internal.ResultAnalyser().run_server('localhost', {2}, '{3}')
+            ", env!("CARGO_PKG_VERSION"), python_distrib, self.config.port, context.get_loglevel().to_string()))
+            .envs(std::env::vars())
+            .spawn()
+            .map_err(|e| {
+                SimusaError::new(
+                    SimusaErrorTypes::NetworkError(NetworkError::Other),
+                    format!("Impossible to start result analyser server: {}", e),
+                )
+            })?
+        );
 
-def show():
-    plt.show()
-"#;
-
-        let script_path = &self.config.script_path;
-        let python_script = match fs::read_to_string(script_path.clone()) {
-            Err(e) => {
-                warning!(
-                    context,
-                    "Result analyser script not found ({}): {}.",
-                    script_path,
-                    e
-                );
-                warning!(context, "Creating default result analyser script");
-                let mut file = fs::File::create(script_path).map_err(|e| {
-                    SimusaError::new(
-                        SimusaErrorTypes::ConfigError,
-                        format!("Impossible to create default result analyser script: {}", e),
-                    )
-                })?;
-                writeln!(file, "#!/usr/bin/python3");
-                writeln!(file, "import numpy as np");
-                writeln!(file, "import matplotlib.pyplot as plt");
-                writeln!(file, "");
-                writeln!(
-                    file,
-                    "def {}(results, config, additional_params):",
-                    self.config.function_name
-                );
-                writeln!(
-                    file,
-                    "    print('It works! You can now edit this script to analyse the results.')"
-                );
-                fs::read_to_string(script_path.clone()).map_err(|e| {
-                    SimusaError::new(
-                        SimusaErrorTypes::ConfigError,
-                        format!("Result analyser script not found ({}): {}", script_path, e),
-                    )
-                })?
-            }
-            Ok(s) => s,
+        let frame = ResultAnalyserFrame {
+            results: results.clone(),
+            config: self.config.clone(),
         };
-        let python_script = CString::new(python_script).unwrap();
-        let res = Python::attach(|py| -> PyResult<()> {
-            let script = PyModule::from_code(py, CONVERT_TO_DICT, c_str!(""), c_str!(""))?;
-            let convert_fn: Py<PyAny> = script.getattr("convert")?.into();
-            let result_dict = convert_fn.call(py, (json_results,), None)?;
-            let config_dict = convert_fn.call(py, (json_config,), None)?;
-            let param_dict = convert_fn.call(
-                py,
-                (serde_json::to_string(&self.config.additionnal_params).unwrap(),),
-                None,
-            )?;
 
-            let script = PyModule::from_code(py, &python_script, c_str!(""), c_str!(""))?;
-            let analyse_fn: Py<PyAny> = script.getattr(&self.config.function_name)?.into();
-            info!(context, "Calling Python script to analyse the results...");
-            let res = analyse_fn.call(py, (result_dict, config_dict, param_dict), None);
-            if let Err(err) = res {
-                err.display(py);
-                return Err(err);
+        let res = self.send_request(frame, context);
+
+        if let Some(mut err) = self.command.as_mut().unwrap().stderr.take() {
+            let mut buf = String::new();
+            err.read_to_string(&mut buf).unwrap();
+            eprintln!("{}", buf);
+        }
+        if let Some(mut output) = self.command.as_mut().unwrap().stdout.take() {
+            let mut buf = String::new();
+            output.read_to_string(&mut buf).unwrap();
+            println!("{}", buf);
+        }
+
+        self.command.as_mut().unwrap().kill().map_err(|e| {
+            SimusaError::new(
+                SimusaErrorTypes::NetworkError(NetworkError::Other),
+                format!("Impossible to stop result analyser server: {}", e),
+            )
+        })?;
+        self.command = None;
+        res
+    }
+}
+
+impl Drop for PythonResultAnalyser {
+    fn drop(&mut self) {
+        if let Some(mut command) = self.command.take() {
+            if let Err(e) = command.kill() {
+                eprintln!("Impossible to stop result analyser server: {}", e);
             }
-            if self.config.show_figures {
-                info!(context, "Showing figures...");
-                let show_script = PyModule::from_code(py, show_figure_py, c_str!(""), c_str!(""))?;
-                let show_fn: Py<PyAny> = show_script.getattr("show")?.into();
-                show_fn.call(py, (), None)?;
-            }
-            Ok(())
-        });
-        if let Some(err) = res.err() {
-            Err(SimusaError::new(
-                SimusaErrorTypes::PythonError,
-                err.to_string(),
-            ))
-        } else {
-            Ok(())
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResultAnalyserFrame {
+    pub results: Results,
+    pub config: PythonResultAnalyserConfig,
 }

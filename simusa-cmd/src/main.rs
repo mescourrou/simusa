@@ -1,5 +1,5 @@
 use clap::Parser;
-use std::path::Path;
+use std::{path::Path, process::{ExitCode, Termination}};
 
 use simusa::{errors::SimusaResult, gui, simulator::Simulator};
 
@@ -50,11 +50,14 @@ fn doit(args: Cli) -> SimusaResult<()> {
     Ok(())
 }
 
-fn main() {
+fn main() -> ExitCode {
     let args = Cli::parse();
 
     let res = doit(args);
     if let Err(e) = res {
         println!("{}", e.detailed_error());
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
     }
 }
