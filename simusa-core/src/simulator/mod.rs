@@ -788,7 +788,7 @@ impl Simulator {
                 for context in node_contexts.values_mut() {
                     context.update_time(time);
                 }
-                if time > running_parameters.max_time {
+                if time > running_parameters.max_time + TIME_ROUND / 2. {
                     break;
                 }
 
@@ -1004,7 +1004,7 @@ impl Simulator {
                         for context in node_contexts.values_mut() {
                             context.update_time(time);
                         }
-                        if time > running_parameters.max_time {
+                        if time > running_parameters.max_time + TIME_ROUND / 2. {
                             break;
                         }
 
@@ -1684,7 +1684,7 @@ impl Simulator {
                 async_api_server.update_time(next_time);
             }
             context.update_time(next_time);
-            if next_time > max_time {
+            if next_time > max_time + TIME_ROUND / 2. {
                 break;
             }
 
