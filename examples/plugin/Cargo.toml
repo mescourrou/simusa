@@ -1,5 +1,5 @@
 [package]
-name = "plugin_example"
+name = "plugin"
 version = "0.1.0"
 edition = "2024"
 
@@ -10,3 +10,14 @@ nalgebra = { version = "^0.34", features = ["serde-serialize"] }
 serde_derive = "^1.0"
 serde = { version = "^1.0", features = ["derive"] }
 serde_json = { version = "1.0.145", features = ["float_roundtrip"] }
+
+# Only to implement custom drawable
+eframe = { version = "0.33.0", default-features = false, features = [
+    # "accesskit",     # Make egui comptaible with screen readers. NOTE: adds a lot of dependencies.
+    "default_fonts", # Embed the default egui fonts.
+    "glow",          # Use the glow rendering backend. Alternative: "wgpu".
+    "persistence",   # Enable restoring app state when restarting the app.
+    "wayland",       # Enables wayland support and fixes clipboard issue.
+    "x11",           # Enables x11 support and fixes clipboard issue on linux.
+] }
+egui = { version = "0.33.0" }

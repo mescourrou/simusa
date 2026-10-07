@@ -1,12 +1,12 @@
-use std::{collections::HashMap, fmt::{Debug, Display}, hash::Hash, str::FromStr};
+use std::{collections::BTreeMap, fmt::{Debug, Display}, hash::Hash, str::FromStr};
 
 use crate::utils::enum_tools::ToVec;
 
 
 pub trait EnumVariables: Clone + Eq + Debug + ToString + ToVec<&'static str> + ToVec<Self> + Display + FromStr + Hash
  {
-    fn mapped_values(mut map_fn: impl FnMut(&Self) -> f32) -> HashMap::<Self, f32> {
-        let mut map = HashMap::new();
+    fn mapped_values(mut map_fn: impl FnMut(&Self) -> f32) -> BTreeMap::<Self, f32> {
+        let mut map = BTreeMap::new();
         for variant in Self::to_vec() {
             let value = map_fn(&variant);
             map.insert(variant, value);

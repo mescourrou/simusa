@@ -1481,6 +1481,19 @@
           "required": [
             "type"
           ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "ExternalNetwork"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
         }
       ]
     },
@@ -2904,6 +2917,19 @@
           "required": [
             "type"
           ]
+        },
+        {
+          "description": "Plugin-based custom physics fault model: delegates fault logic to external compiled or scripted plugins.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Plugin"
+            }
+          },
+          "required": [
+            "type"
+          ]
         }
       ]
     },
@@ -3266,6 +3292,13 @@
               "description": "Name of the function to call in the analysis script (default: `analyse_results`).\nThis function should have the following signature:\n```def analyse_results(records: list, config: dict, additional_params: dict|None)```",
               "type": "string",
               "default": "analyse_results"
+            },
+            "port": {
+              "type": "integer",
+              "format": "uint16",
+              "default": 54600,
+              "maximum": 65535,
+              "minimum": 0
             },
             "script_path": {
               "description": "Path to the Python analysis script (path from config location).\n\nIf the file does not exist, a default script (named `analyse_results.py`) is created in the same directory as the config file.",

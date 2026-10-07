@@ -66,6 +66,7 @@ done
 
 cargo fmt --all
 cargo clippy --all-targets -- -D warnings
+cargo clippy -p simusa --no-default-features -- -D warnings
 cargo clippy -p simusa --features monothreaded -- -D warnings
 cargo build --release
 ./generate_config_doc.py

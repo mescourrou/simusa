@@ -16,7 +16,7 @@ use simusa_com::pub_sub::{MultiClientTrait, PathKey};
 use simusa_macros::EnumToString;
 
 use core::f32;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -25,7 +25,7 @@ use crate::environment::Environment;
 use crate::networking::network::MessageFlag;
 use crate::physics::robot_models::Command;
 use crate::simulator::SimusaBrokerMultiClient;
-#[cfg(not(feature = "monothreaded"))]
+#[cfg(all(not(feature = "monothreaded"), feature = "deprecated_thread_separation"))]
 use crate::simulator::TimeCv;
 use crate::state_estimators::State;
 use crate::time_analysis::TimeAnalysisNode;
@@ -123,7 +123,7 @@ pub struct Node {
     pub(self) send_records: bool,
 
     pub(self) node_meta_data: SharedRwLock<NodeMetaData>,
-    pub(self) meta_data_list: Option<SharedRoLock<HashMap<String, SharedRoLock<NodeMetaData>>>>,
+    pub(self) meta_data_list: Option<SharedRoLock<BTreeMap<String, SharedRoLock<NodeMetaData>>>>,
     pub(self) node_message_client: SimusaBrokerMultiClient,
 
     pub(self) current_command: Option<Command>,
@@ -138,7 +138,7 @@ impl Node {
     pub(crate) fn post_creation_init(
         &mut self,
         physics_list: SharedRoLock<BTreeMap<String, SharedRoLock<Box<dyn Physics>>>>,
-        meta_data_list: SharedRoLock<HashMap<String, SharedRoLock<NodeMetaData>>>,
+        meta_data_list: SharedRoLock<BTreeMap<String, SharedRoLock<NodeMetaData>>>,
         initial_time: f32,
         context: &Context,
     ) -> NodeClient {
@@ -220,7 +220,7 @@ impl Node {
     ///
     /// ## Arguments
     /// * `time` -- Time to reach.
-    #[cfg(not(feature = "monothreaded"))]
+    #[cfg(all(not(feature = "monothreaded"), feature = "deprecated_thread_separation"))]
     pub(crate) fn run_next_time_step(
         &mut self,
         time: f32,
@@ -254,7 +254,7 @@ impl Node {
     /// The network messages are handled between each steps.
     ///
     /// Then, the node state is saved.
-    #[cfg(not(feature = "monothreaded"))]
+    #[cfg(all(not(feature = "monothreaded"), feature = "deprecated_thread_separation"))]
     fn run_time_step(
         &mut self,
         time: f32,
@@ -277,7 +277,11 @@ impl Node {
         self.physics_update(time, &context);
 
         self.handle_messages(time, &context);
-        self.sync_with_others(time_cv, time, &context);
+        // self.sync_with_others(time_cv, time, &context);
+        time_cv.barrier.wait();
+        if self.process_messages() {
+            self.handle_messages(time, &context);
+        }
 
         // Pre loop calls to manage messages
         self.pre_loop_hooks(time, &context);
@@ -288,7 +292,11 @@ impl Node {
             crate::logger::InternalLog::NodeSyncDetailed,
             "Pre prediction step wait"
         );
-        self.sync_with_others(time_cv, time, &context);
+        // self.sync_with_others(time_cv, time, &context);
+        time_cv.barrier.wait();
+        if self.process_messages() {
+            self.handle_messages(time, &context);
+        }
 
         let do_control_loop = self.prediction_step(time, &context);
 
@@ -298,7 +306,11 @@ impl Node {
             crate::logger::InternalLog::NodeSyncDetailed,
             "Post prediction step wait"
         );
-        self.sync_with_others(time_cv, time, &context);
+        // self.sync_with_others(time_cv, time, &context);
+        time_cv.barrier.wait();
+        if self.process_messages() {
+            self.handle_messages(time, &context);
+        }
 
         self.make_observations(time, &context);
 
@@ -308,7 +320,11 @@ impl Node {
             crate::logger::InternalLog::NodeSyncDetailed,
             "Post observation wait"
         );
-        self.sync_with_others(time_cv, time, &context);
+        // self.sync_with_others(time_cv, time, &context);
+        time_cv.barrier.wait();
+        if self.process_messages() {
+            self.handle_messages(time, &context);
+        }
 
         self.correction_step(time, &context);
 
@@ -318,7 +334,11 @@ impl Node {
             crate::logger::InternalLog::NodeSyncDetailed,
             "Post correction step wait"
         );
-        self.sync_with_others(time_cv, time, &context);
+        // self.sync_with_others(time_cv, time, &context);
+        time_cv.barrier.wait();
+        if self.process_messages() {
+            self.handle_messages(time, &context);
+        }
 
         self.nav_and_control_step(time, do_control_loop, &context);
 
@@ -328,7 +348,11 @@ impl Node {
             crate::logger::InternalLog::NodeSyncDetailed,
             "Pre-save wait"
         );
-        self.sync_with_others(time_cv, time, &context);
+        // self.sync_with_others(time_cv, time, &context);
+        time_cv.barrier.wait();
+        if self.process_messages() {
+            self.handle_messages(time, &context);
+        }
 
         Ok(())
     }
@@ -337,50 +361,54 @@ impl Node {
     ///
     /// The method repeatedly processes pending messages while waiting for the
     /// synchronization parity to change.
-    #[cfg(not(feature = "monothreaded"))]
+    #[cfg(all(not(feature = "monothreaded"), feature = "deprecated_thread_separation"))]
     pub(crate) fn sync_with_others(&mut self, time_cv: &TimeCv, time: f32, context: &Context) {
         let context = context.new_callstack_level("sync_with_others");
-        let mut lk = time_cv.waiting.lock().unwrap();
-        let waiting_parity = *time_cv.intermediate_parity.lock().unwrap();
-        *lk += 1;
-        internal!(
-            context,
-            crate::logger::InternalLog::NodeSyncDetailed,
-            "Increase intermediate waiting nodes: {}",
-            *lk
-        );
-
-        loop {
-            while self.process_messages() {
-                *lk -= 1;
-                internal!(
-                    context,
-                    crate::logger::InternalLog::NodeSyncDetailed,
-                    "Messages to process: handle messages"
-                );
-                self.handle_messages(time, &context);
-                *lk += 1;
-            }
-            time_cv.condvar.notify_all();
-            if !self.process_messages() {
-                lk = time_cv.condvar.wait(lk).unwrap();
-            }
-            if waiting_parity != *time_cv.intermediate_parity.lock().unwrap() {
-                internal!(
-                    context,
-                    crate::logger::InternalLog::NodeSyncDetailed,
-                    "End wait"
-                );
-                return;
-            }
-            internal!(
-                context,
-                crate::logger::InternalLog::NodeSyncDetailed,
-                "New loop: waiting = {}",
-                *lk
-            );
-        }
     }
+    // #[cfg(all(not(feature = "monothreaded"), feature = "deprecated_thread_separation"))]
+    // pub(crate) fn sync_with_others(&mut self, time_cv: &TimeCv, time: f32, context: &Context) {
+    //     let context = context.new_callstack_level("sync_with_others");
+    //     let mut waiting_lk = time_cv.waiting.lock().unwrap();
+    //     let waiting_parity = *time_cv.intermediate_parity.lock().unwrap();
+    //     *waiting_lk += 1;
+    //     internal!(
+    //         context,
+    //         crate::logger::InternalLog::NodeSyncDetailed,
+    //         "Increase intermediate waiting nodes: {}",
+    //         *waiting_lk
+    //     );
+
+    //     loop {
+    //         while self.process_messages() {
+    //             *waiting_lk -= 1;
+    //             internal!(
+    //                 context,
+    //                 crate::logger::InternalLog::NodeSyncDetailed,
+    //                 "Messages to process: handle messages"
+    //             );
+    //             self.handle_messages(time, &context);
+    //             *waiting_lk += 1;
+    //         }
+    //         time_cv.condvar.notify_all();
+    //         if !self.process_messages() {
+    //             waiting_lk = time_cv.condvar.wait(waiting_lk).unwrap();
+    //         }
+    //         if waiting_parity != *time_cv.intermediate_parity.lock().unwrap() {
+    //             internal!(
+    //                 context,
+    //                 crate::logger::InternalLog::NodeSyncDetailed,
+    //                 "End wait"
+    //             );
+    //             return;
+    //         }
+    //         internal!(
+    //             context,
+    //             crate::logger::InternalLog::NodeSyncDetailed,
+    //             "New loop: waiting = {}",
+    //             *waiting_lk
+    //         );
+    //     }
+    // }
 
     /// Handle all pending service and network messages up to `time`.
     ///
@@ -898,9 +926,9 @@ impl Node {
     /// Get the optional shared metadata map for all nodes.
     pub fn meta_data_list(
         &self,
-    ) -> Option<SharedRoLock<HashMap<String, SharedRoLock<NodeMetaData>>>> {
+    ) -> Option<SharedRoLock<BTreeMap<String, SharedRoLock<NodeMetaData>>>> {
         self.meta_data_list.clone()
-            as Option<Arc<dyn RoLock<HashMap<String, SharedRoLock<NodeMetaData>>>>>
+            as Option<Arc<dyn RoLock<BTreeMap<String, SharedRoLock<NodeMetaData>>>>>
     }
 
     /// Mark this node as [`NodeState::Zombie`]. The kill is done later.

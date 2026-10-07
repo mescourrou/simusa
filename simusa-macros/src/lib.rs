@@ -1,6 +1,6 @@
 extern crate proc_macro;
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
@@ -886,7 +886,7 @@ impl Parse for EnumVariablesVariant {
 pub fn enum_variables(input: TokenStream) -> TokenStream {
     let parsed = parse_macro_input!(input as EnumVariablesInput);
     let enum_name = parsed.enum_name;
-    let mut sub_enums = HashMap::new();
+    let mut sub_enums = BTreeMap::new();
     for variant in &parsed.variants {
         for sub_enum in &variant.sub_enums {
             if !sub_enums.contains_key(&sub_enum.variant_name) {

@@ -66,7 +66,7 @@ macro_rules! threading_replication_test {
     ($config:ident) => {
         #[test]
         fn $config() {
-            let nb_threads = [0, 1];
+            let nb_threads = [0, 1, 2];
             let nb_threads_len = nb_threads.len();
             let nb_replications = 10;
 
@@ -77,8 +77,8 @@ macro_rules! threading_replication_test {
                     print!(
                         "Run {}/{}: {} threads ... ",
                         j * nb_threads_len + i + 1,
+                        nb_threads_len * nb_replications,
                         nb_thread,
-                        nb_threads_len * nb_replications
                     );
                     let mut simulator_config = SimulatorConfig::load_from_path(Path::new(
                         format!("test_config/{}.yaml", stringify!($config)).as_str(),

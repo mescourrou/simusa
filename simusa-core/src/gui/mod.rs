@@ -9,6 +9,7 @@ mod app;
 use std::{collections::BTreeMap, sync::Arc};
 
 pub use app::SimusaApp;
+pub use app::PainterInfo;
 mod configurator;
 mod drawables;
 pub use drawables::Drawable;

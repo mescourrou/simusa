@@ -6,7 +6,7 @@
 //! - [`PathMultiClient`], a [`PathKey`]-aware implementation with relative key transformation.
 
 use std::{
-    collections::HashMap,
+    collections::BTreeMap,
     fmt::{Debug, Display},
     sync::{Arc, RwLock},
 };
@@ -18,9 +18,9 @@ use crate::pub_sub::{BrokerTrait, Client, PathKey};
 /// Interface for clients that manage subscriptions over multiple keys.
 pub trait MultiClientTrait<KeyType, MessageType, NodeIdType>: Send + Sync + Debug
 where
-    KeyType: std::cmp::Eq + std::hash::Hash + Clone + Default + Send + Sync,
+    KeyType: std::cmp::Eq + Clone + Default + Send + Sync + std::cmp::Ord,
     MessageType: Clone + Send + 'static + Default,
-    NodeIdType: std::hash::Hash + Eq + Clone + Send + Sync + 'static,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + std::cmp::Ord,
 {
     /// Registers an already-created per-key [`Client`].
     fn add_client(&mut self, key: &KeyType, client: Client<MessageType>);
@@ -53,11 +53,11 @@ where
 /// Generic multi-channel client keyed by `KeyType`.
 pub struct MultiClient<KeyType, MessageType, NodeIdType>
 where
-    KeyType: std::cmp::Eq + std::hash::Hash + Clone + Default + Send + Sync,
+    KeyType: std::cmp::Eq + Clone + Default + Send + Sync + std::cmp::Ord,
     MessageType: Clone + Send + 'static + Default,
-    NodeIdType: std::hash::Hash + Eq + Clone + Send + Sync + 'static,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + std::cmp::Ord,
 {
-    clients: HashMap<KeyType, Client<MessageType>>,
+    clients: BTreeMap<KeyType, Client<MessageType>>,
     broker: Arc<RwLock<dyn BrokerTrait<KeyType, MessageType, NodeIdType>>>,
     reception_delay: f32,
     node_id: NodeIdType,
@@ -65,9 +65,9 @@ where
 
 impl<KeyType, MessageType, NodeIdType> MultiClient<KeyType, MessageType, NodeIdType>
 where
-    KeyType: std::cmp::Eq + std::hash::Hash + Clone + Default + Send + Sync + Debug + Display,
+    KeyType: std::cmp::Eq + Clone + Default + Send + Sync + Debug + Display + std::cmp::Ord,
     MessageType: Clone + Send + 'static + Default + Debug + Sync,
-    NodeIdType: std::hash::Hash + Eq + Clone + Send + Sync + 'static + Debug,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + Debug + std::cmp::Ord,
 {
     /// Creates an empty [`MultiClient`].
     pub fn new(
@@ -76,7 +76,7 @@ where
         reception_delay: f32,
     ) -> Self {
         Self {
-            clients: HashMap::new(),
+            clients: BTreeMap::new(),
             broker,
             reception_delay,
             node_id,
@@ -87,9 +87,9 @@ where
 impl<KeyType, MessageType, NodeIdType> MultiClientTrait<KeyType, MessageType, NodeIdType>
     for MultiClient<KeyType, MessageType, NodeIdType>
 where
-    KeyType: std::cmp::Eq + std::hash::Hash + Clone + Default + Send + Sync + Debug + Display,
+    KeyType: std::cmp::Eq + Clone + Default + Send + Sync + Debug + Display + std::cmp::Ord,
     MessageType: Clone + Send + 'static + Default + Debug + Sync,
-    NodeIdType: std::hash::Hash + Eq + Clone + Send + Sync + 'static + Debug,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + Debug + std::cmp::Ord,
 {
     fn add_client(&mut self, key: &KeyType, client: Client<MessageType>) {
         self.clients.insert(key.clone(), client);
@@ -187,7 +187,7 @@ where
 pub struct PathMultiClient<MessageType, NodeIdType>
 where
     MessageType: Clone + Send + 'static + Default + Debug + Sync,
-    NodeIdType: std::hash::Hash + Eq + Clone + Send + Sync + 'static + Debug,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + Debug + std::cmp::Ord,
 {
     multi_client: MultiClient<PathKey, MessageType, NodeIdType>,
     base_path: PathKey,
@@ -196,7 +196,7 @@ where
 impl<MessageType, NodeIdType> PathMultiClient<MessageType, NodeIdType>
 where
     MessageType: Clone + Send + 'static + Default + Debug + Sync,
-    NodeIdType: std::hash::Hash + Eq + Clone + Send + Sync + 'static + Debug,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + Debug + std::cmp::Ord,
 {
     /// Creates a new [`PathMultiClient`].
     ///
@@ -219,7 +219,7 @@ impl<MessageType, NodeIdType> MultiClientTrait<PathKey, MessageType, NodeIdType>
     for PathMultiClient<MessageType, NodeIdType>
 where
     MessageType: Clone + Send + 'static + Default + Debug + Sync,
-    NodeIdType: std::hash::Hash + Eq + Clone + Send + Sync + 'static + Debug,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + Debug + std::cmp::Ord,
 {
     fn add_client(&mut self, key: &PathKey, client: Client<MessageType>) {
         self.multi_client.add_client(key, client);

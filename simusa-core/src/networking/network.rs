@@ -22,6 +22,7 @@ use serde_derive::{Deserialize, Serialize};
 use simusa_com::pub_sub::{BrokerTrait, BrokerTraitExtended, PathKey};
 use simusa_macros::config_derives;
 
+use crate::constants::TIME_ROUND;
 #[cfg(feature = "gui")]
 use crate::constants::TIME_ROUND_DECIMALS;
 use crate::context::Context;
@@ -142,6 +143,31 @@ pub struct Envelope {
     /// Optional transport flags that alter handling behavior.
     pub message_flags: Vec<MessageFlag>,
 }
+
+impl Ord for Envelope {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if let Some(ord) = self.timestamp.partial_cmp(&other.timestamp) {
+            ord
+        } else {
+            self.from.cmp(&other.from)
+        }
+    }
+}
+impl PartialOrd for Envelope {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for Envelope {
+    fn eq(&self, other: &Self) -> bool {
+        (self.timestamp - other.timestamp).abs() < TIME_ROUND 
+            && self.from == other.from
+            && self.message == other.message
+            && self.message_flags == other.message_flags
+    }
+}
+impl Eq for Envelope {}
 
 /// Network interface for [`Node`](crate::node::Node).
 ///

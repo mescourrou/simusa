@@ -7,7 +7,7 @@ log:
     type: Info
     # type: Internal
     # value: [type: All]
-results: {} #default results
+results: {}
 max_time: 100.0
 time_analysis:
   exporter:

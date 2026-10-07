@@ -8,7 +8,7 @@
 //! then samples observation values from configured random distributions.
 
 use std::{
-    collections::HashMap,
+    collections::BTreeMap,
     sync::{Arc, Mutex},
 };
 
@@ -252,7 +252,7 @@ impl<SV: EnumVariables> ClutterFault<SV> {
         seed: f32,
         seed_increment: f32,
         _context: &Context,
-    ) -> Vec<(String, HashMap<SV, f32>)> {
+    ) -> Vec<(String, BTreeMap<SV, f32>)> {
         let mut seed = seed;
 
         let n_obs = self.apparition.lock().unwrap().generate(seed)[0]
@@ -260,7 +260,7 @@ impl<SV: EnumVariables> ClutterFault<SV> {
             .floor() as usize;
         let mut new_obs = Vec::new();
         for _ in 0..n_obs {
-            let mut o = HashMap::new();
+            let mut o = BTreeMap::new();
             seed += seed_increment;
             let mut random_sample = Vec::new();
             for d in self.distributions.lock().unwrap().iter() {

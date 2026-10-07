@@ -21,6 +21,7 @@ schema = ["schemars"]  # Enable schemars for schema generation
 force_hard_determinism = []  # Disable features that may introduce non-determinism
 debug_mode = ["simusa-com/debug_mode"]  # Enable heavy debug logs
 monothreaded = []  # Force single-threaded execution
+deprecated_thread_separation = []  # Enable deprecated features for backward compatibility
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -64,6 +65,7 @@ eframe = { version = "0.33.0", default-features = false, optional = true, featur
 ] }
 egui = { version = "0.33.0", optional = true }
 schemars = { version = "1.1.0", optional = true }
+num_cpus = "1.17.0"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

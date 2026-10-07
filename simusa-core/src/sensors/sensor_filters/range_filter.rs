@@ -9,7 +9,7 @@
 //! - if `inside` is `true`, every configured variable must stay inside its range,
 //! - if `inside` is `false`, configured variables must stay outside the ranges.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use simusa_macros::config_derives;
 
@@ -170,7 +170,7 @@ impl<SV: EnumVariables> RangeFilter<SV> {
     ///
     /// The method evaluates every configured variable and returns `true` when the
     /// input should be kept according to the configured range policy.
-    pub fn match_exclusion(&self, variable_map: &HashMap<SV, f32>) -> bool {
+    pub fn match_exclusion(&self, variable_map: &BTreeMap<SV, f32>) -> bool {
         let mut keep = true;
         for (i, var) in self.config.variables.iter().enumerate() {
             if let Some(value) = variable_map.get(var) {

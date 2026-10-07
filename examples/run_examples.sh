@@ -5,8 +5,8 @@ set -e
 
 echo "Run example 'basic'"
 cd .. && cargo run --example basic && cd -
-echo "Run example 'plugin_example'"
-cd .. && cargo run -p plugin_example && cd -
+echo "Run example 'plugin'"
+cd .. && cargo run -p plugin && cd -
 
 cd python
 echo "Run python example 'controller'"

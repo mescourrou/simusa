@@ -16,7 +16,7 @@ use crate::simulator::SimusaBroker;
 use crate::utils::SharedRwLock;
 
 use super::network::MessageFlag;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use std::sync::{Arc, RwLock};
 
@@ -73,7 +73,7 @@ impl NetworkManager {
     /// Nodes with `None` position are not range-filtered and receive all messages.
     pub fn process_messages(
         &mut self,
-        position_map: &HashMap<String, Option<[f32; 2]>>,
+        position_map: &BTreeMap<String, Option<[f32; 2]>>,
         context: &Context,
     ) -> SimusaResult<()> {
         let context = context.new_callstack_level("process_messages");

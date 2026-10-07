@@ -7,7 +7,7 @@
 //! Perturbations can optionally be scaled proportionally to another variable map.
 
 use std::{
-    collections::HashMap,
+    collections::BTreeMap,
     sync::{Arc, Mutex},
 };
 
@@ -272,12 +272,12 @@ impl<SVO: EnumVariables, SVProp: EnumVariables> AdditiveFault<SVO, SVProp> {
     pub fn add_faults(
         &mut self,
         seed: f32,
-        variable_map: HashMap<SVO, f32>,
-        proportionnal_map: &HashMap<SVProp, f32>,
+        variable_map: BTreeMap<SVO, f32>,
+        proportionnal_map: &BTreeMap<SVProp, f32>,
         _context: &Context,
-    ) -> HashMap<SVO, f32> {
+    ) -> BTreeMap<SVO, f32> {
         let mut variable_map = variable_map;
-        let mut diff_map = HashMap::new();
+        let mut diff_map = BTreeMap::new();
         if self.apparition.generate(seed)[0] < 1. {
             return diff_map;
         }

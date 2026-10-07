@@ -1,3 +1,4 @@
+use egui::Rect;
 #[allow(unused_variables)]
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
@@ -342,7 +343,7 @@ impl MyWonderfulSensorFault {
 }
 
 impl FaultModel for MyWonderfulSensorFault {
-    fn post_init(&mut self, _node: &mut simusa::node::Node, context: &Context) -> SimusaResult<()> {
+    fn post_init(&mut self, _node: &mut simusa::node::Node, _initial_time: f32, context: &Context) -> SimusaResult<()> {
         Ok(())
     }
 
@@ -378,7 +379,7 @@ impl MyWonderfulSensorFilter {
 }
 
 impl SensorFilter for MyWonderfulSensorFilter {
-    fn post_init(&mut self, _node: &mut simusa::node::Node, context: &Context) -> SimusaResult<()> {
+    fn post_init(&mut self, _node: &mut simusa::node::Node, initial_time: f32, context: &Context) -> SimusaResult<()> {
         Ok(())
     }
 
@@ -411,18 +412,18 @@ impl Drawable for MyWonderfulDrawable {
     fn draw(
         &self,
         ui: &mut egui::Ui,
-        viewport: &Rect,
-        painter_info: &PainterInfo,
+        viewport: &egui::Rect,
+        painter_info: &simusa::gui::PainterInfo,
         scale: f32,
         time: f32,
-    ) -> Result<Vec<Shape>, Vec2>
+    ) -> Result<Vec<egui::Shape>, egui::Vec2>
     {
-        Ok(vec![Shape::line_segment(
-            vec![
-                pos2(viewport.left(), viewport.top()),
-                pos2(viewport.right(), viewport.bottom()),
+        Ok(vec![egui::Shape::line_segment(
+            [
+                egui::pos2(viewport.left(), viewport.top()),
+                egui::pos2(viewport.right(), viewport.bottom()),
             ],
-            Stroke::new(self.thickness, Color32::from_rgb(255, 0, 0)),
+            egui::Stroke::new(self.thickness, egui::Color32::from_rgb(255, 0, 0)),
         )])
     }
 
@@ -430,8 +431,8 @@ impl Drawable for MyWonderfulDrawable {
         &mut self,
         ui: &mut egui::Ui,
         ctx: &egui::Context,
-        response: &Response,
-        painter_info: &PainterInfo,
+        response: &egui::Response,
+        painter_info: &simusa::gui::PainterInfo,
         scale: f32,
         time: f32,
     )
