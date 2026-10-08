@@ -161,7 +161,7 @@ impl PartialOrd for Envelope {
 
 impl PartialEq for Envelope {
     fn eq(&self, other: &Self) -> bool {
-        (self.timestamp - other.timestamp).abs() < TIME_ROUND 
+        (self.timestamp - other.timestamp).abs() < TIME_ROUND
             && self.from == other.from
             && self.message == other.message
             && self.message_flags == other.message_flags

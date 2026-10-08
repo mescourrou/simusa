@@ -15,12 +15,21 @@ use serde_json::Value;
 use simusa_com::rfc::{self, RemoteFunctionCall, RemoteFunctionCallHost};
 
 use simusa::{
-    context::Context, controllers::ControllerError, errors::SimusaResult, internal, logger::InternalLog, navigators::{
-        Navigator, NavigatorRecord, 
-    }, node::Node, recordable::Recordable, state_estimators::WorldState,
+    context::Context,
+    controllers::ControllerError,
+    errors::SimusaResult,
+    internal,
+    logger::InternalLog,
+    navigators::{Navigator, NavigatorRecord},
+    node::Node,
+    recordable::Recordable,
+    state_estimators::WorldState,
 };
 
-use crate::{utils::{call_py_method, call_py_method_void}, wrappers::{ControllerErrorWrapper, NodeWrapper, WorldStateWrapper}};
+use crate::{
+    utils::{call_py_method, call_py_method_void},
+    wrappers::{ControllerErrorWrapper, NodeWrapper, WorldStateWrapper},
+};
 
 /// Simulator-side RPC handles used by Rust nodes to call Python navigator logic asynchronously.
 #[derive(Debug, Clone)]
@@ -173,11 +182,9 @@ impl PythonNavigator {
             "Calling python implementation of record"
         );
         let record_str: String = call_py_method!(self.model, "record", String,);
-        NavigatorRecord::Plugin(
-            Value::from_str(&record_str).expect(
-                "Impossible to get serde_json::Value from the input serialized python structure",
-            )
-        )
+        NavigatorRecord::Plugin(Value::from_str(&record_str).expect(
+            "Impossible to get serde_json::Value from the input serialized python structure",
+        ))
     }
 
     fn pre_loop_hook(&mut self, node: NodeWrapper, time: f32, context: &Context) {

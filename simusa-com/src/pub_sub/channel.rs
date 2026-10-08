@@ -6,7 +6,10 @@
 //!   delivery conditions.
 
 use std::{
-    collections::{BTreeMap, BTreeSet, HashSet}, fmt::Debug, hash::Hash, sync::{
+    collections::{BTreeMap, BTreeSet, HashSet},
+    fmt::Debug,
+    hash::Hash,
+    sync::{
         Arc, Mutex,
         mpsc::{self, Receiver, Sender},
     },

@@ -5,7 +5,10 @@ use std::collections::BTreeMap;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{ToTokens, format_ident, quote};
-use syn::{Data, DeriveInput, LitStr, Token, parse::Parse, parse_macro_input, punctuated::Punctuated, spanned::Spanned};
+use syn::{
+    Data, DeriveInput, LitStr, Token, parse::Parse, parse_macro_input, punctuated::Punctuated,
+    spanned::Spanned,
+};
 
 #[proc_macro_derive(ToVec)]
 pub fn derive_tovec(item: TokenStream) -> TokenStream {
@@ -330,9 +333,18 @@ pub fn derive_ui_component(item: TokenStream) -> TokenStream {
                 let mut is_plugin_variant = None;
                 for attr in &variant.attrs {
                     if attr.path().is_ident("plugin") {
-                        let list = attr.meta.require_list().expect("Expected #[plugin(plugin_name, unique_key)] to be a list");
-                        let plugin_name = list.parse_args_with(Punctuated::<LitStr, Token![,]>::parse_terminated).expect("Expected plugin name to be a string literal")[0].clone();
-                        let unique_key = list.parse_args_with(Punctuated::<LitStr, Token![,]>::parse_terminated).expect("Expected unique key to be a string literal")[0].clone();
+                        let list = attr
+                            .meta
+                            .require_list()
+                            .expect("Expected #[plugin(plugin_name, unique_key)] to be a list");
+                        let plugin_name = list
+                            .parse_args_with(Punctuated::<LitStr, Token![,]>::parse_terminated)
+                            .expect("Expected plugin name to be a string literal")[0]
+                            .clone();
+                        let unique_key = list
+                            .parse_args_with(Punctuated::<LitStr, Token![,]>::parse_terminated)
+                            .expect("Expected unique key to be a string literal")[0]
+                            .clone();
                         is_plugin_variant = Some((plugin_name, unique_key));
                         break;
                     }

@@ -14,7 +14,10 @@ use simusa::{
     },
 };
 
-use crate::{messages::{GoToMessageWrapper, SensorFrameMessageWrapper, SensorTriggerMessageWrapper}, wrappers::ObservationWrapper};
+use crate::{
+    messages::{GoToMessageWrapper, SensorFrameMessageWrapper, SensorTriggerMessageWrapper},
+    wrappers::ObservationWrapper,
+};
 
 #[derive(Clone, Debug, EnumToString)]
 #[pyclass]
@@ -170,9 +173,15 @@ impl MessageTypesWrapper {
     pub fn from_rust(msg: &MessageType) -> Self {
         match msg {
             MessageType::String(s) => MessageTypesWrapper::String(s.clone()),
-            MessageType::GoTo(msg) => MessageTypesWrapper::GoTo(GoToMessageWrapper::from_rust(&msg)),
-            MessageType::SensorTrigger(msg) => MessageTypesWrapper::SensorTrigger(SensorTriggerMessageWrapper::from_rust(&msg)),
-            MessageType::SensorFrame(msg) => MessageTypesWrapper::SensorFrame(SensorFrameMessageWrapper::from_rust(&msg)),
+            MessageType::GoTo(msg) => {
+                MessageTypesWrapper::GoTo(GoToMessageWrapper::from_rust(&msg))
+            }
+            MessageType::SensorTrigger(msg) => {
+                MessageTypesWrapper::SensorTrigger(SensorTriggerMessageWrapper::from_rust(&msg))
+            }
+            MessageType::SensorFrame(msg) => {
+                MessageTypesWrapper::SensorFrame(SensorFrameMessageWrapper::from_rust(&msg))
+            }
             MessageType::Observations(observations) => MessageTypesWrapper::Observations(
                 observations
                     .iter()

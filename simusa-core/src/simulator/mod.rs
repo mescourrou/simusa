@@ -138,7 +138,6 @@ impl PartialEq for Record {
 
 impl Eq for Record {}
 
-
 /// Broker type used by the simulator network.
 pub type SimusaBroker = PathBroker<Envelope, String, Option<[f32; 2]>>;
 /// Multi-client handle type associated with [`SimusaBroker`].
@@ -592,10 +591,7 @@ impl Simulator {
                 println!("Node '{}' not found", node_name);
             }
         } else {
-            println!(
-                "Simulator at time {:.4}:",
-                self.last_sim_time
-            );
+            println!("Simulator at time {:.4}:", self.last_sim_time);
             for node in self.nodes.iter() {
                 println!("- {:#?}", node);
             }
@@ -648,7 +644,11 @@ impl Simulator {
                 // if *node_sync_params.time_cv.force_finish.lock().unwrap() {
                 //     break;
                 // }
-                for node in self.nodes.iter_mut().filter(|n| n.state() != NodeState::Terminated) {
+                for node in self
+                    .nodes
+                    .iter_mut()
+                    .filter(|n| n.state() != NodeState::Terminated)
+                {
                     match node.next_time_step(
                         previous_time + TIME_ROUND / 2.,
                         &node_contexts[&node.name()],
@@ -691,7 +691,11 @@ impl Simulator {
                 }
 
                 info!(context, "Run time {}", time);
-                for node in self.nodes.iter_mut().filter(|n| n.state() != NodeState::Terminated) {
+                for node in self
+                    .nodes
+                    .iter_mut()
+                    .filter(|n| n.state() != NodeState::Terminated)
+                {
                     node.process_messages();
                     node.physics_update(time, &node_contexts[&node.name()]);
                 }
@@ -703,7 +707,11 @@ impl Simulator {
                     error = Some(e);
                     break;
                 }
-                for node in self.nodes.iter_mut().filter(|n| n.state() != NodeState::Terminated) {
+                for node in self
+                    .nodes
+                    .iter_mut()
+                    .filter(|n| n.state() != NodeState::Terminated)
+                {
                     if node.process_messages() {
                         node.handle_messages(time, &node_contexts[&node.name()]);
                     }
@@ -717,7 +725,11 @@ impl Simulator {
                     break;
                 }
                 let mut do_control_loops = Vec::new();
-                for node in self.nodes.iter_mut().filter(|n| n.state() != NodeState::Terminated) {
+                for node in self
+                    .nodes
+                    .iter_mut()
+                    .filter(|n| n.state() != NodeState::Terminated)
+                {
                     if node.process_messages() {
                         node.handle_messages(time, &node_contexts[&node.name()]);
                     }
@@ -730,7 +742,11 @@ impl Simulator {
                     error = Some(e);
                     break;
                 }
-                for node in self.nodes.iter_mut().filter(|n| n.state() != NodeState::Terminated) {
+                for node in self
+                    .nodes
+                    .iter_mut()
+                    .filter(|n| n.state() != NodeState::Terminated)
+                {
                     if node.process_messages() {
                         node.handle_messages(time, &node_contexts[&node.name()]);
                     }
@@ -743,7 +759,11 @@ impl Simulator {
                     error = Some(e);
                     break;
                 }
-                for node in self.nodes.iter_mut().filter(|n| n.state() != NodeState::Terminated) {
+                for node in self
+                    .nodes
+                    .iter_mut()
+                    .filter(|n| n.state() != NodeState::Terminated)
+                {
                     if node.process_messages() {
                         node.handle_messages(time, &node_contexts[&node.name()]);
                     }
@@ -757,7 +777,12 @@ impl Simulator {
                     error = Some(e);
                     break;
                 }
-                for (node, do_control_loop) in self.nodes.iter_mut().filter(|n| n.state() != NodeState::Terminated).zip(do_control_loops) {
+                for (node, do_control_loop) in self
+                    .nodes
+                    .iter_mut()
+                    .filter(|n| n.state() != NodeState::Terminated)
+                    .zip(do_control_loops)
+                {
                     if node.process_messages() {
                         node.handle_messages(time, &node_contexts[&node.name()]);
                     }
@@ -774,17 +799,16 @@ impl Simulator {
                 );
 
                 let node_states = self.node_positions();
-                if let Err(e) =
-                    self.end_of_time_step_procedure(
-                        &node_states,
-                        &context
-                    )
-                {
+                if let Err(e) = self.end_of_time_step_procedure(&node_states, &context) {
                     error = Some(e);
                     break;
                 }
 
-                for node in self.nodes.iter_mut().filter(|n| n.state() != NodeState::Terminated) {
+                for node in self
+                    .nodes
+                    .iter_mut()
+                    .filter(|n| n.state() != NodeState::Terminated)
+                {
                     if node.send_records()
                         && let Some(async_api_server) = &self.async_api_server
                     {
@@ -839,7 +863,11 @@ impl Simulator {
                     // if *node_sync_params.time_cv.force_finish.lock().unwrap() {
                     //     break;
                     // }
-                    for node in self.nodes.iter_mut().filter(|n| n.state() != NodeState::Terminated) {
+                    for node in self
+                        .nodes
+                        .iter_mut()
+                        .filter(|n| n.state() != NodeState::Terminated)
+                    {
                         match node.next_time_step(
                             previous_time + TIME_ROUND / 2.,
                             &node_contexts[&node.name()],
@@ -883,7 +911,11 @@ impl Simulator {
 
                     info!(context, "Run time {}", time);
                     pool.scoped(|scope| {
-                        for node in self.nodes.iter_mut().filter(|n| n.state() != NodeState::Terminated) {
+                        for node in self
+                            .nodes
+                            .iter_mut()
+                            .filter(|n| n.state() != NodeState::Terminated)
+                        {
                             let node_context = node_contexts[&node.name()].clone();
                             scope.execute(move || {
                                 node.process_messages();
@@ -900,7 +932,11 @@ impl Simulator {
                         break;
                     }
                     pool.scoped(|scope| {
-                        for node in self.nodes.iter_mut().filter(|n| n.state() != NodeState::Terminated) {
+                        for node in self
+                            .nodes
+                            .iter_mut()
+                            .filter(|n| n.state() != NodeState::Terminated)
+                        {
                             let node_context = node_contexts[&node.name()].clone();
                             scope.execute(move || {
                                 if node.process_messages() {
@@ -920,7 +956,12 @@ impl Simulator {
                     let mut do_control_loops = Vec::new();
                     pool.scoped(|scope| {
                         let (tx, rx) = std::sync::mpsc::channel();
-                        for (i, node) in self.nodes.iter_mut().filter(|n| n.state() != NodeState::Terminated).enumerate() {
+                        for (i, node) in self
+                            .nodes
+                            .iter_mut()
+                            .filter(|n| n.state() != NodeState::Terminated)
+                            .enumerate()
+                        {
                             do_control_loops.push(false);
                             let node_context = node_contexts[&node.name()].clone();
                             let tx = tx.clone();
@@ -944,7 +985,11 @@ impl Simulator {
                         break;
                     }
                     pool.scoped(|scope| {
-                        for node in self.nodes.iter_mut().filter(|n| n.state() != NodeState::Terminated) {
+                        for node in self
+                            .nodes
+                            .iter_mut()
+                            .filter(|n| n.state() != NodeState::Terminated)
+                        {
                             let node_context = node_contexts[&node.name()].clone();
                             scope.execute(move || {
                                 if node.process_messages() {
@@ -962,7 +1007,11 @@ impl Simulator {
                         break;
                     }
                     pool.scoped(|scope| {
-                        for node in self.nodes.iter_mut().filter(|n| n.state() != NodeState::Terminated) {
+                        for node in self
+                            .nodes
+                            .iter_mut()
+                            .filter(|n| n.state() != NodeState::Terminated)
+                        {
                             let node_context = node_contexts[&node.name()].clone();
                             scope.execute(move || {
                                 if node.process_messages() {
@@ -982,8 +1031,11 @@ impl Simulator {
                     }
 
                     pool.scoped(|scope| {
-                        for (node, do_control_loop) in
-                            self.nodes.iter_mut().filter(|n| n.state() != NodeState::Terminated).zip(do_control_loops)
+                        for (node, do_control_loop) in self
+                            .nodes
+                            .iter_mut()
+                            .filter(|n| n.state() != NodeState::Terminated)
+                            .zip(do_control_loops)
                         {
                             let node_context = node_contexts[&node.name()].clone();
                             scope.execute(move || {
@@ -1005,10 +1057,7 @@ impl Simulator {
                     );
 
                     let node_states = self.node_positions();
-                    if let Err(e) = self.end_of_time_step_procedure(
-                        &node_states,
-                        &context,
-                    ) {
+                    if let Err(e) = self.end_of_time_step_procedure(&node_states, &context) {
                         error = Some(e);
                         break;
                     }
@@ -1017,10 +1066,15 @@ impl Simulator {
                         .nodes
                         .iter()
                         .filter(|n| !node_contexts.contains_key(&n.name()))
-                        .map(|node| (node.name(), context.new_node_context(node.name()))).collect::<BTreeMap<_, _>>();
+                        .map(|node| (node.name(), context.new_node_context(node.name())))
+                        .collect::<BTreeMap<_, _>>();
                     node_contexts.extend(new_contexts);
 
-                    for node in self.nodes.iter_mut().filter(|n| n.state() != NodeState::Terminated) {
+                    for node in self
+                        .nodes
+                        .iter_mut()
+                        .filter(|n| n.state() != NodeState::Terminated)
+                    {
                         if node.send_records()
                             && let Some(async_api_server) = &self.async_api_server
                         {
@@ -1087,11 +1141,7 @@ impl Simulator {
 
         self.node_apis.insert(
             name.clone(),
-            node.post_creation_init(
-                self.environment.get_meta_data().clone(),
-                time,
-                context,
-            ),
+            node.post_creation_init(self.environment.get_meta_data().clone(), time, context),
         );
         self.nodes.push(node);
         Ok(())
@@ -1115,7 +1165,7 @@ impl Simulator {
         if filename.is_none() {
             return Ok(());
         }
-        let filename = self.config.base_path.as_ref().join(filename.unwrap());
+        let filename = self.config.get_base_path().join(filename.unwrap());
 
         if !self.records.is_empty() {
             // Results already started, just need to remove last line
@@ -1263,7 +1313,7 @@ impl Simulator {
         let result_config = self.config.results.clone().unwrap();
         let filename = result_config.result_path;
         if let Some(filename) = filename {
-            let filename = self.config.base_path.as_ref().join(filename);
+            let filename = self.config.get_base_path().join(filename);
 
             info!(
                 context,
@@ -1327,7 +1377,7 @@ impl Simulator {
                 "Request for loading results but no result path in configuration".to_string(),
             ));
         }
-        let filename = self.config.base_path.as_ref().join(filename.unwrap());
+        let filename = self.config.get_base_path().join(filename.unwrap());
         let results = Self::deserialize_results_from_file(&filename, &self.context)?;
 
         self.records = results.records;
@@ -1385,7 +1435,6 @@ impl Simulator {
         Ok(serde_json::from_str(&content).expect("Error during json parsing"))
     }
 
-
     fn end_of_time_step_procedure(
         &mut self,
         node_states: &BTreeMap<String, Option<[f32; 2]>>,
@@ -1393,15 +1442,13 @@ impl Simulator {
     ) -> SimusaResult<()> {
         let current_time = context.get_time().expect("Simulator context has no time!!");
         self.last_sim_time = current_time;
-        
+
         let scenario = self.scenario.clone();
         scenario
             .lock()
             .unwrap()
-            .execute_scenario(self,
-                node_states, 
-                context
-            ).unwrap();
+            .execute_scenario(self, node_states, context)
+            .unwrap();
         self.network_manager
             .process_messages(node_states, context)
             .unwrap();
@@ -1430,14 +1477,18 @@ impl Simulator {
                         Some((
                             node_name.clone(),
                             if let Some(physics) = meta_data.physics.as_ref() {
-                                if let Some(state) = physics.read().unwrap().state(self.context.get_time().unwrap(), &self.context) {
+                                if let Some(state) = physics
+                                    .read()
+                                    .unwrap()
+                                    .state(self.context.get_time().unwrap(), &self.context)
+                                {
                                     Some([state.pose.x, state.pose.y])
                                 } else {
                                     None
                                 }
                             } else {
                                 None
-                            }
+                            },
                         ))
                     } else {
                         None

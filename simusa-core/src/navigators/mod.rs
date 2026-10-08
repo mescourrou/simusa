@@ -71,9 +71,7 @@ impl UIComponent for NavigatorConfig {
                         trajectory_follower::TrajectoryFollowerConfig::default(),
                     )
                 }
-                "Plugin" => {
-                    *self = NavigatorConfig::Plugin(serde_json::Value::Null)
-                }
+                "Plugin" => *self = NavigatorConfig::Plugin(serde_json::Value::Null),
                 "GoTo" => *self = NavigatorConfig::GoTo(go_to::GoToConfig::default()),
                 _ => panic!("Where did you find this value?"),
             };
@@ -87,7 +85,14 @@ impl UIComponent for NavigatorConfig {
                 current_node_name,
                 unique_id,
             ),
-            NavigatorConfig::Plugin(c) => edit_plugin_config(ui, "Plugin Navigator", "plugin-navigator", unique_id, buffer_stack, c),
+            NavigatorConfig::Plugin(c) => edit_plugin_config(
+                ui,
+                "Plugin Navigator",
+                "plugin-navigator",
+                unique_id,
+                buffer_stack,
+                c,
+            ),
             NavigatorConfig::GoTo(c) => c.show_mut(
                 ui,
                 ctx,
@@ -203,19 +208,23 @@ pub fn make_navigator_from_config(
                 from_config_params.initial_time,
             )) as Box<dyn Navigator>
         }
-        NavigatorConfig::Plugin(c) => from_config_params.plugin_api.as_ref().ok_or_else(|| {
-            SimusaError::new(
-                SimusaErrorTypes::PluginAPIError,
-                "Plugin API not set!".to_string(),
-            )
-        })?.get_navigator(
-            c,
-            from_config_params.global_config,
-            from_config_params.va_factory,
-            from_config_params.network,
-            from_config_params.initial_time,
-            from_config_params.context,
-        ),
+        NavigatorConfig::Plugin(c) => from_config_params
+            .plugin_api
+            .as_ref()
+            .ok_or_else(|| {
+                SimusaError::new(
+                    SimusaErrorTypes::PluginAPIError,
+                    "Plugin API not set!".to_string(),
+                )
+            })?
+            .get_navigator(
+                c,
+                from_config_params.global_config,
+                from_config_params.va_factory,
+                from_config_params.network,
+                from_config_params.initial_time,
+                from_config_params.context,
+            ),
         NavigatorConfig::GoTo(c) => Box::new(go_to::GoTo::from_config(
             c,
             from_config_params.network,

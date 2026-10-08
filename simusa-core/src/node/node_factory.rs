@@ -944,7 +944,8 @@ impl NodeFactory {
         let initial_state = physics
             .read()
             .unwrap()
-            .state(params.initial_time, &params.context).unwrap()
+            .state(params.initial_time, &params.context)
+            .unwrap()
             .clone();
         let node = Node {
             node_meta_data: Arc::new(RwLock::new(NodeMetaData {

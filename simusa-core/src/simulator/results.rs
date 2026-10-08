@@ -88,7 +88,7 @@ impl UIComponent for ResultConfig {
             ui.horizontal(|ui| {
                 ui.label("Result Path:");
                 if let Some(path) = &mut self.result_path {
-                    path_finder(ui, path, &global_config.base_path);
+                    path_finder(ui, path, &global_config.get_base_path());
                     if ui.button("X").clicked() {
                         self.result_path = None;
                     }

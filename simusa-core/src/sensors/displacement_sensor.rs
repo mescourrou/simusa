@@ -413,18 +413,23 @@ impl DisplacementSensor {
                     )
                 }
                 DisplacementSensorFaultModelConfig::Plugin(cfg) => {
-                    DisplacementSensorFaultModelType::Plugin(plugin_api.as_ref().ok_or_else(|| {
-                        SimusaError::new(
-                            SimusaErrorTypes::PluginAPIError,
-                            "Plugin API is not available.".to_string(),
-                        )
-                    })?.get_sensor_fault(
-                        cfg,
-                        global_config,
-                        va_factory,
-                        initial_time,
-                        context,
-                    ))
+                    DisplacementSensorFaultModelType::Plugin(
+                        plugin_api
+                            .as_ref()
+                            .ok_or_else(|| {
+                                SimusaError::new(
+                                    SimusaErrorTypes::PluginAPIError,
+                                    "Plugin API is not available.".to_string(),
+                                )
+                            })?
+                            .get_sensor_fault(
+                                cfg,
+                                global_config,
+                                va_factory,
+                                initial_time,
+                                context,
+                            ),
+                    )
                 }
             });
         }
@@ -436,18 +441,23 @@ impl DisplacementSensor {
                     RangeFilter::from_config(cfg, initial_time, context),
                 ),
                 DisplacementSensorFilterConfig::Plugin(cfg) => {
-                    DisplacementSensorFilterType::Plugin(plugin_api.as_ref().ok_or_else(|| {
-                        SimusaError::new(
-                            SimusaErrorTypes::PluginAPIError,
-                            "Plugin API is not available.".to_string(),
-                        )
-                    })?.get_sensor_filter(
-                        cfg,
-                        global_config,
-                        va_factory,
-                        initial_time,
-                        context,
-                    ))
+                    DisplacementSensorFilterType::Plugin(
+                        plugin_api
+                            .as_ref()
+                            .ok_or_else(|| {
+                                SimusaError::new(
+                                    SimusaErrorTypes::PluginAPIError,
+                                    "Plugin API is not available.".to_string(),
+                                )
+                            })?
+                            .get_sensor_filter(
+                                cfg,
+                                global_config,
+                                va_factory,
+                                initial_time,
+                                context,
+                            ),
+                    )
                 }
             });
         }
@@ -481,7 +491,8 @@ impl Sensor for DisplacementSensor {
             .expect("Node with Speed sensor should have Physics")
             .read()
             .unwrap()
-            .state(initial_time, context).unwrap()
+            .state(initial_time, context)
+            .unwrap()
             .clone();
         for filter in self.filters.iter_mut() {
             filter.post_init(node, initial_time, context)?;

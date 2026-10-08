@@ -54,9 +54,7 @@ impl UIComponent for PhysicsConfig {
                     *self =
                         PhysicsConfig::Internal(internal_physics::InternalPhysicConfig::default())
                 }
-                "Plugin" => {
-                    *self = PhysicsConfig::Plugin(serde_json::Value::Null)
-                }
+                "Plugin" => *self = PhysicsConfig::Plugin(serde_json::Value::Null),
                 _ => panic!("Where did you find this value?"),
             };
         }
@@ -69,7 +67,14 @@ impl UIComponent for PhysicsConfig {
                 current_node_name,
                 unique_id,
             ),
-            PhysicsConfig::Plugin(c) => edit_plugin_config(ui, "Plugin Physics", "plugin-physics", unique_id, buffer_stack, c),
+            PhysicsConfig::Plugin(c) => edit_plugin_config(
+                ui,
+                "Plugin Physics",
+                "plugin-physics",
+                unique_id,
+                buffer_stack,
+                c,
+            ),
         }
     }
 
@@ -120,11 +125,22 @@ impl UIComponent for PhysicsRecord {
 }
 
 use crate::{
-    context::Context, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, node::{Node, node_factory::FromConfigArguments}, physics::robot_models::Command, recordable::Recordable, simulator::SimulatorConfig, state_estimators::State, utils::SharedRwLock,
+    context::Context,
+    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
+    node::{Node, node_factory::FromConfigArguments},
+    physics::robot_models::Command,
+    recordable::Recordable,
+    simulator::SimulatorConfig,
+    state_estimators::State,
+    utils::SharedRwLock,
 };
 #[cfg(feature = "gui")]
 use crate::{
-    gui::{UIComponent, utils::{edit_plugin_config, show_plugin_config, string_combobox}}, utils::enum_tools::ToVec,
+    gui::{
+        UIComponent,
+        utils::{edit_plugin_config, show_plugin_config, string_combobox},
+    },
+    utils::enum_tools::ToVec,
 };
 
 // Services
@@ -166,7 +182,7 @@ pub trait Physics:
     /// Get the current real state, the groundtruth.
     ///
     /// `context` can be used for logging or diagnostics while retrieving the state.
-    /// 
+    ///
     /// Optional: return None if the state is not available at the current time (e.g., if the node is terminated).
     fn state(&self, time: f32, context: &Context) -> Option<State>;
 
@@ -190,20 +206,24 @@ pub fn make_physics_from_config(
     Ok(Arc::new(RwLock::new(match &config {
         PhysicsConfig::Internal(c) => Box::new(internal_physics::InternalPhysics::from_config(
             c,
-            from_config_args
+            from_config_args,
         )?) as Box<dyn Physics>,
-        PhysicsConfig::Plugin(c) => from_config_args.plugin_api.as_ref().ok_or_else(|| {
-            SimusaError::new(
-                SimusaErrorTypes::PluginAPIError,
-                "Plugin API not set!".to_string(),
-            )
-        })?.get_physics(
-            &c,
-            from_config_args.global_config,
-            from_config_args.va_factory,
-            from_config_args.network,
-            from_config_args.initial_time,
-            from_config_args.context,
-        ),
+        PhysicsConfig::Plugin(c) => from_config_args
+            .plugin_api
+            .as_ref()
+            .ok_or_else(|| {
+                SimusaError::new(
+                    SimusaErrorTypes::PluginAPIError,
+                    "Plugin API not set!".to_string(),
+                )
+            })?
+            .get_physics(
+                &c,
+                from_config_args.global_config,
+                from_config_args.va_factory,
+                from_config_args.network,
+                from_config_args.initial_time,
+                from_config_args.context,
+            ),
     })))
 }

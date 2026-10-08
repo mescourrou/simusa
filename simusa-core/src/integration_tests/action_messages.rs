@@ -69,9 +69,7 @@ mod kill_node {
         physics::robot_models::Command,
         recordable::Recordable,
         sensors::Observation,
-        state_estimators::{
-            StateEstimator, StateEstimatorRecord, WorldState,
-        },
+        state_estimators::{StateEstimator, StateEstimatorRecord, WorldState},
         utils::maths::round_precision,
     };
 
@@ -216,9 +214,7 @@ mod trigger_sensor {
         recordable::Recordable,
         sensors::{Observation, sensor_manager::SensorTriggerMessage},
         simulator::SimulatorConfig,
-        state_estimators::{
-            StateEstimator, StateEstimatorRecord, WorldState,
-        },
+        state_estimators::{StateEstimator, StateEstimatorRecord, WorldState},
         utils::{
             SharedMutex, SharedRwLock,
             determinist_random_variable::DeterministRandomVariableFactory, maths::round_precision,
@@ -340,7 +336,6 @@ fn trigger_sensor_pooled() {
 fn trigger_sensor_monothreaded() {
     trigger_sensor(1);
 }
-
 
 fn trigger_sensor(nb_threads: usize) {
     let trigger_times = VecDeque::<f32>::from(vec![3.2, 5., 6., 7.5, 9.1, 9.9, 10.0, 21.3]);

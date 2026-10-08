@@ -11,8 +11,8 @@ use simusa::navigators::{Navigator, NavigatorRecord};
 use simusa::networking::network::Network;
 use simusa::node::Node;
 use simusa::physics::fault_models::PhysicsFaultModel;
-use simusa::physics::robot_models::unicycle::UnicycleCommand;
 use simusa::physics::robot_models::Command;
+use simusa::physics::robot_models::unicycle::UnicycleCommand;
 use simusa::physics::{Physics, PhysicsRecord};
 use simusa::plugin_api::PluginAPI;
 use simusa::recordable::Recordable;
@@ -24,9 +24,9 @@ use simusa::simulator::{Simulator, SimulatorConfig};
 use simusa::state_estimators::{
     State, StateEstimator, StateEstimatorRecord, StateRecord, WorldState,
 };
+use simusa::utils::SharedRwLock;
 use simusa::utils::determinist_random_variable::DeterministRandomVariableFactory;
 use simusa::utils::frame::Frame;
-use simusa::utils::SharedRwLock;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -155,10 +155,11 @@ impl Physics for MyWonderfulPhysics {
 
 impl Recordable<PhysicsRecord> for MyWonderfulPhysics {
     fn record(&self, context: &Context) -> PhysicsRecord {
-        PhysicsRecord::Plugin(serde_json::to_value(MyWonderfulPhysicsRecord {
+        PhysicsRecord::Plugin(
+            serde_json::to_value(MyWonderfulPhysicsRecord {
                 state: self.state.record(context),
             })
-            .unwrap()
+            .unwrap(),
         )
     }
 }
@@ -225,7 +226,7 @@ impl Recordable<StateEstimatorRecord> for MyWonderfulStateEstimator {
             serde_json::to_value(MyWonderfulStateEstimatorRecord {
                 last_prediction: self.last_prediction,
             })
-            .unwrap()
+            .unwrap(),
         )
     }
 }
@@ -286,7 +287,9 @@ impl Sensor for MyWonderfulSensor {
         self.last_observation = Some(MyWonderfulSensorObservation { data: time });
         self.last_time = time;
         // Return a custom observation here, but you can return an existing one as well (e.g. SpeedObservation)
-        vec![SensorObservation::Plugin(serde_json::to_value(self.last_observation.as_ref().unwrap()).unwrap())]
+        vec![SensorObservation::Plugin(
+            serde_json::to_value(self.last_observation.as_ref().unwrap()).unwrap(),
+        )]
     }
 
     fn next_time_step(&self) -> f32 {
@@ -343,7 +346,12 @@ impl MyWonderfulSensorFault {
 }
 
 impl FaultModel for MyWonderfulSensorFault {
-    fn post_init(&mut self, _node: &mut simusa::node::Node, _initial_time: f32, context: &Context) -> SimusaResult<()> {
+    fn post_init(
+        &mut self,
+        _node: &mut simusa::node::Node,
+        _initial_time: f32,
+        context: &Context,
+    ) -> SimusaResult<()> {
         Ok(())
     }
 
@@ -355,8 +363,7 @@ impl FaultModel for MyWonderfulSensorFault {
         obs_type: SensorObservation,
         environment: &Arc<simusa::environment::Environment>,
         context: &Context,
-    )
-    {
+    ) {
         // Add your fault here, for example, remove the last observation
         obs_list.pop();
     }
@@ -379,7 +386,12 @@ impl MyWonderfulSensorFilter {
 }
 
 impl SensorFilter for MyWonderfulSensorFilter {
-    fn post_init(&mut self, _node: &mut simusa::node::Node, initial_time: f32, context: &Context) -> SimusaResult<()> {
+    fn post_init(
+        &mut self,
+        _node: &mut simusa::node::Node,
+        initial_time: f32,
+        context: &Context,
+    ) -> SimusaResult<()> {
         Ok(())
     }
 
@@ -390,14 +402,12 @@ impl SensorFilter for MyWonderfulSensorFilter {
         observer_state: &State,
         observee_state: Option<&State>,
         context: &Context,
-    ) -> Option<SensorObservation>
-    {
+    ) -> Option<SensorObservation> {
         // Add you filter here, for example, keep only GNSS
         match observation {
             SensorObservation::GNSS(_) => Some(observation),
             _ => None,
         }
-        
     }
 }
 
@@ -416,8 +426,7 @@ impl Drawable for MyWonderfulDrawable {
         painter_info: &simusa::gui::PainterInfo,
         scale: f32,
         time: f32,
-    ) -> Result<Vec<egui::Shape>, egui::Vec2>
-    {
+    ) -> Result<Vec<egui::Shape>, egui::Vec2> {
         Ok(vec![egui::Shape::line_segment(
             [
                 egui::pos2(viewport.left(), viewport.top()),
@@ -435,8 +444,7 @@ impl Drawable for MyWonderfulDrawable {
         painter_info: &simusa::gui::PainterInfo,
         scale: f32,
         time: f32,
-    )
-    {
+    ) {
         // Manage clicks, drags, etc. on the drawable here
     }
 
@@ -456,21 +464,18 @@ impl Drawable for MyWonderfulDrawable {
     }
 
     // You can choose only one of the four methods below to implement, depending on your needs.
-    fn add_computation_unit_record(&mut self, time: f32, record: simusa::node::node_factory::ComputationUnitRecord) {
-        
+    fn add_computation_unit_record(
+        &mut self,
+        time: f32,
+        record: simusa::node::node_factory::ComputationUnitRecord,
+    ) {
     }
 
-    fn add_map_record(&mut self, time: f32, record: simusa::environment::map::MapRecord) {
-        
-    }
+    fn add_map_record(&mut self, time: f32, record: simusa::environment::map::MapRecord) {}
 
-    fn add_robot_record(&mut self, time: f32, record: simusa::node::node_factory::RobotRecord) {
-        
-    }
+    fn add_robot_record(&mut self, time: f32, record: simusa::node::node_factory::RobotRecord) {}
 
-    fn add_scenario_record(&mut self, time: f32, record: simusa::scenario::config::EventRecord) {
-        
-    }
+    fn add_scenario_record(&mut self, time: f32, record: simusa::scenario::config::EventRecord) {}
 }
 
 ///////////////////////////////////
@@ -489,7 +494,11 @@ impl MyWonderfulResultAnalyser {
 }
 
 impl ResultAnalyserTrait for MyWonderfulResultAnalyser {
-    fn analyse_results(&mut self, results: &simusa::simulator::Results, context: &Context) -> SimusaResult<()> {
+    fn analyse_results(
+        &mut self,
+        results: &simusa::simulator::Results,
+        context: &Context,
+    ) -> SimusaResult<()> {
         // Perform the analysis here
         Ok(())
     }
@@ -580,8 +589,7 @@ impl PluginAPI for MyWonderfulPlugin {
         va_factory: &Arc<DeterministRandomVariableFactory>,
         initial_time: f32,
         context: &Context,
-    ) -> Box<dyn simusa::physics::fault_models::PhysicsFaultModel>
-    {
+    ) -> Box<dyn simusa::physics::fault_models::PhysicsFaultModel> {
         Box::new(MyWonderfulPhysicsFault::from_config(
             serde_json::from_value(config.clone()).unwrap(),
             initial_time,
@@ -595,8 +603,7 @@ impl PluginAPI for MyWonderfulPlugin {
         va_factory: &Arc<DeterministRandomVariableFactory>,
         initial_time: f32,
         context: &Context,
-    ) -> Box<dyn simusa::sensors::fault_models::FaultModel>
-    {
+    ) -> Box<dyn simusa::sensors::fault_models::FaultModel> {
         Box::new(MyWonderfulSensorFault::from_config(
             serde_json::from_value(config.clone()).unwrap(),
             initial_time,
@@ -610,15 +617,17 @@ impl PluginAPI for MyWonderfulPlugin {
         va_factory: &Arc<DeterministRandomVariableFactory>,
         initial_time: f32,
         context: &Context,
-    ) -> Box<dyn simusa::sensors::sensor_filters::SensorFilter>
-    {
+    ) -> Box<dyn simusa::sensors::sensor_filters::SensorFilter> {
         Box::new(MyWonderfulSensorFilter::from_config(
             serde_json::from_value(config.clone()).unwrap(),
             initial_time,
         ))
     }
 
-    fn get_drawables(&self, global_config: &SimulatorConfig) -> Vec<Box<dyn simusa::gui::Drawable>> {
+    fn get_drawables(
+        &self,
+        global_config: &SimulatorConfig,
+    ) -> Vec<Box<dyn simusa::gui::Drawable>> {
         vec![Box::new(MyWonderfulDrawable { thickness: 2.0 })]
     }
 
@@ -627,14 +636,12 @@ impl PluginAPI for MyWonderfulPlugin {
         config: &serde_json::Value,
         global_config: &SimulatorConfig,
         context: &Context,
-    ) -> Box<dyn simusa::result_analyser::ResultAnalyserTrait>
-    {
+    ) -> Box<dyn simusa::result_analyser::ResultAnalyserTrait> {
         Box::new(MyWonderfulResultAnalyser::from_config(
             serde_json::from_value(config.clone()).unwrap(),
             0.0,
         ))
     }
-
 }
 
 fn main() {

@@ -4,15 +4,24 @@ use std::sync::{Arc, Mutex};
 use pyo3::prelude::*;
 
 use simusa::{
-    context::Context, controllers::Controller, internal, logger::InternalLog, navigators::{
-        Navigator,
-        go_to::GoToMessage,
-    }, networking::network::{MessageFlag, Network}, physics::Physics, plugin_api::PluginAPI, sensors::sensor_manager::SensorTriggerMessage, simulator::SimulatorConfig, state_estimators::StateEstimator, utils::{
-        SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory,
-    },
+    context::Context,
+    controllers::Controller,
+    internal,
+    logger::InternalLog,
+    navigators::{Navigator, go_to::GoToMessage},
+    networking::network::{MessageFlag, Network},
+    physics::Physics,
+    plugin_api::PluginAPI,
+    sensors::sensor_manager::SensorTriggerMessage,
+    simulator::SimulatorConfig,
+    state_estimators::StateEstimator,
+    utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
 };
 
-use crate::{controllers::PythonController, navigators::PythonNavigator, physics::PythonPhysics, state_estimators::PythonStateEstimator, utils::call_py_method};
+use crate::{
+    controllers::PythonController, navigators::PythonNavigator, physics::PythonPhysics,
+    state_estimators::PythonStateEstimator, utils::call_py_method,
+};
 
 /// Plugin API bridge backed by a Python object. Holds references to Python component instances.
 #[derive(Debug)]
@@ -105,11 +114,7 @@ impl PluginAPI for PythonAPI {
         initial_time: f32,
         context: &Context,
     ) -> Box<dyn Controller> {
-        internal!(
-            context,
-            InternalLog::API,
-            "Calling Python API"
-        );
+        internal!(context, InternalLog::API, "Calling Python API");
         self.controllers
             .lock()
             .unwrap()
@@ -142,11 +147,7 @@ impl PluginAPI for PythonAPI {
         initial_time: f32,
         context: &Context,
     ) -> Box<dyn Navigator> {
-        internal!(
-            context,
-            InternalLog::API,
-            "Calling Python API"
-        );
+        internal!(context, InternalLog::API, "Calling Python API");
         self.navigators
             .lock()
             .unwrap()
@@ -172,11 +173,7 @@ impl PluginAPI for PythonAPI {
         initial_time: f32,
         context: &Context,
     ) -> Box<dyn Physics> {
-        internal!(
-            context,
-            InternalLog::API,
-            "Calling Python API"
-        );
+        internal!(context, InternalLog::API, "Calling Python API");
         self.physics
             .lock()
             .unwrap()

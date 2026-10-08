@@ -1,6 +1,10 @@
-use simusa::{navigators::go_to::GoToMessage, networking::network::MessageFlag, sensors::sensor_manager::{SensorFrameMessage, SensorTriggerMessage}};
-use simusa_macros::EnumToString;
 use pyo3::prelude::*;
+use simusa::{
+    navigators::go_to::GoToMessage,
+    networking::network::MessageFlag,
+    sensors::sensor_manager::{SensorFrameMessage, SensorTriggerMessage},
+};
+use simusa_macros::EnumToString;
 
 #[derive(Clone, Debug)]
 #[pyclass(get_all, set_all)]
@@ -27,7 +31,6 @@ impl SensorTriggerMessageWrapper {
 }
 
 #[derive(Clone, Debug)]
-
 #[pyclass(get_all, set_all)]
 #[pyo3(name = "SensorFrameMessage")]
 pub struct SensorFrameMessageWrapper {
@@ -42,10 +45,7 @@ impl SensorFrameMessageWrapper {
     /// Creates an empty frame message.
     #[new]
     pub fn new(frame: [f32; 3], sensor_name: String) -> Self {
-        Self {
-            frame,
-            sensor_name,
-        }
+        Self { frame, sensor_name }
     }
 }
 
@@ -153,5 +153,4 @@ impl MessageFlagWrapper {
             Self::Kill => MessageFlag::Kill,
         }
     }
-    
 }

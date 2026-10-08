@@ -9,11 +9,20 @@
 pub mod pid;
 
 use crate::{
-    context::Context, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, node::node_factory::FromConfigArguments, physics::{PhysicsConfig, robot_models::Command}, recordable::Recordable, utils::SharedRwLock,
+    context::Context,
+    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
+    node::node_factory::FromConfigArguments,
+    physics::{PhysicsConfig, robot_models::Command},
+    recordable::Recordable,
+    utils::SharedRwLock,
 };
 #[cfg(feature = "gui")]
 use crate::{
-    gui::{UIComponent, utils::{edit_plugin_config, show_plugin_config, string_combobox}}, utils::enum_tools::ToVec,
+    gui::{
+        UIComponent,
+        utils::{edit_plugin_config, show_plugin_config, string_combobox},
+    },
+    utils::enum_tools::ToVec,
 };
 use std::sync::{Arc, RwLock};
 
@@ -82,9 +91,7 @@ impl UIComponent for ControllerConfig {
         if current_str != self.to_string() {
             match current_str.as_str() {
                 "PID" => *self = ControllerConfig::PID(pid::PIDConfig::default()),
-                "Plugin" => {
-                    *self = ControllerConfig::Plugin(serde_json::Value::Null)
-                }
+                "Plugin" => *self = ControllerConfig::Plugin(serde_json::Value::Null),
                 _ => panic!("Where did you find this value?"),
             };
         }
@@ -97,7 +104,14 @@ impl UIComponent for ControllerConfig {
                 current_node_name,
                 unique_id,
             ),
-            ControllerConfig::Plugin(c) => edit_plugin_config(ui, "Plugin Controller", "plugin-controller", unique_id, buffer_stack, c),
+            ControllerConfig::Plugin(c) => edit_plugin_config(
+                ui,
+                "Plugin Controller",
+                "plugin-controller",
+                unique_id,
+                buffer_stack,
+                c,
+            ),
         }
     }
 
@@ -198,18 +212,22 @@ pub fn make_controller_from_config(
             from_config_params.initial_time,
             from_config_params.context,
         )) as Box<dyn Controller>,
-        ControllerConfig::Plugin(c) => from_config_params.plugin_api.as_ref().ok_or_else(|| {
-            SimusaError::new(
-                SimusaErrorTypes::PluginAPIError,
-                "Plugin API not set!".to_string(),
-            )
-        })?.get_controller(
-            c,
-            from_config_params.global_config,
-            from_config_params.va_factory,
-            from_config_params.network,
-            from_config_params.initial_time,
-            from_config_params.context,
-        ),
+        ControllerConfig::Plugin(c) => from_config_params
+            .plugin_api
+            .as_ref()
+            .ok_or_else(|| {
+                SimusaError::new(
+                    SimusaErrorTypes::PluginAPIError,
+                    "Plugin API not set!".to_string(),
+                )
+            })?
+            .get_controller(
+                c,
+                from_config_params.global_config,
+                from_config_params.va_factory,
+                from_config_params.network,
+                from_config_params.initial_time,
+                from_config_params.context,
+            ),
     })))
 }

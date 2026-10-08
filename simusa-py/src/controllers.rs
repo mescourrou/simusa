@@ -14,11 +14,7 @@ use serde_json::Value;
 use simusa_com::rfc::{self, RemoteFunctionCall, RemoteFunctionCallHost};
 
 use simusa::{
-    context::Context,
-    errors::SimusaResult,
-    internal,
-    node::Node,
-    physics::robot_models::Command,
+    context::Context, errors::SimusaResult, internal, node::Node, physics::robot_models::Command,
     recordable::Recordable,
 };
 

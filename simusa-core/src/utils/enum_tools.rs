@@ -25,7 +25,16 @@ use std::{
 /// A trait for enums that represent variables names in the simulator.
 /// This trait provides a method to create a mapping from enum variants to any type `T` (e.g. f32) using a provided mapping function.
 pub trait EnumVariables:
-    Clone + Eq + Debug + ToString + ToVec<&'static str> + ToVec<Self> + Display + FromStr + std::cmp::Ord + std::hash::Hash
+    Clone
+    + Eq
+    + Debug
+    + ToString
+    + ToVec<&'static str>
+    + ToVec<Self>
+    + Display
+    + FromStr
+    + std::cmp::Ord
+    + std::hash::Hash
 {
     /// Maps each enum variant to a value of type `T` using the provided mapping function, and returns a `BTreeMap` of the results.
     fn mapped_values<T>(mut map_fn: impl FnMut(&Self) -> T) -> BTreeMap<Self, T> {

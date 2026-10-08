@@ -99,7 +99,10 @@ pub enum OrientedLandmarkSensorFaultModelConfig {
     #[check]
     Misassociation(MisassociationFaultConfig),
     /// Plugin-provided external fault model.
-    #[plugin("OrientedLandmarkSensorFaultModel", "oriented-landmark-sensor-fault-model")]
+    #[plugin(
+        "OrientedLandmarkSensorFaultModel",
+        "oriented-landmark-sensor-fault-model"
+    )]
     Plugin(serde_json::Value),
 }
 
@@ -553,12 +556,17 @@ impl OrientedLandmarkSensor {
                     )
                 }
                 OrientedLandmarkSensorFaultModelConfig::Plugin(c) => {
-                    OrientedLandmarkSensorFaultModelType::Plugin(plugin_api.as_ref().ok_or_else(|| {
-                        SimusaError::new(
-                            SimusaErrorTypes::PluginAPIError,
-                            "Plugin API not set!".to_string(),
-                        )
-                    })?.get_sensor_fault(c, global_config, va_factory, initial_time, context))
+                    OrientedLandmarkSensorFaultModelType::Plugin(
+                        plugin_api
+                            .as_ref()
+                            .ok_or_else(|| {
+                                SimusaError::new(
+                                    SimusaErrorTypes::PluginAPIError,
+                                    "Plugin API not set!".to_string(),
+                                )
+                            })?
+                            .get_sensor_fault(c, global_config, va_factory, initial_time, context),
+                    )
                 }
             });
         }
@@ -584,12 +592,17 @@ impl OrientedLandmarkSensor {
                     ))
                 }
                 OrientedLandmarkSensorFilterConfig::Plugin(c) => {
-                    OrientedLandmarkSensorFilterType::Plugin(plugin_api.as_ref().ok_or_else(|| {
-                        SimusaError::new(
-                            SimusaErrorTypes::PluginAPIError,
-                            "Plugin API not set!".to_string(),
-                        )
-                    })?.get_sensor_filter(c, global_config, va_factory, initial_time, context))
+                    OrientedLandmarkSensorFilterType::Plugin(
+                        plugin_api
+                            .as_ref()
+                            .ok_or_else(|| {
+                                SimusaError::new(
+                                    SimusaErrorTypes::PluginAPIError,
+                                    "Plugin API not set!".to_string(),
+                                )
+                            })?
+                            .get_sensor_filter(c, global_config, va_factory, initial_time, context),
+                    )
                 }
             });
         }

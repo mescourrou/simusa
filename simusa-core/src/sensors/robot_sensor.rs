@@ -500,14 +500,17 @@ impl RobotSensor {
                         cfg, va_factory, context,
                     ))
                 }
-                RobotSensorFaultModelConfig::Plugin(cfg) => {
-                    RobotSensorFaultModelType::Plugin(plugin_api.as_ref().ok_or_else(|| {
-                        SimusaError::new(
-                            SimusaErrorTypes::PluginAPIError,
-                            "Plugin API not set!".to_string(),
-                        )
-                    })?.get_sensor_fault(cfg, global_config, va_factory, initial_time, context))
-                }
+                RobotSensorFaultModelConfig::Plugin(cfg) => RobotSensorFaultModelType::Plugin(
+                    plugin_api
+                        .as_ref()
+                        .ok_or_else(|| {
+                            SimusaError::new(
+                                SimusaErrorTypes::PluginAPIError,
+                                "Plugin API not set!".to_string(),
+                            )
+                        })?
+                        .get_sensor_fault(cfg, global_config, va_factory, initial_time, context),
+                ),
             });
         }
 
@@ -523,14 +526,17 @@ impl RobotSensor {
                 RobotSensorFilterConfig::Label(cfg) => RobotSensorFilterType::Label(
                     StringFilter::from_config(cfg, initial_time, context),
                 ),
-                RobotSensorFilterConfig::Plugin(cfg) => {
-                    RobotSensorFilterType::Plugin(plugin_api.as_ref().ok_or_else(|| {
-                        SimusaError::new(
-                            SimusaErrorTypes::PluginAPIError,
-                            "Plugin API not set!".to_string(),
-                        )
-                    })?.get_sensor_filter(cfg, global_config, va_factory, initial_time, context))
-                }
+                RobotSensorFilterConfig::Plugin(cfg) => RobotSensorFilterType::Plugin(
+                    plugin_api
+                        .as_ref()
+                        .ok_or_else(|| {
+                            SimusaError::new(
+                                SimusaErrorTypes::PluginAPIError,
+                                "Plugin API not set!".to_string(),
+                            )
+                        })?
+                        .get_sensor_filter(cfg, global_config, va_factory, initial_time, context),
+                ),
             });
         }
 
@@ -604,7 +610,8 @@ impl Sensor for RobotSensor {
         );
 
         for (i, (other_node_name, other_node_meta_data)) in node
-            .meta_data_list().unwrap()
+            .meta_data_list()
+            .unwrap()
             .read()
             .unwrap()
             .iter()
@@ -617,8 +624,9 @@ impl Sensor for RobotSensor {
             if other_node_meta_data.state == NodeState::Terminated {
                 continue;
             }
-            let other_state = if let Some(other_node_physics) = other_node_meta_data
-                .physics.as_ref() {
+            let other_state = if let Some(other_node_physics) =
+                other_node_meta_data.physics.as_ref()
+            {
                 other_node_physics
                     .read()
                     .unwrap()
@@ -634,8 +642,6 @@ impl Sensor for RobotSensor {
                 other_node_name
             );
 
-
-            
             if node.environment().is_target_observable(
                 &other_state.pose.fixed_rows::<2>(0).clone_owned(),
                 Some(0.),

@@ -1,19 +1,36 @@
+use ::simusa::{
+    navigators::go_to::GoToMessage, networking::network::MessageFlag, plugin_api::PluginAPI,
+    sensors::sensor_manager::SensorTriggerMessage,
+};
 use pyo3::prelude::*;
-use ::simusa::{navigators::go_to::GoToMessage, networking::network::MessageFlag, plugin_api::PluginAPI, sensors::sensor_manager::SensorTriggerMessage};
 
-use crate::{controllers::ControllerWrapper, messages::{GoToMessageWrapper, MessageFlagWrapper, SensorTriggerMessageWrapper}, navigators::NavigatorWrapper, networking::MessageTypesWrapper, physics::PhysicsWrapper, result_analyser::ResultAnalyser, state_estimators::StateEstimatorWrapper, wrappers::{CommandWrapper, ControllerErrorWrapper, DisplacementObservationWrapper, GNSSObservationWrapper, MultiClientWrapper, NodeWrapper, ObservationWrapper, OrientedLandmarkObservationWrapper, OrientedRobotObservationWrapper, PluginAPIWrapper, Pose, SensorObservationWrapper, SimulatorWrapper, SpeedObservationWrapper, StateWrapper, UnicycleCommandWrapper, Vec2, Vec3, WorldStateWrapper}};
-
+use crate::{
+    controllers::ControllerWrapper,
+    messages::{GoToMessageWrapper, MessageFlagWrapper, SensorTriggerMessageWrapper},
+    navigators::NavigatorWrapper,
+    networking::MessageTypesWrapper,
+    physics::PhysicsWrapper,
+    result_analyser::ResultAnalyser,
+    state_estimators::StateEstimatorWrapper,
+    wrappers::{
+        CommandWrapper, ControllerErrorWrapper, DisplacementObservationWrapper,
+        GNSSObservationWrapper, MultiClientWrapper, NodeWrapper, ObservationWrapper,
+        OrientedLandmarkObservationWrapper, OrientedRobotObservationWrapper, PluginAPIWrapper,
+        Pose, SensorObservationWrapper, SimulatorWrapper, SpeedObservationWrapper, StateWrapper,
+        UnicycleCommandWrapper, Vec2, Vec3, WorldStateWrapper,
+    },
+};
 
 pub mod controllers;
 pub mod general;
+pub mod messages;
 pub mod navigators;
 pub mod networking;
 pub mod physics;
+mod result_analyser;
 pub mod state_estimators;
 pub mod utils;
 pub mod wrappers;
-pub mod messages;
-mod result_analyser;
 
 /// Run the GUI of the simulator. This function will block until the GUI is closed but
 /// will allow communications between Python thread and GUI to be able to use [`PythonAPI`] in the GUI.
@@ -26,10 +43,13 @@ pub fn run_gui(
     plugin_api: Option<Py<PyAny>>,
     load_results: bool,
 ) {
-    use std::{sync::{Arc, RwLock}, thread};
+    use std::{
+        sync::{Arc, RwLock},
+        thread,
+    };
 
-    use ::simusa::{api::async_api::PluginAsyncAPI, context::Context};
     use ::simusa::gui;
+    use ::simusa::{api::async_api::PluginAsyncAPI, context::Context};
 
     use crate::general::PythonAPI;
     let async_plugin_api = plugin_api.as_ref().map(|_| Arc::new(PluginAsyncAPI::new()));
@@ -113,7 +133,6 @@ pub fn run_gui(
 pub fn run_gui(_py: Python, _plugin_api: Option<Py<PyAny>>) {
     unimplemented!("run_gui not available. Compile python package with 'gui' feature");
 }
-
 
 #[pymodule]
 #[pyo3(name = "simusa")]

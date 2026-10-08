@@ -467,14 +467,18 @@ impl Recordable<WorldStateRecord> for WorldState {
 
 #[cfg(feature = "gui")]
 use crate::gui::{
-    UIComponent, utils::{edit_plugin_config, show_plugin_config, string_combobox, text_singleline_with_apply},
+    UIComponent,
+    utils::{edit_plugin_config, show_plugin_config, string_combobox, text_singleline_with_apply},
 };
-use crate::{errors::{SimusaError, SimusaErrorTypes}, simulator::SimulatorConfig};
 use crate::utils::determinist_random_variable::DeterministRandomVariableFactory;
 #[cfg(feature = "gui")]
 use crate::utils::enum_tools::ToVec;
 use crate::{context::Context, utils::geometry::mod2pi};
 use crate::{errors::SimusaResult, node::Node};
+use crate::{
+    errors::{SimusaError, SimusaErrorTypes},
+    simulator::SimulatorConfig,
+};
 use crate::{node::node_factory::FromConfigArguments, utils::occupancy_grid::OccupancyGrid};
 use crate::{
     physics::robot_models::Command, utils::determinist_random_variable::RandomVariableTypeConfig,
@@ -529,9 +533,7 @@ impl UIComponent for StateEstimatorConfig {
                         perfect_estimator::PerfectEstimatorConfig::default(),
                     )
                 }
-                "Plugin" => {
-                    *self = StateEstimatorConfig::Plugin(serde_json::Value::Null)
-                }
+                "Plugin" => *self = StateEstimatorConfig::Plugin(serde_json::Value::Null),
                 _ => panic!("Where did you find this value?"),
             };
         }
@@ -544,7 +546,14 @@ impl UIComponent for StateEstimatorConfig {
                 current_node_name,
                 unique_id,
             ),
-            StateEstimatorConfig::Plugin(c) => edit_plugin_config(ui, "Plugin State Estimator", "plugin-state-estimator", unique_id, buffer_stack, c),
+            StateEstimatorConfig::Plugin(c) => edit_plugin_config(
+                ui,
+                "Plugin State Estimator",
+                "plugin-state-estimator",
+                unique_id,
+                buffer_stack,
+                c,
+            ),
         }
     }
 
@@ -606,19 +615,23 @@ pub fn make_state_estimator_from_config(
                 from_config_params.context,
             )) as Box<dyn StateEstimator>
         }
-        StateEstimatorConfig::Plugin(c) => from_config_params.plugin_api.as_ref().ok_or_else(|| {
-            SimusaError::new(
-                SimusaErrorTypes::PluginAPIError,
-                "Plugin API is not available.".to_string(),
-            )
-        })?.get_state_estimator(
-            c,
-            from_config_params.global_config,
-            from_config_params.va_factory,
-            from_config_params.network,
-            from_config_params.initial_time,
-            from_config_params.context,
-        ),
+        StateEstimatorConfig::Plugin(c) => from_config_params
+            .plugin_api
+            .as_ref()
+            .ok_or_else(|| {
+                SimusaError::new(
+                    SimusaErrorTypes::PluginAPIError,
+                    "Plugin API is not available.".to_string(),
+                )
+            })?
+            .get_state_estimator(
+                c,
+                from_config_params.global_config,
+                from_config_params.va_factory,
+                from_config_params.network,
+                from_config_params.initial_time,
+                from_config_params.context,
+            ),
     })
 }
 

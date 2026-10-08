@@ -1,5 +1,26 @@
 # Changelogs
 
+## v1.10.0
+Features:
+- [breaking] Rename External options to Plugin
+- [breaking] Result Analyser is now a strategy, extensible with PluginAPI. Python result analyser is called as an external command
+- [breaking] Python is now externalized (no Pyo3 dependency in core crate)
+- [breaking] Settable sensor frame (Sensor frame setting is moved up to ManagedSensor struct)
+- Remove old threading method (separate thread with heavy sync operations), optimization.threads = 0 now spawn as many thread in the pool than system cores
+- Keep previous result files, appending .x to the end of previous file
+- Keep Terminated nodes in simulator node list (but not executed)
+- Add time-trigger event to send any message
+- Building rust CLI and python package for linux and windows in future Releases
+- Move Physics to node MetaData instead of just positions
+- `result_path` is now relative to the configuration path
+
+Fixes:
+- [breaking] Repeatability: replace HashMaps by BTreeMaps to enforce iteration determinism;
+- Scenario records saving in simulator records (were only send on a channel)
+- Make sure that max-time is executed
+
+Doc update and add activity diagram
+
 ## v1.9.1
 Changes to fit `crates.io` publication.
 

@@ -8,8 +8,8 @@ mod app;
 
 use std::{collections::BTreeMap, sync::Arc};
 
-pub use app::SimusaApp;
 pub use app::PainterInfo;
+pub use app::SimusaApp;
 mod configurator;
 mod drawables;
 pub use drawables::Drawable;
@@ -32,7 +32,6 @@ pub fn run_gui(
     plugin_api: Option<Arc<dyn PluginAPI>>,
     load_results: bool,
 ) {
-
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([400.0, 300.0])

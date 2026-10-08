@@ -11,7 +11,9 @@
 
 pub use std::str::FromStr;
 use std::{
-    collections::BTreeMap, fmt::{Debug, Display}, hash::Hash,
+    collections::BTreeMap,
+    fmt::{Debug, Display},
+    hash::Hash,
 };
 
 use colored::Colorize;

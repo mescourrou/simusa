@@ -12,12 +12,23 @@ use pyo3::{prelude::*, types::PyDict};
 use simusa_com::rfc::{self, RemoteFunctionCall, RemoteFunctionCallHost};
 
 use simusa::{
-    constants::TIME_ROUND, context::Context, errors::SimusaResult, internal, logger::InternalLog, node::Node, physics::robot_models::Command, recordable::Recordable, sensors::Observation, state_estimators::{
-        StateEstimator, StateEstimatorRecord, WorldState,
-    }, utils::maths::round_precision,
+    constants::TIME_ROUND,
+    context::Context,
+    errors::SimusaResult,
+    internal,
+    logger::InternalLog,
+    node::Node,
+    physics::robot_models::Command,
+    recordable::Recordable,
+    sensors::Observation,
+    state_estimators::{StateEstimator, StateEstimatorRecord, WorldState},
+    utils::maths::round_precision,
 };
 
-use crate::{utils::{call_py_method, call_py_method_void}, wrappers::{CommandWrapper, NodeWrapper, ObservationWrapper, WorldStateWrapper}};
+use crate::{
+    utils::{call_py_method, call_py_method_void},
+    wrappers::{CommandWrapper, NodeWrapper, ObservationWrapper, WorldStateWrapper},
+};
 
 #[derive(Debug, Clone)]
 /// Async client implementation of the state-estimator interface for Python GIL support.
@@ -95,11 +106,7 @@ impl StateEstimator for PythonStateEstimatorAsyncClient {
     }
 
     fn world_state(&self, context: &Context) -> WorldState {
-        internal!(
-            context,
-            InternalLog::API,
-            "Get state from async client"
-        );
+        internal!(context, InternalLog::API, "Get state from async client");
         self.state.call(()).unwrap()
     }
 

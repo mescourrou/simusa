@@ -386,14 +386,17 @@ impl SpeedSensor {
                 SpeedSensorFaultModelConfig::Additive(c) => SpeedSensorFaultModelType::Additive(
                     AdditiveFault::from_config(c, va_factory, initial_time, context),
                 ),
-                SpeedSensorFaultModelConfig::Plugin(c) => {
-                    SpeedSensorFaultModelType::Plugin(plugin_api.as_ref().ok_or_else(|| {
-                        SimusaError::new(
-                            SimusaErrorTypes::PluginAPIError, 
-                            "Plugin API is not available.".to_string(),
-                        )
-                    })?.get_sensor_fault(c, global_config, va_factory, initial_time, context))
-                }
+                SpeedSensorFaultModelConfig::Plugin(c) => SpeedSensorFaultModelType::Plugin(
+                    plugin_api
+                        .as_ref()
+                        .ok_or_else(|| {
+                            SimusaError::new(
+                                SimusaErrorTypes::PluginAPIError,
+                                "Plugin API is not available.".to_string(),
+                            )
+                        })?
+                        .get_sensor_fault(c, global_config, va_factory, initial_time, context),
+                ),
             });
         }
 
@@ -403,14 +406,17 @@ impl SpeedSensor {
                 SpeedSensorFilterConfig::Range(c) => {
                     SpeedSensorFilterType::Range(RangeFilter::from_config(c, initial_time, context))
                 }
-                SpeedSensorFilterConfig::Plugin(c) => {
-                    SpeedSensorFilterType::Plugin(plugin_api.as_ref().ok_or_else(|| {
-                        SimusaError::new(
-                            SimusaErrorTypes::PluginAPIError,
-                            "Plugin API is not available.".to_string(),
-                        )
-                    })?.get_sensor_filter(c, global_config, va_factory, initial_time, context))
-                }
+                SpeedSensorFilterConfig::Plugin(c) => SpeedSensorFilterType::Plugin(
+                    plugin_api
+                        .as_ref()
+                        .ok_or_else(|| {
+                            SimusaError::new(
+                                SimusaErrorTypes::PluginAPIError,
+                                "Plugin API is not available.".to_string(),
+                            )
+                        })?
+                        .get_sensor_filter(c, global_config, va_factory, initial_time, context),
+                ),
             });
         }
 

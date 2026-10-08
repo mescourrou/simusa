@@ -10,14 +10,23 @@ use std::sync::{Arc, Mutex};
 use crate::{gui::UIComponent, simulator::SimulatorConfig};
 
 use crate::{
-    context::Context, error, errors::SimusaResult, internal, logger::InternalLog, node::node_factory::FromConfigArguments, physics::{
+    context::Context,
+    error,
+    errors::SimusaResult,
+    internal,
+    logger::InternalLog,
+    node::node_factory::FromConfigArguments,
+    physics::{
         fault_models::{
             PhysicsFaultModel, PhysicsFaultModelConfig, make_physics_fault_model_from_config,
         },
         robot_models::{
             Command, RobotModel, RobotModelConfig, make_model_from_config, unicycle::UnicycleConfig,
         },
-    }, recordable::Recordable, state_estimators::{State, StateConfig, StateRecord}, utils::{SharedMutex, determinist_random_variable::DeterministRandomVariableFactory},
+    },
+    recordable::Recordable,
+    state_estimators::{State, StateConfig, StateRecord},
+    utils::{SharedMutex, determinist_random_variable::DeterministRandomVariableFactory},
 };
 use config_checker::*;
 use serde_derive::{Deserialize, Serialize};

@@ -12,8 +12,10 @@ use crate::{
 #[cfg(feature = "gui")]
 use crate::{
     gui::{
-        UIComponent, utils::{edit_plugin_config, json_config, show_plugin_config, string_combobox},
-    }, utils::enum_tools::ToVec,
+        UIComponent,
+        utils::{edit_plugin_config, json_config, show_plugin_config, string_combobox},
+    },
+    utils::enum_tools::ToVec,
 };
 
 pub mod python_analyser;
@@ -70,14 +72,23 @@ impl UIComponent for ResultAnalyserConfig {
                 current_node_name,
                 unique_id,
             ),
-            ResultAnalyserConfig::Plugin(config) => edit_plugin_config(ui, "Plugin Result Analyser", "plugin-result-analyser", unique_id, buffer_stack, config),
+            ResultAnalyserConfig::Plugin(config) => edit_plugin_config(
+                ui,
+                "Plugin Result Analyser",
+                "plugin-result-analyser",
+                unique_id,
+                buffer_stack,
+                config,
+            ),
         }
     }
 
     fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
         match self {
             ResultAnalyserConfig::Python(python_config) => python_config.show(ui, ctx, unique_id),
-            ResultAnalyserConfig::Plugin(config) => show_plugin_config(ui, "Plugin Result Analyser", config),
+            ResultAnalyserConfig::Plugin(config) => {
+                show_plugin_config(ui, "Plugin Result Analyser", config)
+            }
         }
     }
 }

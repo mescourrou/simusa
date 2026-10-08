@@ -12,14 +12,30 @@ use serde::{Deserialize, Serialize};
 use simusa_macros::{EnumToString, UIComponent, config_derives, enum_variables};
 
 use crate::{
-    config::NumberConfig, constants::TIME_ROUND, context::Context, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, internal, node::Node, plugin_api::PluginAPI, recordable::Recordable, sensors::{
-        Sensor, SensorObservation, SensorRecord, fault_models::{
-            FaultModel, additive::{AdditiveFault, AdditiveFaultConfig}, clutter::{ClutterFault, ClutterFaultConfig}, misdetection::{MisdetectionFault, MisdetectionFaultConfig},
-        }, sensor_filters::{
+    config::NumberConfig,
+    constants::TIME_ROUND,
+    context::Context,
+    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
+    internal,
+    node::Node,
+    plugin_api::PluginAPI,
+    recordable::Recordable,
+    sensors::{
+        Sensor, SensorObservation, SensorRecord,
+        fault_models::{
+            FaultModel,
+            additive::{AdditiveFault, AdditiveFaultConfig},
+            clutter::{ClutterFault, ClutterFaultConfig},
+            misdetection::{MisdetectionFault, MisdetectionFaultConfig},
+        },
+        sensor_filters::{
             SensorFilter,
             range_filter::{RangeFilter, RangeFilterConfig},
         },
-    }, simulator::SimulatorConfig, state_estimators::State, utils::{
+    },
+    simulator::SimulatorConfig,
+    state_estimators::State,
+    utils::{
         determinist_random_variable::DeterministRandomVariableFactory,
         enum_tools::EnumVariables,
         frame::{Frame, FrameConfig, FrameRecord},
@@ -628,14 +644,17 @@ impl ScanSensor {
                         context,
                     ))
                 }
-                ScanSensorFaultModelConfig::Plugin(cfg) => {
-                    FaultModelTypeScanSensor::Plugin(plugin_api.as_ref().ok_or_else(|| {
-                        SimusaError::new(
-                            SimusaErrorTypes::PluginAPIError, 
-                            "Plugin API is not available.".to_string(),
-                        )
-                    })?.get_sensor_fault(cfg, global_config, va_factory, initial_time, context))
-                }
+                ScanSensorFaultModelConfig::Plugin(cfg) => FaultModelTypeScanSensor::Plugin(
+                    plugin_api
+                        .as_ref()
+                        .ok_or_else(|| {
+                            SimusaError::new(
+                                SimusaErrorTypes::PluginAPIError,
+                                "Plugin API is not available.".to_string(),
+                            )
+                        })?
+                        .get_sensor_fault(cfg, global_config, va_factory, initial_time, context),
+                ),
             });
         }
 
@@ -645,14 +664,17 @@ impl ScanSensor {
                 ScanSensorFilterConfig::Range(cfg) => ScanSensorFilterType::Range(
                     RangeFilter::from_config(cfg, initial_time, context),
                 ),
-                ScanSensorFilterConfig::Plugin(cfg) => {
-                    ScanSensorFilterType::Plugin(plugin_api.as_ref().ok_or_else(|| {
-                        SimusaError::new(
-                            SimusaErrorTypes::PluginAPIError, 
-                            "Plugin API is not available.".to_string(),
-                        )
-                    })?.get_sensor_filter(cfg, global_config, va_factory, initial_time, context))
-                }
+                ScanSensorFilterConfig::Plugin(cfg) => ScanSensorFilterType::Plugin(
+                    plugin_api
+                        .as_ref()
+                        .ok_or_else(|| {
+                            SimusaError::new(
+                                SimusaErrorTypes::PluginAPIError,
+                                "Plugin API is not available.".to_string(),
+                            )
+                        })?
+                        .get_sensor_filter(cfg, global_config, va_factory, initial_time, context),
+                ),
             });
         }
 

@@ -5,21 +5,32 @@
 //! Currently, the main implementation is [`AdditiveRobotCenteredPhysicsFault`].
 pub mod additive_robot_centered;
 
-
 use std::{fmt::Debug, sync::Arc};
 
 use simusa_macros::config_derives;
 
 use crate::{
-    context::Context, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, node::node_factory::FromConfigArguments, physics::{
+    context::Context,
+    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
+    node::node_factory::FromConfigArguments,
+    physics::{
         fault_models::additive_robot_centered::{
             AdditiveRobotCenteredPhysicsFault, AdditiveRobotCenteredPhysicsFaultConfig,
         },
         robot_models::RobotModelConfig,
-    }, plugin_api::PluginAPI, state_estimators::State, utils::determinist_random_variable::DeterministRandomVariableFactory,
+    },
+    plugin_api::PluginAPI,
+    state_estimators::State,
+    utils::determinist_random_variable::DeterministRandomVariableFactory,
 };
 #[cfg(feature = "gui")]
-use crate::{gui::{UIComponent, utils::{edit_plugin_config, show_plugin_config}}, simulator::SimulatorConfig};
+use crate::{
+    gui::{
+        UIComponent,
+        utils::{edit_plugin_config, show_plugin_config},
+    },
+    simulator::SimulatorConfig,
+};
 
 /// Configuration enum for physics fault models.
 ///
@@ -59,7 +70,14 @@ impl UIComponent for PhysicsFaultModelConfig {
                         current_node_name,
                         unique_id,
                     ),
-                    Self::Plugin(cfg) => edit_plugin_config(ui, "Plugin Physics fault", "plugin-physics-fault", unique_id, buffer_stack, cfg),
+                    Self::Plugin(cfg) => edit_plugin_config(
+                        ui,
+                        "Plugin Physics fault",
+                        "plugin-physics-fault",
+                        unique_id,
+                        buffer_stack,
+                        cfg,
+                    ),
                 };
             });
     }
@@ -176,18 +194,22 @@ pub fn make_physics_fault_model_from_config(
                 from_config_params.initial_time,
             )) as Box<dyn PhysicsFaultModel>
         }
-        PhysicsFaultModelConfig::Plugin(cfg) => from_config_params.plugin_api.as_ref().ok_or_else(|| {
-            SimusaError::new(
-                SimusaErrorTypes::PluginAPIError,
-                "Plugin API not set!".to_string(),
-            )
-        })?.get_physics_fault(
-            cfg,
-            from_config_params.global_config,
-            from_config_params.va_factory,
-            from_config_params.initial_time,
-            from_config_params.context,
-        )
+        PhysicsFaultModelConfig::Plugin(cfg) => from_config_params
+            .plugin_api
+            .as_ref()
+            .ok_or_else(|| {
+                SimusaError::new(
+                    SimusaErrorTypes::PluginAPIError,
+                    "Plugin API not set!".to_string(),
+                )
+            })?
+            .get_physics_fault(
+                cfg,
+                from_config_params.global_config,
+                from_config_params.va_factory,
+                from_config_params.initial_time,
+                from_config_params.context,
+            ),
     })
 }
 

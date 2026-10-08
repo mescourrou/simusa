@@ -392,20 +392,17 @@ impl GNSSSensor {
                         context,
                     ))
                 }
-                GNSSSensorFaultModelConfig::Plugin(config) => {
-                    GNSSSensorFaultModelType::Plugin(plugin_api.as_ref().ok_or_else(|| {
-                        SimusaError::new(
-                            SimusaErrorTypes::PluginAPIError,
-                            "Plugin API is not available.".to_string(),
-                        )
-                    })?.get_sensor_fault(
-                        config,
-                        global_config,
-                        va_factory,
-                        initial_time,
-                        context
-                    ))
-                }
+                GNSSSensorFaultModelConfig::Plugin(config) => GNSSSensorFaultModelType::Plugin(
+                    plugin_api
+                        .as_ref()
+                        .ok_or_else(|| {
+                            SimusaError::new(
+                                SimusaErrorTypes::PluginAPIError,
+                                "Plugin API is not available.".to_string(),
+                            )
+                        })?
+                        .get_sensor_fault(config, global_config, va_factory, initial_time, context),
+                ),
             });
         }
 
@@ -415,20 +412,23 @@ impl GNSSSensor {
                 GNSSSensorFilterConfig::Range(config) => GNSSSensorFilterType::Range(
                     RangeFilter::from_config(config, initial_time, context),
                 ),
-                GNSSSensorFilterConfig::Plugin(config) => {
-                    GNSSSensorFilterType::Plugin(plugin_api.as_ref().ok_or_else(|| {
-                        SimusaError::new(
-                            SimusaErrorTypes::PluginAPIError,
-                            "Plugin API is not available.".to_string(),
-                        )
-                    })?.get_sensor_filter(
-                        config,
-                        global_config,
-                        va_factory,
-                        initial_time,
-                        context
-                    ))
-                }
+                GNSSSensorFilterConfig::Plugin(config) => GNSSSensorFilterType::Plugin(
+                    plugin_api
+                        .as_ref()
+                        .ok_or_else(|| {
+                            SimusaError::new(
+                                SimusaErrorTypes::PluginAPIError,
+                                "Plugin API is not available.".to_string(),
+                            )
+                        })?
+                        .get_sensor_filter(
+                            config,
+                            global_config,
+                            va_factory,
+                            initial_time,
+                            context,
+                        ),
+                ),
             });
         }
 

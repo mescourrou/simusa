@@ -48,7 +48,16 @@ fn main() {
 use std::sync::Arc;
 
 use crate::{
-    context::Context, controllers::Controller, navigators::Navigator, networking::network::Network, physics::{Physics, fault_models::PhysicsFaultModel}, result_analyser::ResultAnalyserTrait, sensors::{Sensor, fault_models::FaultModel, sensor_filters::SensorFilter}, simulator::SimulatorConfig, state_estimators::StateEstimator, utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
+    context::Context,
+    controllers::Controller,
+    navigators::Navigator,
+    networking::network::Network,
+    physics::{Physics, fault_models::PhysicsFaultModel},
+    result_analyser::ResultAnalyserTrait,
+    sensors::{Sensor, fault_models::FaultModel, sensor_filters::SensorFilter},
+    simulator::SimulatorConfig,
+    state_estimators::StateEstimator,
+    utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
 };
 
 /// Trait to link the simulator to the external implementation.

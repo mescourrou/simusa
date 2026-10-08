@@ -27,15 +27,11 @@ use simusa::api::async_api::PluginAsyncAPI;
 
 use simusa::{
     context::Context,
-    controllers::{ControllerError},
+    controllers::ControllerError,
     debug, error, info,
-    networking::{
-        network::{Envelope, MessageFlag, Network},
-    },
+    networking::network::{Envelope, MessageFlag, Network},
     node::Node,
-    physics::{
-        robot_models::{Command, holonomic::HolonomicCommand, unicycle::UnicycleCommand},
-    },
+    physics::robot_models::{Command, holonomic::HolonomicCommand, unicycle::UnicycleCommand},
     plugin_api::PluginAPI,
     sensors::{
         Observation, SensorObservation, displacement_sensor::DisplacementObservation,
@@ -48,7 +44,11 @@ use simusa::{
     warning,
 };
 
-use crate::{controllers::ControllerWrapper, general::PythonAPI, messages::MessageFlagWrapper, navigators::NavigatorWrapper, networking::MessageTypesWrapper, physics::PhysicsWrapper, state_estimators::StateEstimatorWrapper};
+use crate::{
+    controllers::ControllerWrapper, general::PythonAPI, messages::MessageFlagWrapper,
+    navigators::NavigatorWrapper, networking::MessageTypesWrapper, physics::PhysicsWrapper,
+    state_estimators::StateEstimatorWrapper,
+};
 
 #[derive(Clone, Debug)]
 #[pyclass(get_all, set_all)]
@@ -1471,4 +1471,3 @@ impl SimulatorWrapper {
         self.simulator.stop();
     }
 }
-

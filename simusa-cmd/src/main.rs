@@ -1,5 +1,8 @@
 use clap::Parser;
-use std::{path::Path, process::{ExitCode, Termination}};
+use std::{
+    path::Path,
+    process::{ExitCode, Termination},
+};
 
 use simusa::{errors::SimusaResult, gui, simulator::Simulator};
 

@@ -5,7 +5,7 @@
 //! state-based triggers, and executes corresponding actions during simulation.
 
 use std::{
-    collections::{BTreeSet, BTreeMap},
+    collections::{BTreeMap, BTreeSet},
     str::FromStr,
     sync::{Arc, Mutex},
 };
@@ -17,10 +17,21 @@ use simusa_com::{
 };
 
 use crate::{
-    config::NumberConfig, constants::TIME_ROUND, context::Context, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, info, internal, logger::InternalLog, networking::{self, message_types::MessageType, network::Envelope}, node::node_factory::RecordType, scenario::config::{
+    config::NumberConfig,
+    constants::TIME_ROUND,
+    context::Context,
+    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
+    info, internal,
+    logger::InternalLog,
+    networking::{self, message_types::MessageType, network::Envelope},
+    node::node_factory::RecordType,
+    scenario::config::{
         AreaEventTriggerConfig, EventConfig, EventRecord, EventTriggerConfig, EventTypeConfig,
         ProximityEventTriggerConfig, ScenarioConfig, SpawnEventConfig, TimeEventTriggerConfig,
-    }, simulator::{Record, Simulator, SimulatorConfig, SimusaBroker}, utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory}, warning,
+    },
+    simulator::{Record, Simulator, SimulatorConfig, SimusaBroker},
+    utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
+    warning,
 };
 
 use crate::networking::network::MessageFlag;
@@ -264,12 +275,9 @@ impl Scenario {
                     trigger
                 );
 
-                if let Err(e) = simulator.spawn_node_from_name(
-                    &model_name,
-                    &node_name,
-                    time,
-                    &context,
-                ) {
+                if let Err(e) =
+                    simulator.spawn_node_from_name(&model_name, &node_name, time, &context)
+                {
                     warning!(
                         context,
                         "Ignoring error while sending Spawn message for node `{}`: {}",

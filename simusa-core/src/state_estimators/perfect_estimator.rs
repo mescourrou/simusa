@@ -6,10 +6,16 @@ by the controller should be perfect.
 
 use super::{State, WorldState, WorldStateRecord};
 use crate::{
-    constants::TIME_ROUND, context::Context, error, info, node::NodeState, physics::robot_models::Command, utils::{
+    constants::TIME_ROUND,
+    context::Context,
+    error, info,
+    node::NodeState,
+    physics::robot_models::Command,
+    utils::{
         determinist_random_variable::DeterministRandomVariableFactory,
         periodicity::{Periodicity, PeriodicityConfig},
-    }, warning,
+    },
+    warning,
 };
 
 #[cfg(feature = "gui")]

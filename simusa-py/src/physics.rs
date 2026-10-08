@@ -10,12 +10,20 @@ use serde_json::Value;
 use simusa_com::rfc::{self, RemoteFunctionCall, RemoteFunctionCallHost};
 
 use simusa::{
-    context::Context, errors::SimusaResult, internal, logger::InternalLog, node::Node, physics::{
-        Physics, PhysicsRecord, robot_models::Command,
-    }, recordable::Recordable, state_estimators::State,
+    context::Context,
+    errors::SimusaResult,
+    internal,
+    logger::InternalLog,
+    node::Node,
+    physics::{Physics, PhysicsRecord, robot_models::Command},
+    recordable::Recordable,
+    state_estimators::State,
 };
 
-use crate::{utils::{call_py_method, call_py_method_void}, wrappers::{CommandWrapper, NodeWrapper, StateWrapper}};
+use crate::{
+    utils::{call_py_method, call_py_method_void},
+    wrappers::{CommandWrapper, NodeWrapper, StateWrapper},
+};
 
 #[derive(Debug, Clone)]
 /// Async simulator-side physics adapter communicating with Python through RFC channels.

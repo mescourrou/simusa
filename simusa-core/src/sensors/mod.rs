@@ -46,7 +46,12 @@ use crate::{
 };
 #[cfg(feature = "gui")]
 use crate::{
-    gui::{UIComponent, utils::{edit_plugin_config, show_plugin_config, string_combobox}}, simulator::SimulatorConfig, utils::enum_tools::ToVec,
+    gui::{
+        UIComponent,
+        utils::{edit_plugin_config, show_plugin_config, string_combobox},
+    },
+    simulator::SimulatorConfig,
+    utils::enum_tools::ToVec,
 };
 
 /// Runtime sensor observation with metadata.
@@ -200,9 +205,7 @@ impl SensorObservation {
             SensorObservationRecord::Scan(r) => {
                 SensorObservation::Scan(ScanObservation::from_record(r))
             }
-            SensorObservationRecord::Plugin(r) => {
-                SensorObservation::Plugin(r.clone())
-            }
+            SensorObservationRecord::Plugin(r) => SensorObservation::Plugin(r.clone()),
         }
     }
 }
@@ -262,7 +265,7 @@ impl UIComponent for SensorObservationRecord {
             Self::GNSS(r) => r.show(ui, ctx, unique_id),
             Self::OrientedRobot(r) => r.show(ui, ctx, unique_id),
             Self::Scan(r) => r.show(ui, ctx, unique_id),
-            Self::Plugin(r) => show_plugin_config(ui, "Plugin Observation", r)
+            Self::Plugin(r) => show_plugin_config(ui, "Plugin Observation", r),
         });
     }
 }
@@ -333,9 +336,7 @@ impl UIComponent for SensorConfig {
                 "GNSS" => *self = SensorConfig::GNSS(gnss_sensor::GNSSSensorConfig::default()),
                 "Robot" => *self = SensorConfig::Robot(robot_sensor::RobotSensorConfig::default()),
                 "Scan" => *self = SensorConfig::Scan(scan_sensor::ScanSensorConfig::default()),
-                "Plugin" => {
-                    *self = SensorConfig::Plugin(serde_json::Value::Null)
-                }
+                "Plugin" => *self = SensorConfig::Plugin(serde_json::Value::Null),
                 _ => panic!("Where did you find this value?"),
             };
         }
@@ -388,7 +389,14 @@ impl UIComponent for SensorConfig {
                 current_node_name,
                 unique_id,
             ),
-            SensorConfig::Plugin(c) => edit_plugin_config(ui, "Plugin Sensor", "plugin-sensor", unique_id, buffer_stack, c),
+            SensorConfig::Plugin(c) => edit_plugin_config(
+                ui,
+                "Plugin Sensor",
+                "plugin-sensor",
+                unique_id,
+                buffer_stack,
+                c,
+            ),
         }
     }
 

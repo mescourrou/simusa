@@ -73,9 +73,9 @@ pub struct NodeMetaData {
     /// Current lifecycle state of the node.
     pub state: NodeState,
     /// Physics of the node if it has one.
-    /// 
+    ///
     /// WARNING: When the node is terminated, the physics is still available but the
-    /// state() function will return None if called in the future. 
+    /// state() function will return None if called in the future.
     pub physics: Option<Arc<dyn RoLock<Box<dyn Physics>>>>,
 }
 

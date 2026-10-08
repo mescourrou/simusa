@@ -169,8 +169,6 @@ pub fn text_singleline_with_apply(
     }
 }
 
-
-
 pub fn edit_plugin_config(
     ui: &mut egui::Ui,
     plugin_name: &str,

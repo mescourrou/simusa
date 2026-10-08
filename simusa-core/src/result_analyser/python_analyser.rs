@@ -1,6 +1,14 @@
 #[cfg(feature = "gui")]
 use std::collections::BTreeMap;
-use std::{ffi::{CStr, CString}, fs, io::{BufReader, BufWriter, Read, Write}, net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream}, process::Stdio, sync::Arc, time::Duration};
+use std::{
+    ffi::{CStr, CString},
+    fs,
+    io::{BufReader, BufWriter, Read, Write},
+    net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream},
+    process::Stdio,
+    sync::Arc,
+    time::Duration,
+};
 
 #[cfg(feature = "gui")]
 use egui::CollapsingHeader;
@@ -8,9 +16,17 @@ use serde::{Deserialize, Serialize};
 use simusa_macros::config_derives;
 
 use crate::{
-    VERSION, context::Context, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, info, internal, logger::InternalLog, networking::NetworkError, plugin_api::PluginAPI, result_analyser::ResultAnalyserTrait, simulator::Results, warning,
+    VERSION,
+    context::Context,
+    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
+    info, internal,
+    logger::InternalLog,
+    networking::NetworkError,
+    plugin_api::PluginAPI,
+    result_analyser::ResultAnalyserTrait,
+    simulator::Results,
+    warning,
 };
-
 
 #[cfg(feature = "gui")]
 use crate::{
@@ -69,7 +85,7 @@ impl UIComponent for PythonResultAnalyserConfig {
         CollapsingHeader::new("Python Result Analyser").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label("Script path:");
-                path_finder(ui, &mut self.script_path, &global_config.base_path);
+                path_finder(ui, &mut self.script_path, &global_config.get_base_path());
             });
             ui.horizontal(|ui| {
                 ui.label("Function name:");
@@ -127,7 +143,8 @@ impl PythonResultAnalyser {
         _context: &Context,
     ) -> Self {
         let config = PythonResultAnalyserConfig {
-            script_path: fs::canonicalize(&global_config.base_path).unwrap()
+            script_path: fs::canonicalize(&global_config.get_base_path())
+                .unwrap()
                 .join(&config.script_path)
                 .to_str()
                 .unwrap()
@@ -140,13 +157,13 @@ impl PythonResultAnalyser {
         }
     }
 
-
     fn send_request(&self, frame: ResultAnalyserFrame, context: &Context) -> SimusaResult<()> {
         let mut connection = None;
         for _ in 0..10 {
-            if let Ok(conn) = TcpStream::connect(
-                &SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), self.config.port)
-            ) {
+            if let Ok(conn) = TcpStream::connect(&SocketAddr::new(
+                IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                self.config.port,
+            )) {
                 connection = Some(conn);
                 break;
             }
@@ -161,26 +178,38 @@ impl PythonResultAnalyser {
         let mut reader = BufReader::new(connection.try_clone().unwrap());
         let mut writer = BufWriter::new(connection);
         internal!(
-            context, 
+            context,
             InternalLog::ExternalNetwork,
-            "Sending results to result analyser server at port {}", self.config.port);
+            "Sending results to result analyser server at port {}",
+            self.config.port
+        );
 
         let buf = serde_json::to_vec(&frame).map_err(|e| {
             SimusaError::new(
                 SimusaErrorTypes::NetworkError(NetworkError::Other),
-                format!("Impossible to serialize results for result analyser server: {}", e),
+                format!(
+                    "Impossible to serialize results for result analyser server: {}",
+                    e
+                ),
             )
         })?;
         writer.write(&buf.len().to_be_bytes());
         writer.write_all(&buf).map_err(|e| {
             SimusaError::new(
                 SimusaErrorTypes::NetworkError(NetworkError::Other),
-                format!("Impossible to send results to result analyser server: {}", e),
+                format!(
+                    "Impossible to send results to result analyser server: {}",
+                    e
+                ),
             )
         })?;
         writer.flush().unwrap();
 
-        internal!(context, InternalLog::ExternalNetwork, "Waiting for result analyser server response...");
+        internal!(
+            context,
+            InternalLog::ExternalNetwork,
+            "Waiting for result analyser server response..."
+        );
 
         let mut buf = Vec::new();
         // reader.tim set_read_timeout(None).map_err(|e| {
@@ -208,11 +237,11 @@ impl ResultAnalyserTrait for PythonResultAnalyser {
                 "Result analyser server is already running".into(),
             ));
         }
-#[cfg(target_os = "windows")]
+        #[cfg(target_os = "windows")]
         let python_distrib = "win_amd64";
-#[cfg(target_os = "linux")]
+        #[cfg(target_os = "linux")]
         let python_distrib = "linux_x86_64";
-#[cfg(target_os = "macos")]
+        #[cfg(target_os = "macos")]
         let python_distrib = "manylinux_2_39_x86_64";
 
         self.command = Some(std::process::Command::new("python3")

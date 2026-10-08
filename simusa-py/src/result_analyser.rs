@@ -1,14 +1,20 @@
-use std::ffi::{CStr, CString};
-use std::{fs, net::TcpListener};
-use std::io::{BufReader, Read, Write};
 use pyo3::ffi::c_str;
 use pyo3::prelude::*;
+use std::ffi::{CStr, CString};
+use std::io::{BufReader, Read, Write};
+use std::{fs, net::TcpListener};
 
 use simusa::debug;
 use simusa::logger::{LogLevel, LoggerConfig};
 use simusa::result_analyser::python_analyser::ResultAnalyserFrame;
-use simusa::{context::Context, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, info, result_analyser::python_analyser::PythonResultAnalyserConfig, simulator::Results, warning};
-
+use simusa::{
+    context::Context,
+    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
+    info,
+    result_analyser::python_analyser::PythonResultAnalyserConfig,
+    simulator::Results,
+    warning,
+};
 
 const CONVERT_TO_DICT: &CStr = cr#"
 import json
@@ -31,9 +37,7 @@ def convert(records):
 #[derive(Clone, Debug)]
 #[pyclass]
 #[pyo3(name = "ResultAnalyser")]
-pub struct ResultAnalyser {
-
-}
+pub struct ResultAnalyser {}
 
 #[pymethods]
 impl ResultAnalyser {
@@ -42,20 +46,32 @@ impl ResultAnalyser {
         Self {}
     }
 
-    pub fn run_server(&self, py: Python, host: String, port: u16, loglevel: String) -> PyResult<()> {
-        let context = Context::new(&LoggerConfig {
-            log_level: match loglevel.to_lowercase().as_str() {
-                "debug" => LogLevel::Debug,
-                "info" => LogLevel::Info,
-                "warning" | "warn" => LogLevel::Warn,
-                "error" => LogLevel::Error,
-                "off" => LogLevel::Off,
-                _ => LogLevel::Info,
+    pub fn run_server(
+        &self,
+        py: Python,
+        host: String,
+        port: u16,
+        loglevel: String,
+    ) -> PyResult<()> {
+        let context = Context::new(
+            &LoggerConfig {
+                log_level: match loglevel.to_lowercase().as_str() {
+                    "debug" => LogLevel::Debug,
+                    "info" => LogLevel::Info,
+                    "warning" | "warn" => LogLevel::Warn,
+                    "error" => LogLevel::Error,
+                    "off" => LogLevel::Off,
+                    _ => LogLevel::Info,
+                },
+                ..Default::default()
             },
-            ..Default::default()
-        }, None);
+            None,
+        );
         let context = context.new_callstack_level("python_result_analyser");
-        debug!(context, "Starting result analyser server at {}:{}", host, port);
+        debug!(
+            context,
+            "Starting result analyser server at {}:{}", host, port
+        );
         let connection = TcpListener::bind(format!("{}:{}", host, port)).map_err(|e| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
                 "Impossible to start result analyser server at {}:{}: {}",
@@ -91,13 +107,14 @@ impl ResultAnalyser {
                         e
                     ))
                 })?;
-                self.analyser_results(py, &frame.results, &frame.config, &context).map_err(|e| {
-                    let _ = stream.write("OK".as_bytes());
-                    PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                        "Impossible to analyse results: {}",
-                        e.detailed_error()
-                    ))
-                })?;
+                self.analyser_results(py, &frame.results, &frame.config, &context)
+                    .map_err(|e| {
+                        let _ = stream.write("OK".as_bytes());
+                        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                            "Impossible to analyse results: {}",
+                            e.detailed_error()
+                        ))
+                    })?;
                 let _ = stream.write("OK".as_bytes());
                 break;
             }
@@ -108,7 +125,13 @@ impl ResultAnalyser {
 }
 
 impl ResultAnalyser {
-    fn analyser_results(&self, py: Python, results: &Results, config: &PythonResultAnalyserConfig, context: &Context) -> SimusaResult<()> {
+    fn analyser_results(
+        &self,
+        py: Python,
+        results: &Results,
+        config: &PythonResultAnalyserConfig,
+        context: &Context,
+    ) -> SimusaResult<()> {
         let json_results = serde_json::to_string(&results.records)
             .expect("Error during converting results to json");
         let json_config =
@@ -117,7 +140,12 @@ impl ResultAnalyser {
         let script_path = &config.script_path;
         let python_script = match fs::read_to_string(script_path.clone()) {
             Err(e) => {
-                warning!(context, "Result analyser script not found ({}): {}.", script_path, e);
+                warning!(
+                    context,
+                    "Result analyser script not found ({}): {}.",
+                    script_path,
+                    e
+                );
                 warning!(context, "Creating default result analyser script");
                 let mut file = fs::File::create(script_path).map_err(|e| {
                     SimusaError::new(
@@ -145,11 +173,21 @@ impl ResultAnalyser {
                     )
                 })?
             }
-            Ok(s) => s
+            Ok(s) => s,
         };
-        info!(context, "Calling Python script to analyse the results ({})", script_path);
+        info!(
+            context,
+            "Calling Python script to analyse the results ({})", script_path
+        );
         let python_script = CString::new(python_script).unwrap();
-        let res = Self::call_script(py, &python_script, config, &json_results, &json_config, context);
+        let res = Self::call_script(
+            py,
+            &python_script,
+            config,
+            &json_results,
+            &json_config,
+            context,
+        );
         if let Some(err) = res.err() {
             Err(SimusaError::new(
                 SimusaErrorTypes::PythonError,
@@ -160,7 +198,14 @@ impl ResultAnalyser {
         }
     }
 
-    fn call_script(py: Python, python_script: &CString, config: &PythonResultAnalyserConfig, json_results: &str, json_config: &str, context: &Context) -> PyResult<()> {
+    fn call_script(
+        py: Python,
+        python_script: &CString,
+        config: &PythonResultAnalyserConfig,
+        json_results: &str,
+        json_config: &str,
+        context: &Context,
+    ) -> PyResult<()> {
         let show_figure_py = cr#"
 import matplotlib.pyplot as plt
 

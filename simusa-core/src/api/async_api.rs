@@ -213,7 +213,7 @@ impl AsyncApiRunner {
                         let mut simulator = simulator_arc.lock().unwrap();
                         println!(
                             "Loading config: {}",
-                            request.config.base_path.to_str().unwrap()
+                            request.config.get_base_path().to_str().unwrap()
                         );
                         simulator.load_config_full(
                             &request.config,

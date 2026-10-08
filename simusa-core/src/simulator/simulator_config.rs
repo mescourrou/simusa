@@ -148,7 +148,8 @@ pub struct SimulatorConfig {
     /// Result-export configuration.
     pub results: Option<ResultConfig>,
     /// Auto-computed base directory used to resolve relative paths in the configuration.
-    pub base_path: Box<Path>,
+    #[serde(skip)]
+    base_path: Box<Path>,
     /// Maximum simulated time before stopping the run.
     pub max_time: f32,
     #[check]
@@ -243,6 +244,14 @@ impl SimulatorConfig {
         }
 
         Ok(config)
+    }
+
+    pub fn get_base_path(&self) -> &Path {
+        self.base_path.as_ref()
+    }
+
+    pub(crate) fn set_base_path(&mut self, path: Box<Path>) {
+        self.base_path = path;
     }
 }
 
