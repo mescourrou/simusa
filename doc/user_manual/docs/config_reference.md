@@ -68,7 +68,7 @@ The root of your configuration file includes:
 ## Configuration File Structure
 
 ```yaml
-version: 1.8.0
+version: 1.10.0
 max_time: 100.0
 log:
   log_level: Info
@@ -80,15 +80,18 @@ environment:
   map_path: my_map.yaml
 optimization:
   threads: 0
-robots:
+nodes:
   - name: robot1
+    type: Robot
     navigator: { ... }        # See Navigation Configuration
     controller: { ... }       # See Controller Configuration
     physics: { ... }          # See Physics Configuration
     state_estimator: { ... }  # See State Estimator Configuration
     sensor_manager: { ... }   # See Sensor Manager Configuration
     network: { ... }          # See Network Configuration
-computation_units: [ ... ]    # See Computation Units
+- name: cu1
+    type: ComputationUnit
+    [ ... ]    # See Computation Units
 scenario: { ... }             # See Scenario Configuration
 ```
 

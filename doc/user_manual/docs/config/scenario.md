@@ -249,8 +249,9 @@ event_type:
 
 Define robot template:
 ```yaml
-robots:
+nodes:
   - name: robot_template
+    type: Robot
     navigator: { type: GoTo, target_point: [10.0, 10.0], target_speed: 0.5 }
     controller: { type: PID, proportional_gains: [1.0, 1.0, 1.0], ... }
     physics: { type: Internal, model: { type: Unicycle, wheel_distance: 0.2 }, ... }

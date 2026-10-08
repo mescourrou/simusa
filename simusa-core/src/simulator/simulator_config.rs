@@ -9,18 +9,10 @@ use egui::CollapsingHeader;
 use simusa_macros::config_derives;
 #[cfg(feature = "gui")]
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::{fs, path::Path};
 
 use crate::{
-    VERSION,
-    environment::EnvironmentConfig,
-    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
-    logger::LoggerConfig,
-    node::node_factory::{ComputationUnitConfig, RobotConfig},
-    scenario::config::ScenarioConfig,
-    simulator::ResultConfig,
-    time_analysis::TimeAnalysisConfig,
-    utils::format_option_f32,
+    VERSION, environment::EnvironmentConfig, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, logger::LoggerConfig, node::node_factory::{ComputationUnitConfig, NodeConfig, NodeTypeConfig, RobotConfig}, scenario::config::ScenarioConfig, simulator::ResultConfig, time_analysis::TimeAnalysisConfig, utils::format_option_f32,
 };
 
 #[cfg(feature = "gui")]
@@ -83,7 +75,7 @@ impl Check for OptimizationConfig {
 /// # Example
 ///
 /// ```yaml
-/// version: 1.9.0
+/// version: 1.10.0
 /// max_time: 10.0
 /// log:
 ///   log_level:
@@ -97,8 +89,9 @@ impl Check for OptimizationConfig {
 /// random_seed: null # Different seed each run
 /// environment:
 ///   map: null
-/// robots:
+/// nodes:
 ///   - name: robot1
+///     type: Robot
 ///     navigator:
 ///       type: GoTo
 ///       target_point: null
@@ -132,7 +125,6 @@ impl Check for OptimizationConfig {
 ///     network:
 ///       range: 0.0 # unlimited range
 ///       reception_delay: 0.0
-/// computation_units: []
 /// scenario:
 ///   events: []
 /// ```
@@ -152,27 +144,25 @@ pub struct SimulatorConfig {
     base_path: Box<Path>,
     /// Maximum simulated time before stopping the run.
     pub max_time: f32,
+    /// Optimization settings (parallelization, etc.).
+    #[check]
+    pub optimization: OptimizationConfig,
     #[check]
     /// Time-analysis/profiling configuration.
     pub time_analysis: Option<TimeAnalysisConfig>,
     /// Optional deterministic random seed for the simulation. If not provided, a different seed will be used at each run.
     #[serde(serialize_with = "format_option_f32")]
     pub random_seed: Option<f32>,
-    /// List of the robots to run, with their specific configuration.
+    /// List of the nodes to run, with their specific configuration.
     #[check]
-    pub robots: Vec<RobotConfig>,
+    pub nodes: Vec<NodeConfig>,
     /// List of computation units to run, with their specific configuration.
-    #[check]
-    pub computation_units: Vec<ComputationUnitConfig>,
     /// Scenario settings (occuring events).
     #[check]
     pub scenario: ScenarioConfig,
     /// Global environment settings (maps).
     #[check]
     pub environment: EnvironmentConfig,
-    /// Optimization settings (parallelization, etc.).
-    #[check]
-    pub optimization: OptimizationConfig,
 }
 
 impl Default for SimulatorConfig {
@@ -185,8 +175,7 @@ impl Default for SimulatorConfig {
             results: None,
             time_analysis: Some(TimeAnalysisConfig::default()),
             random_seed: None,
-            robots: Vec::new(),
-            computation_units: Vec::new(),
+            nodes: Vec::new(),
             max_time: 60.,
             scenario: ScenarioConfig::default(),
             environment: EnvironmentConfig::default(),
@@ -202,6 +191,11 @@ impl SimulatorConfig {
     /// input path and expands time-analysis output paths accordingly.
     pub fn load_from_path(path: &Path) -> SimusaResult<Self> {
         // let mut value = .expect("Failed to load config").parse();
+        if !fs::exists(path).expect("Cannot check path existance") {
+            let default_config = SimulatorConfig::example();
+            let file = std::fs::File::create(path).unwrap();
+            serde_yaml_ng::to_writer(file, &default_config).unwrap();
+        }
         let mut config: serde_yaml_ng::Value =
             match yaml_include::Transformer::new(path.into(), true) {
                 Ok(loader) => loader.parse(),
@@ -252,6 +246,16 @@ impl SimulatorConfig {
 
     pub(crate) fn set_base_path(&mut self, path: Box<Path>) {
         self.base_path = path;
+    }
+
+    pub fn example() -> SimulatorConfig {
+        let mut config = SimulatorConfig::default();
+        config.nodes.push(NodeConfig { 
+            name: "robot1".to_string(),
+            node_type: NodeTypeConfig::Robot(RobotConfig::default()),
+            ..Default::default()
+        });
+        config
     }
 }
 
@@ -350,43 +354,22 @@ impl crate::gui::UIComponent for SimulatorConfig {
             });
 
             ui.vertical(|ui| {
-                ui.label("Robots:");
+                ui.label("Nodes:");
                 let mut remove = None;
-                for (i, r) in self.robots.iter_mut().enumerate() {
-                    let robot_unique_id = format!("{}-{}", unique_id, r.name);
+                for (i, n) in self.nodes.iter_mut().enumerate() {
+                    let node_unique_id = format!("{}-{}", unique_id, n.name);
                     ui.horizontal_top(|ui| {
-                        r.show_mut(ui, ctx, buffer_stack, global_config, None, &robot_unique_id);
+                        n.show_mut(ui, ctx, buffer_stack, global_config, None, &node_unique_id);
                         if ui.button("X").clicked() {
                             remove = Some(i);
                         }
                     });
                 }
                 if let Some(i) = remove {
-                    self.robots.remove(i);
+                    self.nodes.remove(i);
                 }
                 if ui.button("Add").clicked() {
-                    self.robots.push(RobotConfig::default());
-                }
-            });
-
-            ui.vertical(|ui| {
-                ui.label("Computation Units:");
-                let mut remove = None;
-                for (i, cu) in self.computation_units.iter_mut().enumerate() {
-                    let cu_unique_id = format!("{}-{}", unique_id, cu.name);
-                    ui.horizontal_top(|ui| {
-                        cu.show_mut(ui, ctx, buffer_stack, global_config, None, &cu_unique_id);
-                        if ui.button("X").clicked() {
-                            remove = Some(i);
-                        }
-                    });
-                }
-                if let Some(i) = remove {
-                    self.computation_units.remove(i);
-                }
-                if ui.button("Add").clicked() {
-                    self.computation_units
-                        .push(ComputationUnitConfig::default());
+                    self.nodes.push(NodeConfig::default());
                 }
             });
         });
@@ -434,18 +417,10 @@ impl crate::gui::UIComponent for SimulatorConfig {
             });
 
             ui.vertical(|ui| {
-                ui.label("Robots:");
-                for r in &self.robots {
-                    let robot_unique_id = format!("{}-{}", unique_id, r.name);
-                    r.show(ui, ctx, &robot_unique_id);
-                }
-            });
-
-            ui.vertical(|ui| {
-                ui.label("Computation Units:");
-                for cu in &self.computation_units {
-                    let cu_unique_id = format!("{}-{}", unique_id, cu.name);
-                    cu.show(ui, ctx, &cu_unique_id);
+                ui.label("Nodes:");
+                for n in &self.nodes {
+                    let node_unique_id = format!("{}-{}", unique_id, n.name);
+                    n.show(ui, ctx, &node_unique_id);
                 }
             });
         });

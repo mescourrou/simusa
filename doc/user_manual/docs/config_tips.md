@@ -24,11 +24,12 @@ This guide provides best practices, common patterns, and troubleshooting advice 
 Two robots that coordinate through communication:
 
 ```yaml
-version: 1.9.0
+version: 1.10.0
 max_time: 30.0
 
-robots:
+nodes:
   - name: robot1
+    type: Robot
     navigator:
       type: TrajectoryFollower
       trajectory: !include paths/robot1_path.yaml
@@ -69,6 +70,7 @@ robots:
     state_estimator_bench: []
 
   - name: robot2
+    type: Robot
     navigator:
       type: TrajectoryFollower
       trajectory: !include paths/robot2_path.yaml
@@ -113,12 +115,13 @@ robots:
 Configure realistic sensor noise and faults at startup:
 
 ```yaml
-version: 1.9.0
+version: 1.10.0
 max_time: 20.0
 environment:
   map: !include maps/landmarks.yaml
-robots:
+nodes:
   - name: robot1
+    type: Robot
     navigator:
       type: TrajectoryFollower
       trajectory: !include paths/robot_path.yaml
@@ -189,12 +192,13 @@ robots:
 One computation unit receives sensor data from all robots and performs centralized state estimation:
 
 ```yaml
-version: 1.9.0
+version: 1.10.0
 max_time: 20.0
 environment:
   map: !include maps/landmarks.yaml
-robots:
+nodes:
   - name: robot1
+    type: Robot
     sensor_manager:
       sensors:
         - name: landmark_sensor
@@ -216,6 +220,7 @@ robots:
       reception_delay: 0.01
   
   - name: robot2
+    type: Robot
     # Similar configuration to robot1
     sensor_manager:
       sensors:
@@ -236,9 +241,8 @@ robots:
     network:
       range: 100.0
       reception_delay: 0.01
-
-computation_units:
   - name: Central Processing
+    type: ComputationUnit
     state_estimators:
       - name: global_slam
         config:
@@ -265,7 +269,7 @@ computation_units:
 Specify the correct version matching your simulator to get a warning when using different major versions:
 
 ```yaml
-version: 1.9.0  # Match your installed SiMuSA version
+version: 1.10.0  # Match your installed SiMuSA version
 ```
 
 Check with: `simusa-cmd --version`
@@ -300,7 +304,7 @@ Enable auto-completion in your editor:
 
 ```yaml
 # yaml-language-server: $schema=../config.schema.json
-version: 1.9.0
+version: 1.10.0
 ```
 
 This provides:
@@ -576,7 +580,7 @@ physics:
 ### For Detailed Analysis
 
 ```yaml
-version: 1.9.0
+version: 1.10.0
 max_time: 10.0  # Shorter simulation
 
 log:
@@ -595,9 +599,10 @@ results:
 ### For Large Fleet Simulations
 
 ```yaml
-robots:
+nodes:
   # All robots use same base config with minimal sensing
   - name: robot_1
+    type: Robot
     sensor_manager:
       sensors: []  # No sensors = faster
     network:

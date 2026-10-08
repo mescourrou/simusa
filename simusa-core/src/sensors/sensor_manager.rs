@@ -116,14 +116,7 @@ impl UIComponent for ManagedSensorConfig {
                     ui.checkbox(&mut self.triggered, "");
                 });
 
-                let mut node_list = Vec::from_iter(
-                    global_config.robots.iter().map(|x| x.name.clone()).chain(
-                        global_config
-                            .computation_units
-                            .iter()
-                            .map(|x| x.name.clone()),
-                    ),
-                );
+                let mut node_list = Vec::from_iter(global_config.nodes.iter().map(|x| x.name.clone()));
                 if let Some(idx) = node_list
                     .iter()
                     .position(|x| x == current_node_name.unwrap())

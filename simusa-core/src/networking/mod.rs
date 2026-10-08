@@ -70,30 +70,17 @@ mod tests {
     use simusa_com::pub_sub::{MultiClientTrait, PathKey};
 
     use crate::{
-        config::NumberConfig,
-        constants::TIME_ROUND,
-        context::Context,
-        debug,
-        logger::LogLevel,
-        networking::{
+        config::NumberConfig, constants::TIME_ROUND, context::Context, debug, logger::LogLevel, networking::{
             message_types::MessageType,
             network::{Envelope, Network, NetworkConfig},
-        },
-        node::{Node, node_factory::RobotConfig},
-        physics::robot_models::Command,
-        plugin_api::PluginAPI,
-        recordable::Recordable,
-        sensors::{
+        }, node::{Node, node_factory::{NodeConfig, NodeTypeConfig, RobotConfig}}, physics::robot_models::Command, plugin_api::PluginAPI, recordable::Recordable, sensors::{
             Observation, SensorConfig,
             robot_sensor::RobotSensorConfig,
             sensor_manager::{ManagedSensorConfig, SensorManagerConfig},
-        },
-        simulator::{Simulator, SimulatorConfig, SimusaBrokerMultiClient},
-        state_estimators::{
+        }, simulator::{Simulator, SimulatorConfig, SimusaBrokerMultiClient}, state_estimators::{
             BenchStateEstimatorConfig, StateEstimator, StateEstimatorConfig, StateEstimatorRecord,
             WorldState,
-        },
-        utils::{
+        }, utils::{
             SharedMutex, SharedRwLock,
             determinist_random_variable::DeterministRandomVariableFactory, maths::round_precision,
         },
@@ -218,24 +205,30 @@ mod tests {
             NumberConfig::Num(p) => p,
             _ => 1.,
         } * 1.1;
-        config.robots.push(RobotConfig {
+        config.nodes.push(NodeConfig {
             name: "node1".to_string(),
-            state_estimator_bench: vec![BenchStateEstimatorConfig {
-                name: "own".to_string(),
-                config: StateEstimatorConfig::Plugin(Value::Bool(false)),
-            }],
+            node_type: NodeTypeConfig::Robot(RobotConfig {
+                state_estimator_bench: vec![BenchStateEstimatorConfig {
+                    name: "own".to_string(),
+                    config: StateEstimatorConfig::Plugin(Value::Bool(false)),
+                }],
+                ..Default::default()
+            }),
             ..Default::default()
         });
-        config.robots.push(RobotConfig {
+        config.nodes.push(NodeConfig {
             name: "node2".to_string(),
-            network: NetworkConfig {
-                reception_delay: 0.,
+            node_type: NodeTypeConfig::Robot(RobotConfig {
+                network: NetworkConfig {
+                    reception_delay: 0.,
+                    ..Default::default()
+                },
+                state_estimator_bench: vec![BenchStateEstimatorConfig {
+                    name: "own".to_string(),
+                    config: StateEstimatorConfig::Plugin(Value::Bool(true)),
+                }],
                 ..Default::default()
-            },
-            state_estimator_bench: vec![BenchStateEstimatorConfig {
-                name: "own".to_string(),
-                config: StateEstimatorConfig::Plugin(Value::Bool(true)),
-            }],
+            }),
             ..Default::default()
         });
 
@@ -281,28 +274,34 @@ mod tests {
             NumberConfig::Num(p) => p,
             _ => 1.,
         } * 1.1;
-        config.robots.push(RobotConfig {
+        config.nodes.push(NodeConfig {
             name: "node1".to_string(),
-            sensor_manager: SensorManagerConfig {
-                sensors: vec![ManagedSensorConfig {
-                    name: "RobotSensor".to_string(),
-                    send_to: Vec::new(),
-                    config: SensorConfig::Robot(RobotSensorConfig::default()), // Test valid while RobotSensor uses service for other node poses.
-                    ..Default::default()
-                }],
-            },
+            node_type: NodeTypeConfig::Robot(RobotConfig {
+                sensor_manager: SensorManagerConfig {
+                    sensors: vec![ManagedSensorConfig {
+                        name: "RobotSensor".to_string(),
+                        send_to: Vec::new(),
+                        config: SensorConfig::Robot(RobotSensorConfig::default()), // Test valid while RobotSensor uses service for other node poses.
+                        ..Default::default()
+                    }],
+                },
+                ..Default::default()
+            }),
             ..Default::default()
         });
-        config.robots.push(RobotConfig {
+        config.nodes.push(NodeConfig {
             name: "node2".to_string(),
-            sensor_manager: SensorManagerConfig {
-                sensors: vec![ManagedSensorConfig {
-                    name: "RobotSensor".to_string(),
-                    send_to: Vec::new(),
-                    config: SensorConfig::Robot(RobotSensorConfig::default()),
-                    ..Default::default()
-                }],
-            },
+            node_type: NodeTypeConfig::Robot(RobotConfig {
+                sensor_manager: SensorManagerConfig {
+                    sensors: vec![ManagedSensorConfig {
+                        name: "RobotSensor".to_string(),
+                        send_to: Vec::new(),
+                        config: SensorConfig::Robot(RobotSensorConfig::default()),
+                        ..Default::default()
+                    }],
+                },
+                ..Default::default()
+            }),
             ..Default::default()
         });
 

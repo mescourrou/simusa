@@ -8,16 +8,7 @@ use egui::{Rect, Response, RichText, Shape, Vec2};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    api::async_api::AsyncApiRunner,
-    context::Context,
-    environment::map::MapRecord,
-    error,
-    gui::app::PainterInfo,
-    node::node_factory::{ComputationUnitRecord, RecordType, RobotRecord},
-    plugin_api::PluginAPI,
-    recordable::Recordable,
-    scenario::config::EventRecord,
-    simulator::SimulatorConfig,
+    api::async_api::AsyncApiRunner, context::Context, environment::map::MapRecord, error, gui::app::PainterInfo, node::node_factory::{ComputationUnitRecord, NodeTypeConfig, RecordType, RobotRecord}, plugin_api::PluginAPI, recordable::Recordable, scenario::config::EventRecord, simulator::SimulatorConfig,
 };
 
 pub mod map;
@@ -200,13 +191,13 @@ impl DrawableManager {
         );
 
         // Insert robots
-        for robot in &config.robots {
-            if robot.autospawn {
+        for node in &config.nodes {
+            if node.autospawn && let NodeTypeConfig::Robot(robot) = &node.node_type {
                 self.add_drawable(
-                    Box::new(robot::Robot::init(robot, config, robot.name.clone())),
+                    Box::new(robot::Robot::init(robot, config, node.name.clone())),
                     context,
                 );
-                self.drawn_robots.push(robot.name.clone());
+                self.drawn_robots.push(node.name.clone());
             }
         }
         if let Some(plugin_api) = plugin_api {
@@ -282,13 +273,15 @@ impl DrawableManager {
                     && let Some(config) = simulator_config
                 {
                     if let Some(new_config) =
-                        config.robots.iter().find(|rc| rc.name == rec.model_name)
+                        config.nodes.iter().find(|rc| rc.name == rec.model_name)
                     {
-                        self.add_drawable(
-                            Box::new(robot::Robot::init(new_config, config, rec.name.clone())),
-                            context,
-                        );
-                        self.drawn_robots.push(rec.name.clone());
+                        if let NodeTypeConfig::Robot(new_config) = &new_config.node_type {
+                            self.add_drawable(
+                                Box::new(robot::Robot::init(new_config, config, rec.name.clone())),
+                                context,
+                            );
+                            self.drawn_robots.push(rec.name.clone());
+                        }
                     } else {
                         error!(context, "Received record for unknown robot {}", rec.name);
                     }

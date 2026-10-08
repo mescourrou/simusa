@@ -16,8 +16,9 @@ time_analysis:
     type: TraceEventExporter
   output_path: "time_performance"
 max_time: 60.
-robots:
+nodes:
   - name: "robot1"
+    type: Robot
     navigator: 
       type: GoTo
       target_speed: 0.5
@@ -25,8 +26,8 @@ robots:
       type: Perfect
       prediction_activation:
         period: {type: Num, value: 0.1}
-computation_units:
   - name: "master"
+    type: ComputationUnit
     state_estimators:
       - name: "master"
         config:

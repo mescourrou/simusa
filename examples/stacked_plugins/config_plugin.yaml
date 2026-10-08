@@ -6,8 +6,9 @@ results:
   result_path: "results.json"
 time_analysis: null
 max_time: 60.
-robots:
+nodes:
   - name: "robot1"
+    type: Robot
     navigator:
       type: Plugin
     state_estimator:

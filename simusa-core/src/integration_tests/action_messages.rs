@@ -4,27 +4,17 @@ use std::{
 };
 
 use crate::{
-    constants::TIME_ROUND,
-    context::Context,
-    logger::LogLevel,
-    navigators::{
+    constants::TIME_ROUND, context::Context, logger::LogLevel, navigators::{
         NavigatorConfig, go_to::GoToConfig, trajectory::TrajectoryConfig,
         trajectory_follower::TrajectoryFollowerConfig,
-    },
-    networking::network::Network,
-    node::node_factory::{RecordType, RobotConfig},
-    plugin_api::PluginAPI,
-    sensors::{
+    }, networking::network::Network, node::node_factory::{NodeConfig, NodeTypeConfig, RecordType, RobotConfig}, plugin_api::PluginAPI, sensors::{
         SensorConfig,
         robot_sensor::RobotSensorConfig,
         sensor_manager::{ManagedSensorConfig, SensorManagerConfig},
-    },
-    simulator::{ResultConfig, Simulator, SimulatorConfig},
-    state_estimators::{
+    }, simulator::{ResultConfig, Simulator, SimulatorConfig}, state_estimators::{
         BenchStateEstimatorConfig, StateEstimator, StateEstimatorConfig,
         perfect_estimator::PerfectEstimatorConfig,
-    },
-    utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
+    }, utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
 };
 
 struct PluginAPITest<SE: StateEstimator + 'static> {
@@ -139,30 +129,39 @@ fn kill_node() {
     // config.log.log_level = LogLevel::Internal(vec![crate::logger::InternalLog::All]);
     config.max_time = 10.;
     config.results = Some(ResultConfig::default());
-    config.robots.push(RobotConfig {
+    config.nodes.push(NodeConfig {
         name: "node1".to_string(),
-        state_estimator: StateEstimatorConfig::Perfect(PerfectEstimatorConfig {
-            targets: vec!["self".to_string(), "node2".to_string(), "node3".to_string()],
+        node_type: NodeTypeConfig::Robot(RobotConfig {
+            state_estimator: StateEstimatorConfig::Perfect(PerfectEstimatorConfig {
+                targets: vec!["self".to_string(), "node2".to_string(), "node3".to_string()],
+                ..Default::default()
+            }),
+            state_estimator_bench: vec![BenchStateEstimatorConfig {
+                name: "own".to_string(),
+                config: StateEstimatorConfig::Plugin(serde_json::Value::Null),
+            }],
             ..Default::default()
         }),
-        state_estimator_bench: vec![BenchStateEstimatorConfig {
-            name: "own".to_string(),
-            config: StateEstimatorConfig::Plugin(serde_json::Value::Null),
-        }],
         ..Default::default()
     });
-    config.robots.push(RobotConfig {
+    config.nodes.push(NodeConfig {
         name: "node2".to_string(),
-        state_estimator: StateEstimatorConfig::Perfect(PerfectEstimatorConfig {
-            targets: vec!["self".to_string(), "node1".to_string(), "node3".to_string()],
+        node_type: NodeTypeConfig::Robot(RobotConfig {
+            state_estimator: StateEstimatorConfig::Perfect(PerfectEstimatorConfig {
+                targets: vec!["self".to_string(), "node1".to_string(), "node3".to_string()],
+                ..Default::default()
+            }),
             ..Default::default()
         }),
         ..Default::default()
     });
-    config.robots.push(RobotConfig {
+    config.nodes.push(NodeConfig {
         name: "node3".to_string(),
-        state_estimator: StateEstimatorConfig::Perfect(PerfectEstimatorConfig {
-            targets: vec!["self".to_string(), "node1".to_string(), "node2".to_string()],
+        node_type: NodeTypeConfig::Robot(RobotConfig {
+            state_estimator: StateEstimatorConfig::Perfect(PerfectEstimatorConfig {
+                targets: vec!["self".to_string(), "node1".to_string(), "node2".to_string()],
+                ..Default::default()
+            }),
             ..Default::default()
         }),
         ..Default::default()
@@ -349,40 +348,46 @@ fn trigger_sensor(nb_threads: usize) {
     // config.log.log_level = LogLevel::Internal(vec![crate::logger::InternalLog::All]);
     config.max_time = 25.;
     config.results = None;
-    config.robots.push(RobotConfig {
+    config.nodes.push(NodeConfig {
         name: "robot1".to_string(),
-        navigator: NavigatorConfig::TrajectoryFollower(TrajectoryFollowerConfig {
-            trajectory: TrajectoryConfig {
-                point_list: vec![vec![0., 0.], vec![1., 1.]],
-                do_loop: false,
+        node_type: NodeTypeConfig::Robot(RobotConfig {
+            navigator: NavigatorConfig::TrajectoryFollower(TrajectoryFollowerConfig {
+                trajectory: TrajectoryConfig {
+                    point_list: vec![vec![0., 0.], vec![1., 1.]],
+                    do_loop: false,
+                },
+                ..Default::default()
+            }),
+            state_estimator_bench: vec![BenchStateEstimatorConfig {
+                name: "triggered".to_string(),
+                config: StateEstimatorConfig::Plugin(serde_json::Value::Bool(false)),
+            }],
+            sensor_manager: SensorManagerConfig {
+                sensors: vec![ManagedSensorConfig {
+                    name: "RobotSensor".to_string(),
+                    config: SensorConfig::Robot(RobotSensorConfig {
+                        detection_distance: 100.,
+                        activation_time: None,
+                        ..Default::default()
+                    }),
+                    triggered: true,
+                    ..Default::default()
+                }],
             },
             ..Default::default()
         }),
-        state_estimator_bench: vec![BenchStateEstimatorConfig {
-            name: "triggered".to_string(),
-            config: StateEstimatorConfig::Plugin(serde_json::Value::Bool(false)),
-        }],
-        sensor_manager: SensorManagerConfig {
-            sensors: vec![ManagedSensorConfig {
-                name: "RobotSensor".to_string(),
-                config: SensorConfig::Robot(RobotSensorConfig {
-                    detection_distance: 100.,
-                    activation_time: None,
-                    ..Default::default()
-                }),
-                triggered: true,
-                ..Default::default()
-            }],
-        },
         ..Default::default()
     });
-    config.robots.push(RobotConfig {
+    config.nodes.push(NodeConfig {
         name: "robot2".to_string(),
-        navigator: NavigatorConfig::GoTo(GoToConfig::default()),
-        state_estimator_bench: vec![BenchStateEstimatorConfig {
-            name: "triggering".to_string(),
-            config: StateEstimatorConfig::Plugin(serde_json::Value::Bool(true)),
-        }],
+        node_type: NodeTypeConfig::Robot(RobotConfig {
+            navigator: NavigatorConfig::GoTo(GoToConfig::default()),
+            state_estimator_bench: vec![BenchStateEstimatorConfig {
+                name: "triggering".to_string(),
+                config: StateEstimatorConfig::Plugin(serde_json::Value::Bool(true)),
+            }],
+            ..Default::default()
+        }),
         ..Default::default()
     });
 

@@ -1,22 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "SimulatorConfig",
-  "description": "Scenario configuration for the simulator.\nThe Simulator configuration is the root of the scenario configuration.\n\n# Example\n\n```yaml\nversion: 1.9.0\nmax_time: 10.0\nlog:\n  log_level:\n    type: Info\nresults: null\ntime_analysis:\n  exporter:\n    type: TraceEventExporter\n  output_path: time_performance # .json or .csv will be appended\n  analysis_unit: s\nrandom_seed: null # Different seed each run\nenvironment:\n  map: null\nrobots:\n  - name: robot1\n    navigator:\n      type: GoTo\n      target_point: null\n      target_speed: 0.5\n      stop_distance: 0.2\n      stop_ramp_coefficient: 0.5\n    controller:\n      type: PID\n      robot_model:\n        type: Unicycle\n        wheel_distance: 0.25\n      proportional_gains: [1.0, 1.0]\n      derivative_gains: [0.0, 0.1]\n      integral_gains: [0.0, 0.0]\n    physics:\n      type: Internal\n      model:\n        type: Unicycle\n        wheel_distance: 0.25\n      initial_state:\n        pose: [0.0, 0.0, 0.0]\n        velocity: [0.0, 0.0]\n    state_estimator:\n      type: Perfect\n      prediction_activation:\n        perdiod: {type: Num, value: 0.1}\n      targets:\n        - self\n    sensor_manager:\n      sensors: []\n    network:\n      range: 0.0 # unlimited range\n      reception_delay: 0.0\ncomputation_units: []\nscenario:\n  events: []\n```",
+  "description": "Scenario configuration for the simulator.\nThe Simulator configuration is the root of the scenario configuration.\n\n# Example\n\n```yaml\nversion: 1.10.0\nmax_time: 10.0\nlog:\n  log_level:\n    type: Info\nresults: null\ntime_analysis:\n  exporter:\n    type: TraceEventExporter\n  output_path: time_performance # .json or .csv will be appended\n  analysis_unit: s\nrandom_seed: null # Different seed each run\nenvironment:\n  map: null\nnodes:\n  - name: robot1\n    type: Robot\n    navigator:\n      type: GoTo\n      target_point: null\n      target_speed: 0.5\n      stop_distance: 0.2\n      stop_ramp_coefficient: 0.5\n    controller:\n      type: PID\n      robot_model:\n        type: Unicycle\n        wheel_distance: 0.25\n      proportional_gains: [1.0, 1.0]\n      derivative_gains: [0.0, 0.1]\n      integral_gains: [0.0, 0.0]\n    physics:\n      type: Internal\n      model:\n        type: Unicycle\n        wheel_distance: 0.25\n      initial_state:\n        pose: [0.0, 0.0, 0.0]\n        velocity: [0.0, 0.0]\n    state_estimator:\n      type: Perfect\n      prediction_activation:\n        perdiod: {type: Num, value: 0.1}\n      targets:\n        - self\n    sensor_manager:\n      sensors: []\n    network:\n      range: 0.0 # unlimited range\n      reception_delay: 0.0\nscenario:\n  events: []\n```",
   "type": "object",
   "properties": {
-    "base_path": {
-      "description": "Auto-computed base directory used to resolve relative paths in the configuration.",
-      "type": "string",
-      "default": "."
-    },
-    "computation_units": {
-      "description": "List of computation units to run, with their specific configuration.",
-      "type": "array",
-      "default": [],
-      "items": {
-        "$ref": "#/$defs/ComputationUnitConfig"
-      }
-    },
     "environment": {
       "description": "Global environment settings (maps).",
       "$ref": "#/$defs/EnvironmentConfig",
@@ -44,6 +31,14 @@
       "type": "number",
       "format": "float",
       "default": 60.0
+    },
+    "nodes": {
+      "description": "List of the nodes to run, with their specific configuration.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/NodeConfig"
+      }
     },
     "optimization": {
       "description": "Optimization settings (parallelization, etc.).",
@@ -73,16 +68,8 @@
       ],
       "default": null
     },
-    "robots": {
-      "description": "List of the robots to run, with their specific configuration.",
-      "type": "array",
-      "default": [],
-      "items": {
-        "$ref": "#/$defs/RobotConfig"
-      }
-    },
     "scenario": {
-      "description": "Scenario settings (occuring events).",
+      "description": "List of computation units to run, with their specific configuration.\nScenario settings (occuring events).",
       "$ref": "#/$defs/ScenarioConfig",
       "default": {
         "events": []
@@ -291,42 +278,6 @@
           "items": {
             "type": "number",
             "format": "float"
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    "ComputationUnitConfig": {
-      "description": "Configuration of the [`NodeType::ComputationUnit`].\n\nTo get observations from other nodes, specify the `send_to` option of [`ManagedSensorConfig`](crate::sensors::sensor_manager::ManagedSensorConfig).\n\nDefault values:\n- `name`: `\"NoName\"`\n- `network`: [`NetworkConfig::default`]\n- `state_estimators`: empty vector\n- `labels`: empty vector\n\n# Example\n```yaml\ncomputation_units:\n- name: Central Unit\n  state_estimators:\n  - name: central_perfect\n    config:\n      type: Perfect\n      prediction_activation:\n        period: {type: Num, value: 0.1}\n      targets:\n      - robot1\n      - robot2\n```",
-      "type": "object",
-      "properties": {
-        "labels": {
-          "description": "Free-form labels attached to the node metadata.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "name": {
-          "description": "Name of the unit.",
-          "type": "string",
-          "default": "NoName"
-        },
-        "network": {
-          "description": "[`Network`] configuration.",
-          "$ref": "#/$defs/NetworkConfig",
-          "default": {
-            "range": 0.0,
-            "reception_delay": 0.0
-          }
-        },
-        "state_estimators": {
-          "description": "[`StateEstimator`](crate::state_estimators::StateEstimator)s",
-          "type": "array",
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/BenchStateEstimatorConfig"
           }
         }
       },
@@ -2055,6 +2006,162 @@
       },
       "additionalProperties": false
     },
+    "NodeConfig": {
+      "description": "Full configuration of a [`Node`]",
+      "type": "object",
+      "properties": {
+        "autospawn": {
+          "description": "If `true`, node starts in running state when created.",
+          "type": "boolean",
+          "default": true
+        },
+        "labels": {
+          "description": "Free-form labels attached to the node metadata.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "description": "Name of the robot. Will be used in the `model_name` field as well.",
+          "type": "string",
+          "default": "NoName"
+        }
+      },
+      "oneOf": [
+        {
+          "description": "Configuration for [`NodeType::Robot`].",
+          "type": "object",
+          "properties": {
+            "controller": {
+              "description": "[`Controller`](crate::controllers::Controller) to use, and its configuration.",
+              "$ref": "#/$defs/ControllerConfig",
+              "default": {
+                "derivative_gains": [],
+                "integral_gains": [],
+                "proportional_gains": [],
+                "robot_model": null,
+                "type": "PID"
+              }
+            },
+            "navigator": {
+              "description": "[`Navigator`](crate::navigators::Navigator) to use, and its configuration.",
+              "$ref": "#/$defs/NavigatorConfig",
+              "default": {
+                "stop_distance": 0.20000000298023224,
+                "stop_ramp_coefficient": 0.5,
+                "target_point": null,
+                "target_speed": 0.5,
+                "type": "GoTo"
+              }
+            },
+            "network": {
+              "description": "[`Network`] configuration.",
+              "$ref": "#/$defs/NetworkConfig",
+              "default": {
+                "range": 0.0,
+                "reception_delay": 0.0
+              }
+            },
+            "physics": {
+              "description": "[`Physics`](crate::physics::Physics) to use, and its configuration.",
+              "$ref": "#/$defs/PhysicsConfig",
+              "default": {
+                "faults": [],
+                "initial_state": {
+                  "pose": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "random": [],
+                  "variable_order": [],
+                  "velocity": [
+                    0.0,
+                    0.0
+                  ]
+                },
+                "model": {
+                  "type": "Unicycle",
+                  "wheel_distance": 0.25
+                },
+                "type": "Internal"
+              }
+            },
+            "sensor_manager": {
+              "description": "[`SensorManager`] configuration, which defines the [`Sensor`](crate::sensors::Sensor)s used.",
+              "$ref": "#/$defs/SensorManagerConfig",
+              "default": {
+                "sensors": []
+              }
+            },
+            "state_estimator": {
+              "description": "[`StateEstimator`](crate::state_estimators::StateEstimator) to use, and its configuration.",
+              "$ref": "#/$defs/StateEstimatorConfig",
+              "default": {
+                "prediction_activation": {
+                  "offset": null,
+                  "period": {
+                    "type": "Num",
+                    "value": 0.10000000149011612
+                  },
+                  "table": null
+                },
+                "targets": [
+                  "self"
+                ],
+                "type": "Perfect"
+              }
+            },
+            "state_estimator_bench": {
+              "description": "Additional [`StateEstimator`](crate::state_estimators::StateEstimator) to be evaluated but without a feedback\nloop with the [`Navigator`](crate::navigators::Navigator)",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/BenchStateEstimatorConfig"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "Robot"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "description": "Configuration for [`NodeType::Sensor`].",
+          "type": "object",
+          "properties": {
+            "network": {
+              "description": "[`Network`] configuration.",
+              "$ref": "#/$defs/NetworkConfig",
+              "default": {
+                "range": 0.0,
+                "reception_delay": 0.0
+              }
+            },
+            "state_estimators": {
+              "description": "[`StateEstimator`](crate::state_estimators::StateEstimator)s",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/BenchStateEstimatorConfig"
+              }
+            },
+            "type": {
+              "type": "string",
+              "const": "ComputationUnit"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
     "NumberConfig": {
       "description": "Numeric configuration value.\n\nThis enum is typically used in higher-level `*Config` structures when a field can be either a\nfixed number or a random variable.\n\nDefault: [`NumberConfig::Num`] with `0.0`.",
       "oneOf": [
@@ -3439,119 +3546,6 @@
           ]
         }
       ]
-    },
-    "RobotConfig": {
-      "description": "Configuration of the [`NodeType::Robot`].\n\nThis configuration defines the different modules composing the robot, as well as their configuration.\n\nDefault values:\n- `name`: `\"NoName\"`\n- `navigator`: default [`go_to::GoToConfig`]\n- `controller`: default [`pid::PIDConfig`]\n- `physics`: default [`internal_physics::InternalPhysicConfig`]\n- `state_estimator`: default [`perfect_estimator::PerfectEstimatorConfig`]\n- `sensor_manager`: [`SensorManagerConfig::default`]\n- `network`: [`NetworkConfig::default`]\n- `state_estimator_bench`: empty vector\n- `autospawn`: `true`\n- `labels`: empty vector\n\n# Example\n```yaml\nrobots:\n- name: robot2\n  navigator:\n    type: TrajectoryFollower\n    trajectory_path: path.yaml\n    forward_distance: 0.2\n    target_speed: 0.3\n    stop_distance: 0.2\n    stop_ramp_coefficient: 0.5\n  controller:\n    type: PID\n  physics:\n    type: Internal\n    model:\n      type: Unicycle\n      wheel_distance: 0.25\n    initial_state:\n      random:\n        - type: Uniform\n          min:\n          - -5.0\n          - -5.0\n          - -3.1416\n          max:\n          - 5.0\n          - 5.0\n          - 3.1416\n      variable_order: [x, y, orientation]\n    faults: []\n  state_estimator:\n    type: Perfect\n    prediction_activation:\n      period: {type: Num, value: 0.1}\n    targets:\n    - self\n  sensor_manager:\n    sensors:\n    - name: RobotSensor\n      send_to:\n      - Central Unit\n      config:\n        type: Robot\n        detection_distance: 100.0\n        activation_time:\n          period: {type: Num, value: 0.1}\n        faults: []\n        filters:\n          - type: Range\n            variables: [x, y]\n            min_range: [0, -1]\n            max_range: [10, 1]\n  network:\n    range: 10.0\n    reception_delay: 0.1\n  state_estimator_bench: []\n```",
-      "type": "object",
-      "properties": {
-        "autospawn": {
-          "description": "If `true`, node starts in running state when created.",
-          "type": "boolean",
-          "default": true
-        },
-        "controller": {
-          "description": "[`Controller`](crate::controllers::Controller) to use, and its configuration.",
-          "$ref": "#/$defs/ControllerConfig",
-          "default": {
-            "derivative_gains": [],
-            "integral_gains": [],
-            "proportional_gains": [],
-            "robot_model": null,
-            "type": "PID"
-          }
-        },
-        "labels": {
-          "description": "Free-form labels attached to the node metadata.",
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          }
-        },
-        "name": {
-          "description": "Name of the robot. Will be used in the `model_name` field as well.",
-          "type": "string",
-          "default": "NoName"
-        },
-        "navigator": {
-          "description": "[`Navigator`](crate::navigators::Navigator) to use, and its configuration.",
-          "$ref": "#/$defs/NavigatorConfig",
-          "default": {
-            "stop_distance": 0.20000000298023224,
-            "stop_ramp_coefficient": 0.5,
-            "target_point": null,
-            "target_speed": 0.5,
-            "type": "GoTo"
-          }
-        },
-        "network": {
-          "description": "[`Network`] configuration.",
-          "$ref": "#/$defs/NetworkConfig",
-          "default": {
-            "range": 0.0,
-            "reception_delay": 0.0
-          }
-        },
-        "physics": {
-          "description": "[`Physics`](crate::physics::Physics) to use, and its configuration.",
-          "$ref": "#/$defs/PhysicsConfig",
-          "default": {
-            "faults": [],
-            "initial_state": {
-              "pose": [
-                0.0,
-                0.0,
-                0.0
-              ],
-              "random": [],
-              "variable_order": [],
-              "velocity": [
-                0.0,
-                0.0
-              ]
-            },
-            "model": {
-              "type": "Unicycle",
-              "wheel_distance": 0.25
-            },
-            "type": "Internal"
-          }
-        },
-        "sensor_manager": {
-          "description": "[`SensorManager`] configuration, which defines the [`Sensor`](crate::sensors::Sensor)s used.",
-          "$ref": "#/$defs/SensorManagerConfig",
-          "default": {
-            "sensors": []
-          }
-        },
-        "state_estimator": {
-          "description": "[`StateEstimator`](crate::state_estimators::StateEstimator) to use, and its configuration.",
-          "$ref": "#/$defs/StateEstimatorConfig",
-          "default": {
-            "prediction_activation": {
-              "offset": null,
-              "period": {
-                "type": "Num",
-                "value": 0.10000000149011612
-              },
-              "table": null
-            },
-            "targets": [
-              "self"
-            ],
-            "type": "Perfect"
-          }
-        },
-        "state_estimator_bench": {
-          "description": "Additional [`StateEstimator`](crate::state_estimators::StateEstimator) to be evaluated but without a feedback\nloop with the [`Navigator`](crate::navigators::Navigator)",
-          "type": "array",
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/BenchStateEstimatorConfig"
-          }
-        }
-      },
-      "additionalProperties": false
     },
     "RobotModelConfig": {
       "description": "Configuration enum selecting the robot kinematic model.\n\nPlease note that the robot model is transfered from the Physics configuration to\nother modules (e.g. controller) if it differs or is not provided.\n\nDefault value: [`RobotModelConfig::Unicycle`] with [`UnicycleConfig::default`].",

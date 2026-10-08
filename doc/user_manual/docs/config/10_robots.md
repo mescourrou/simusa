@@ -11,8 +11,9 @@ The `robots` section defines all robots in the simulation, their kinematics mode
 Each robot in the `robots` list contains:
 
 ```yaml
-robots:
+nodes:
   - name: robot1                     # Unique robot identifier
+    type: Robot                      # This node is a Robot
     navigator: { ... }               # Navigation component
     controller: { ... }              # Control component
     physics: { ... }                 # Physics simulation
@@ -81,8 +82,9 @@ physics:
 ```yaml
 max_time: 30.0
 
-robots:
+nodes:
   - name: robot1
+    type: Robot
     navigator:
       type: TrajectoryFollower
       trajectory_path: paths/robot1.yaml

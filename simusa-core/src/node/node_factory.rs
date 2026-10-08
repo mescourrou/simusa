@@ -12,34 +12,19 @@ use std::{
 use config_checker::*;
 use serde::{Deserialize, Serialize};
 use simusa_com::pub_sub::{BrokerTrait, PathKey};
-use simusa_macros::config_derives;
+use simusa_macros::{UIComponent, config_derives};
 
 #[cfg(feature = "gui")]
 use crate::gui::{UIComponent, utils::text_singleline_with_apply};
 
 use crate::{
-    context::Context,
-    controllers::{self, ControllerConfig, ControllerRecord, pid},
-    environment::{Environment, map::MapRecord},
-    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
-    internal,
-    navigators::{self, NavigatorConfig, NavigatorRecord, go_to},
-    networking::{
+    api::internal_api::NodeServer, context::Context, controllers::{self, ControllerConfig, ControllerRecord, pid}, environment::{Environment, map::MapRecord}, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, internal, navigators::{self, NavigatorConfig, NavigatorRecord, go_to}, networking::{
         self,
         network::{Network, NetworkConfig},
-    },
-    node::{Node, NodeMetaData, NodeState},
-    physics::{self, PhysicsConfig, PhysicsRecord, internal_physics},
-    plugin_api::PluginAPI,
-    scenario::config::EventRecord,
-    sensors::sensor_manager::{SensorManager, SensorManagerConfig, SensorManagerRecord},
-    simulator::{SimulatorConfig, SimusaBroker, SimusaBrokerMultiClient},
-    state_estimators::{
+    }, node::{Node, NodeMetaData, NodeState}, physics::{self, PhysicsConfig, PhysicsRecord, internal_physics}, plugin_api::PluginAPI, scenario::config::EventRecord, sensors::sensor_manager::{SensorManager, SensorManagerConfig, SensorManagerRecord}, simulator::{SimulatorConfig, SimusaBroker, SimusaBrokerMultiClient}, state_estimators::{
         self, BenchStateEstimator, BenchStateEstimatorConfig, BenchStateEstimatorRecord, State,
         StateEstimatorConfig, StateEstimatorRecord, perfect_estimator,
-    },
-    time_analysis::TimeAnalysisFactory,
-    utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
+    }, time_analysis::{TimeAnalysisFactory, TimeAnalysisNode}, utils::{SharedMutex, SharedRoLock, SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
 };
 
 /// Type of node instantiated in the simulator.
@@ -223,6 +208,143 @@ impl RecordType {
     }
 }
 
+/// Root configuration for all nodes types.
+#[config_derives]
+#[derive(UIComponent)]
+pub enum NodeTypeConfig {
+    /// Configuration for [`NodeType::Robot`].
+    #[check]
+    Robot(RobotConfig),
+    /// Configuration for [`NodeType::Sensor`].
+    #[check]
+    ComputationUnit(ComputationUnitConfig),
+}
+
+impl Default for NodeTypeConfig {
+    fn default() -> Self {
+        NodeTypeConfig::Robot(RobotConfig::default())
+    }
+}
+
+impl NodeTypeConfig {
+    /// Returns the corresponding [`NodeType`] for this configuration.
+    pub fn as_node_type(&self) -> NodeType {
+        match &self {
+            Self::Robot(_) => NodeType::Robot,
+            Self::ComputationUnit(_) => NodeType::ComputationUnit,
+        }
+    }
+}
+
+/// Full configuration of a [`Node`]
+#[config_derives(skip_unknown_fields)] // skip_unknown_fields to be compatible with node_type flatten
+pub struct NodeConfig {
+    /// Name of the robot. Will be used in the `model_name` field as well.
+    pub name: String,
+    /// If `true`, node starts in running state when created.
+    pub autospawn: bool,
+    /// Free-form labels attached to the node metadata.
+    pub labels: Vec<String>,
+    /// Configuration of the type-specific behaviour
+    #[serde(flatten)]
+    pub node_type: NodeTypeConfig,
+}
+
+impl Default for NodeConfig {
+    fn default() -> Self {
+        NodeConfig {
+            name: String::from("NoName"),
+            autospawn: true,
+            labels: Vec::new(),
+            node_type: NodeTypeConfig::default(),
+        }
+    }
+}
+
+#[cfg(feature = "gui")]
+impl UIComponent for NodeConfig {
+    fn show_mut(
+        &mut self,
+        ui: &mut egui::Ui,
+        ctx: &egui::Context,
+        buffer_stack: &mut std::collections::BTreeMap<String, String>,
+        global_config: &SimulatorConfig,
+        _current_node_name: Option<&String>,
+        unique_id: &str,
+    ) {
+        let name_copy = self.name.clone();
+        let current_node_name = Some(&name_copy);
+        egui::CollapsingHeader::new(&self.name).show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label("Name: ");
+                text_singleline_with_apply(
+                    ui,
+                    format!("node-name-key-{}", unique_id).as_str(),
+                    buffer_stack,
+                    &mut self.name,
+                );
+            });
+
+            ui.horizontal(|ui| {
+                ui.label("Labels: ");
+
+                let mut to_remove = Vec::new();
+                for (i, label) in self.labels.iter_mut().enumerate() {
+                    let unique_var_id = format!("node-labels-key-{}-{}", i, unique_id);
+                    ui.horizontal(|ui| {
+                        text_singleline_with_apply(ui, &unique_var_id, buffer_stack, label);
+                    });
+                    if ui.button("-").clicked() {
+                        to_remove.push(i);
+                    }
+                }
+                for i in to_remove.iter().rev() {
+                    self.labels.remove(*i);
+                }
+                if ui.button("+").clicked() {
+                    self.labels.push(String::new());
+                }
+            });
+
+            ui.horizontal(|ui| {
+                ui.label("Autospawn:");
+                ui.checkbox(&mut self.autospawn, "");
+            });
+            
+            self.node_type.show_mut(
+                ui,
+                ctx,
+                buffer_stack,
+                global_config,
+                current_node_name,
+                unique_id,
+            );
+
+        });
+    }
+
+    fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
+        egui::CollapsingHeader::new(&self.name).show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(format!("Name: {}", self.name));
+            });
+
+            ui.horizontal(|ui| {
+                ui.label("Labels: ");
+                ui.vertical(|ui| {
+                    for label in &self.labels {
+                        ui.label(format!("- '{}'", label));
+                    }
+                });
+            });
+
+            ui.horizontal(|ui| {
+                ui.label(format!("Autospawn: {}", self.autospawn));
+            });
+        });
+    }
+}
+
 ////////////////////////
 /*        ROBOT       */
 ////////////////////////
@@ -245,8 +367,9 @@ impl RecordType {
 ///
 /// # Example
 /// ```yaml
-/// robots:
+/// nodes:
 /// - name: robot2
+///   type: Robot
 ///   navigator:
 ///     type: TrajectoryFollower
 ///     trajectory_path: path.yaml
@@ -303,8 +426,6 @@ impl RecordType {
 /// ```
 #[config_derives]
 pub struct RobotConfig {
-    /// Name of the robot. Will be used in the `model_name` field as well.
-    pub name: String,
     /// [`Navigator`](crate::navigators::Navigator) to use, and its configuration.
     #[check]
     pub navigator: NavigatorConfig,
@@ -328,10 +449,6 @@ pub struct RobotConfig {
     /// loop with the [`Navigator`](crate::navigators::Navigator)
     #[check]
     pub state_estimator_bench: Vec<BenchStateEstimatorConfig>,
-    /// If `true`, node starts in running state when created.
-    pub autospawn: bool,
-    /// Free-form labels attached to the node metadata.
-    pub labels: Vec<String>,
 }
 
 impl Default for RobotConfig {
@@ -344,7 +461,6 @@ impl Default for RobotConfig {
     /// * Default [`Network`] config.
     fn default() -> Self {
         RobotConfig {
-            name: String::from("NoName"),
             navigator: NavigatorConfig::GoTo(go_to::GoToConfig::default()),
             controller: ControllerConfig::PID(pid::PIDConfig::default()),
             physics: PhysicsConfig::Internal(internal_physics::InternalPhysicConfig::default()),
@@ -354,8 +470,6 @@ impl Default for RobotConfig {
             sensor_manager: SensorManagerConfig::default(),
             network: NetworkConfig::default(),
             state_estimator_bench: Vec::new(),
-            autospawn: true,
-            labels: Vec::new(),
         }
     }
 }
@@ -368,159 +482,101 @@ impl UIComponent for RobotConfig {
         ctx: &egui::Context,
         buffer_stack: &mut std::collections::BTreeMap<String, String>,
         global_config: &SimulatorConfig,
-        _current_node_name: Option<&String>,
+        current_node_name: Option<&String>,
         unique_id: &str,
     ) {
-        let name_copy = self.name.clone();
-        let current_node_name = Some(&name_copy);
-        egui::CollapsingHeader::new(&self.name).show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label("Name: ");
-                text_singleline_with_apply(
+        self.network.show_mut(
+            ui,
+            ctx,
+            buffer_stack,
+            global_config,
+            current_node_name,
+            unique_id,
+        );
+        self.navigator.show_mut(
+            ui,
+            ctx,
+            buffer_stack,
+            global_config,
+            current_node_name,
+            unique_id,
+        );
+        self.physics.show_mut(
+            ui,
+            ctx,
+            buffer_stack,
+            global_config,
+            current_node_name,
+            unique_id,
+        );
+        self.controller.show_mut(
+            ui,
+            ctx,
+            buffer_stack,
+            global_config,
+            current_node_name,
+            unique_id,
+        );
+        self.state_estimator.show_mut(
+            ui,
+            ctx,
+            buffer_stack,
+            global_config,
+            current_node_name,
+            unique_id,
+        );
+
+        ui.label("State estimator bench:");
+        let mut seb_to_remove = None;
+        for (i, seb) in self.state_estimator_bench.iter_mut().enumerate() {
+            let seb_unique_id = format!("{}-{}", unique_id, seb.name);
+            ui.horizontal_top(|ui| {
+                seb.show_mut(
                     ui,
-                    format!("robot-name-key-{}", unique_id).as_str(),
+                    ctx,
                     buffer_stack,
-                    &mut self.name,
+                    global_config,
+                    current_node_name,
+                    &seb_unique_id,
                 );
-            });
-
-            ui.horizontal(|ui| {
-                ui.label("Labels: ");
-
-                let mut to_remove = Vec::new();
-                for (i, label) in self.labels.iter_mut().enumerate() {
-                    let unique_var_id = format!("robot-labels-key-{}-{}", i, unique_id);
-                    ui.horizontal(|ui| {
-                        text_singleline_with_apply(ui, &unique_var_id, buffer_stack, label);
-                    });
-                    if ui.button("-").clicked() {
-                        to_remove.push(i);
-                    }
-                }
-                for i in to_remove.iter().rev() {
-                    self.labels.remove(*i);
-                }
-                if ui.button("+").clicked() {
-                    self.labels.push(String::new());
+                if ui.button("X").clicked() {
+                    seb_to_remove = Some(i);
                 }
             });
-
-            ui.horizontal(|ui| {
-                ui.label("Autospawn:");
-                ui.checkbox(&mut self.autospawn, "");
-            });
-            self.network.show_mut(
-                ui,
-                ctx,
-                buffer_stack,
-                global_config,
-                current_node_name,
-                unique_id,
-            );
-            self.navigator.show_mut(
-                ui,
-                ctx,
-                buffer_stack,
-                global_config,
-                current_node_name,
-                unique_id,
-            );
-            self.physics.show_mut(
-                ui,
-                ctx,
-                buffer_stack,
-                global_config,
-                current_node_name,
-                unique_id,
-            );
-            self.controller.show_mut(
-                ui,
-                ctx,
-                buffer_stack,
-                global_config,
-                current_node_name,
-                unique_id,
-            );
-            self.state_estimator.show_mut(
-                ui,
-                ctx,
-                buffer_stack,
-                global_config,
-                current_node_name,
-                unique_id,
-            );
-
-            ui.label("State estimator bench:");
-            let mut seb_to_remove = None;
-            for (i, seb) in self.state_estimator_bench.iter_mut().enumerate() {
-                let seb_unique_id = format!("{}-{}", unique_id, seb.name);
-                ui.horizontal_top(|ui| {
-                    seb.show_mut(
-                        ui,
-                        ctx,
-                        buffer_stack,
-                        global_config,
-                        current_node_name,
-                        &seb_unique_id,
-                    );
-                    if ui.button("X").clicked() {
-                        seb_to_remove = Some(i);
-                    }
-                });
-            }
-            if let Some(i) = seb_to_remove {
-                self.state_estimator_bench.remove(i);
-            }
-            if ui.button("Add State Estimator benched").clicked() {
-                self.state_estimator_bench
-                    .push(BenchStateEstimatorConfig::default());
-            }
-            self.sensor_manager.show_mut(
-                ui,
-                ctx,
-                buffer_stack,
-                global_config,
-                current_node_name,
-                unique_id,
-            );
-        });
+        }
+        if let Some(i) = seb_to_remove {
+            self.state_estimator_bench.remove(i);
+        }
+        if ui.button("Add State Estimator benched").clicked() {
+            self.state_estimator_bench
+                .push(BenchStateEstimatorConfig::default());
+        }
+        self.sensor_manager.show_mut(
+            ui,
+            ctx,
+            buffer_stack,
+            global_config,
+            current_node_name,
+            unique_id,
+        );
     }
 
     fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
-        egui::CollapsingHeader::new(&self.name).show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label(format!("Name: {}", self.name));
+        self.network.show(ui, ctx, unique_id);
+        self.navigator.show(ui, ctx, unique_id);
+        self.physics.show(ui, ctx, unique_id);
+        self.controller.show(ui, ctx, unique_id);
+        self.state_estimator.show(ui, ctx, unique_id);
+
+        ui.label("State estimator bench:");
+        for seb in &self.state_estimator_bench {
+            let seb_unique_id = format!("{}-{}", unique_id, seb.name);
+            ui.horizontal_top(|ui| {
+                seb.show(ui, ctx, &seb_unique_id);
             });
+        }
 
-            ui.horizontal(|ui| {
-                ui.label("Labels: ");
-                ui.vertical(|ui| {
-                    for label in &self.labels {
-                        ui.label(format!("- '{}'", label));
-                    }
-                });
-            });
-
-            ui.horizontal(|ui| {
-                ui.label(format!("Autospawn: {}", self.autospawn));
-            });
-
-            self.network.show(ui, ctx, unique_id);
-            self.navigator.show(ui, ctx, unique_id);
-            self.physics.show(ui, ctx, unique_id);
-            self.controller.show(ui, ctx, unique_id);
-            self.state_estimator.show(ui, ctx, unique_id);
-
-            ui.label("State estimator bench:");
-            for seb in &self.state_estimator_bench {
-                let seb_unique_id = format!("{}-{}", unique_id, seb.name);
-                ui.horizontal_top(|ui| {
-                    seb.show(ui, ctx, &seb_unique_id);
-                });
-            }
-
-            self.sensor_manager.show(ui, ctx, unique_id);
-        });
+        self.sensor_manager.show(ui, ctx, unique_id);
     }
 }
 
@@ -630,18 +686,12 @@ impl UIComponent for RobotRecord {
 /// ```
 #[config_derives]
 pub struct ComputationUnitConfig {
-    /// Name of the unit.
-    pub name: String,
     /// [`Network`] configuration.
     #[check]
     pub network: NetworkConfig,
-
     /// [`StateEstimator`](crate::state_estimators::StateEstimator)s
     #[check]
     pub state_estimators: Vec<BenchStateEstimatorConfig>,
-
-    /// Free-form labels attached to the node metadata.
-    pub labels: Vec<String>,
 }
 
 impl Default for ComputationUnitConfig {
@@ -649,10 +699,8 @@ impl Default for ComputationUnitConfig {
     /// * Default [`Network`] config.
     fn default() -> Self {
         ComputationUnitConfig {
-            name: String::from("NoName"),
             network: NetworkConfig::default(),
             state_estimators: Vec::new(),
-            labels: Vec::new(),
         }
     }
 }
@@ -665,105 +713,55 @@ impl UIComponent for ComputationUnitConfig {
         ctx: &egui::Context,
         buffer_stack: &mut std::collections::BTreeMap<String, String>,
         global_config: &SimulatorConfig,
-        _current_node_name: Option<&String>,
+        current_node_name: Option<&String>,
         unique_id: &str,
     ) {
-        let name_copy = self.name.clone();
-        let current_node_name = Some(&name_copy);
-        egui::CollapsingHeader::new(&self.name).show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label("Name: ");
-                text_singleline_with_apply(
+        self.network.show_mut(
+            ui,
+            ctx,
+            buffer_stack,
+            global_config,
+            current_node_name,
+            unique_id,
+        );
+
+        ui.label("State estimators:");
+        let mut se_to_remove = None;
+        for (i, seb) in self.state_estimators.iter_mut().enumerate() {
+            let seb_unique_id = format!("{}-{}", unique_id, seb.name);
+            ui.horizontal_top(|ui| {
+                seb.show_mut(
                     ui,
-                    format!("cu-name-key-{}", unique_id).as_str(),
+                    ctx,
                     buffer_stack,
-                    &mut self.name,
+                    global_config,
+                    current_node_name,
+                    &seb_unique_id,
                 );
-            });
-
-            ui.horizontal(|ui| {
-                ui.label("Labels: ");
-
-                let mut to_remove = Vec::new();
-                for (i, label) in self.labels.iter_mut().enumerate() {
-                    let unique_var_id = format!("cu-labels-key-{}-{}", i, unique_id);
-                    ui.horizontal(|ui| {
-                        text_singleline_with_apply(ui, &unique_var_id, buffer_stack, label);
-                    });
-                    if ui.button("-").clicked() {
-                        to_remove.push(i);
-                    }
-                }
-                for i in to_remove.iter().rev() {
-                    self.labels.remove(*i);
-                }
-                if ui.button("+").clicked() {
-                    self.labels.push(String::new());
+                if ui.button("X").clicked() {
+                    se_to_remove = Some(i);
                 }
             });
-
-            self.network.show_mut(
-                ui,
-                ctx,
-                buffer_stack,
-                global_config,
-                current_node_name,
-                unique_id,
-            );
-
-            ui.label("State estimators:");
-            let mut se_to_remove = None;
-            for (i, seb) in self.state_estimators.iter_mut().enumerate() {
-                let seb_unique_id = format!("{}-{}", unique_id, seb.name);
-                ui.horizontal_top(|ui| {
-                    seb.show_mut(
-                        ui,
-                        ctx,
-                        buffer_stack,
-                        global_config,
-                        current_node_name,
-                        &seb_unique_id,
-                    );
-                    if ui.button("X").clicked() {
-                        se_to_remove = Some(i);
-                    }
-                });
-            }
-            if let Some(i) = se_to_remove {
-                self.state_estimators.remove(i);
-            }
-            if ui.button("Add State Estimator").clicked() {
-                self.state_estimators
-                    .push(BenchStateEstimatorConfig::default());
-            }
-        });
+        }
+        if let Some(i) = se_to_remove {
+            self.state_estimators.remove(i);
+        }
+        if ui.button("Add State Estimator").clicked() {
+            self.state_estimators
+                .push(BenchStateEstimatorConfig::default());
+        }
     }
 
     fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
-        egui::CollapsingHeader::new(&self.name).show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label(format!("Name: {}", self.name));
+        self.network.show(ui, ctx, unique_id);
+
+        ui.label("State estimators:");
+        for seb in &self.state_estimators {
+            let seb_unique_id = format!("{}-{}", unique_id, seb.name);
+            ui.horizontal_top(|ui| {
+                seb.show(ui, ctx, &seb_unique_id);
             });
-
-            ui.horizontal(|ui| {
-                ui.label("Labels: ");
-                ui.vertical(|ui| {
-                    for label in &self.labels {
-                        ui.label(format!("- '{}'", label));
-                    }
-                });
-            });
-
-            self.network.show(ui, ctx, unique_id);
-
-            ui.label("State estimators:");
-            for seb in &self.state_estimators {
-                let seb_unique_id = format!("{}-{}", unique_id, seb.name);
-                ui.horizontal_top(|ui| {
-                    seb.show(ui, ctx, &seb_unique_id);
-                });
-            }
-        });
+        }
     }
 }
 
@@ -841,10 +839,22 @@ pub struct MakeNodeParams<'a> {
     pub context: Context,
 }
 
-/// Factory for creating runtime [`Node`] instances.
-pub struct NodeFactory {}
+struct NodeBuilder {
+    node_type: NodeType,
+    node_name: String,
+    labels: Vec<String>,
+    node_server: Option<NodeServer>,
+    other_node_names: Vec<String>,
+    time_analysis: Option<SharedMutex<TimeAnalysisNode>>,
+    send_records: bool,
+    node_meta_data: SharedRwLock<NodeMetaData>,
+    meta_data_list: Option<SharedRoLock<BTreeMap<String, SharedRoLock<NodeMetaData>>>>,
+    node_message_client: SimusaBrokerMultiClient,
+    environment: Arc<Environment>,
+    send_record: bool,
+}
 
-impl NodeFactory {
+impl NodeBuilder {
     fn make_global_channels(
         node_name: &String,
         broker: &SharedRwLock<SimusaBroker>,
@@ -917,14 +927,55 @@ impl NodeFactory {
         Ok(client)
     }
 
-    /// Builds a robot node from [`RobotConfig`].
-    pub fn make_robot(config: &RobotConfig, params: &mut MakeNodeParams) -> SimusaResult<Node> {
-        let node_type = NodeType::Robot;
-        let node_name = params.new_name.unwrap_or(&config.name).to_string();
-        // Make global channels
+    pub fn from_config(config: &NodeConfig, params: &mut MakeNodeParams) -> SimusaResult<Node> {
+        let node_name = config.name.clone();
+        let node_type = config.node_type.as_node_type();
         let client = Self::make_global_channels(&node_name, params.broker, &params.context)?;
+        let proto_node = Self {
+            node_type: node_type.clone(),
+            labels: config.labels.clone(),
+            node_server: None,
+            other_node_names: Vec::new(),
+            time_analysis: params
+                .time_analysis_factory
+                .as_mut()
+                .map(|taf| taf.new_node(node_name.clone())),
+            send_records: false,
+            node_meta_data: Arc::new(RwLock::new(NodeMetaData {
+                name: node_name.clone(),
+                node_type: node_type,
+                model_name: node_name.clone(),
+                labels: config.labels.clone(),
+                state: if config.autospawn {
+                    NodeState::Running
+                } else {
+                    NodeState::Created
+                },
+                physics: None,
+            })),
+            meta_data_list: None,
+            node_message_client: client,
+            environment: params.environment.clone(),
+            node_name,
+            send_record: params.force_send_results || params.global_config.results.is_some(),
+        };
+        match &config.node_type {
+            NodeTypeConfig::Robot(robot_config) => proto_node.make_robot(robot_config, params),
+            NodeTypeConfig::ComputationUnit(cu_config) => {
+                proto_node.make_computation_unit(cu_config, params)
+            }
+        }
+    }
+
+    fn make_robot(
+        self,
+        config: &RobotConfig,
+        params: &mut MakeNodeParams,
+    ) -> SimusaResult<Node> {
+        
+        // Make global channels
         let network = Arc::new(RwLock::new(Network::from_config(
-            node_name.clone(),
+            self.node_name.clone(),
             &config.network,
             params.global_config,
             params.va_factory,
@@ -935,7 +986,7 @@ impl NodeFactory {
             global_config: params.global_config,
             initial_time: params.initial_time,
             network: &network,
-            node_name: &node_name,
+            node_name: &self.node_name,
             plugin_api: params.plugin_api,
             va_factory: params.va_factory,
             context: &params.context,
@@ -947,19 +998,8 @@ impl NodeFactory {
             .state(params.initial_time, &params.context)
             .unwrap()
             .clone();
+        self.node_meta_data.write().unwrap().physics = Some(physics.clone());
         let node = Node {
-            node_meta_data: Arc::new(RwLock::new(NodeMetaData {
-                name: node_name.clone(),
-                node_type,
-                model_name: config.name.clone(),
-                labels: config.labels.clone(),
-                state: if config.autospawn {
-                    NodeState::Running
-                } else {
-                    NodeState::Created
-                },
-                physics: Some(physics.clone()),
-            })),
             navigator: Some(navigators::make_navigator_from_config(
                 &config.navigator,
                 &from_config_args,
@@ -986,17 +1026,15 @@ impl NodeFactory {
             state_estimator_bench: Some(Arc::new(RwLock::new(Vec::with_capacity(
                 config.state_estimator_bench.len(),
             )))),
-            node_server: None,
-            other_node_names: Vec::new(),
-            time_analysis: params
-                .time_analysis_factory
-                .as_mut()
-                .map(|taf| taf.new_node(node_name.clone())),
-            send_records: params.force_send_results || params.global_config.results.is_some(),
-            meta_data_list: None,
-            node_message_client: client,
             current_command: None,
-            environment: params.environment.clone(),
+            node_meta_data: self.node_meta_data,
+            node_server: self.node_server,
+            other_node_names: self.other_node_names,
+            time_analysis: self.time_analysis,
+            send_records: self.send_record,
+            meta_data_list: self.meta_data_list,
+            node_message_client: self.node_message_client,
+            environment: self.environment,
         };
 
         for state_estimator_config in &config.state_estimator_bench {
@@ -1019,16 +1057,13 @@ impl NodeFactory {
         Ok(node)
     }
 
-    /// Builds a computation-unit node from [`ComputationUnitConfig`].
-    pub(crate) fn make_computation_unit(
+    fn make_computation_unit(
+        self,
         config: &ComputationUnitConfig,
         params: &mut MakeNodeParams,
     ) -> SimusaResult<Node> {
-        let node_type = NodeType::ComputationUnit;
-        let node_name = params.new_name.unwrap_or(&config.name).to_string();
-        let client = Self::make_global_channels(&node_name, params.broker, &params.context)?;
         let network = Arc::new(RwLock::new(Network::from_config(
-            node_name.clone(),
+            self.node_name.clone(),
             &config.network,
             params.global_config,
             params.va_factory,
@@ -1039,20 +1074,12 @@ impl NodeFactory {
             global_config: params.global_config,
             initial_time: params.initial_time,
             network: &network,
-            node_name: &node_name,
+            node_name: &self.node_name,
             plugin_api: params.plugin_api,
             va_factory: params.va_factory,
             context: &params.context,
         };
         let node = Node {
-            node_meta_data: Arc::new(RwLock::new(NodeMetaData {
-                name: node_name.clone(),
-                node_type,
-                model_name: config.name.clone(),
-                labels: config.labels.clone(),
-                state: NodeState::Running,
-                physics: None,
-            })),
             navigator: None,
             controller: None,
             physics: None,
@@ -1067,17 +1094,15 @@ impl NodeFactory {
             state_estimator_bench: Some(Arc::new(RwLock::new(Vec::with_capacity(
                 config.state_estimators.len(),
             )))),
-            node_server: None,
-            other_node_names: Vec::new(),
-            time_analysis: params
-                .time_analysis_factory
-                .as_mut()
-                .map(|taf| taf.new_node(node_name.clone())),
-            send_records: params.force_send_results || params.global_config.results.is_some(),
-            meta_data_list: None,
-            node_message_client: client,
             current_command: None,
-            environment: params.environment.clone(),
+            node_meta_data: self.node_meta_data,
+            node_server: self.node_server,
+            other_node_names: self.other_node_names,
+            time_analysis: self.time_analysis,
+            send_records: self.send_record,
+            meta_data_list: self.meta_data_list,
+            node_message_client: self.node_message_client,
+            environment: self.environment,
         };
 
         for state_estimator_config in &config.state_estimators {
@@ -1099,21 +1124,24 @@ impl NodeFactory {
 
         Ok(node)
     }
+}
+
+/// Factory for creating runtime [`Node`] instances.
+pub struct NodeFactory {}
+
+impl NodeFactory {
+    pub fn make_node(config: &NodeConfig, params: &mut MakeNodeParams) -> SimusaResult<Node> {
+        NodeBuilder::from_config(config, params)
+    }
 
     /// Builds a node by searching its name in global robot and computation-unit configs.
     pub(crate) fn make_node_from_name(
         name: &str,
         params: &mut MakeNodeParams,
     ) -> SimusaResult<Node> {
-        for robot_config in params.global_config.robots.iter() {
-            if robot_config.name == name {
-                return Self::make_robot(robot_config, params);
-            }
-        }
-
-        for cu_config in params.global_config.computation_units.iter() {
-            if cu_config.name == name {
-                return Self::make_computation_unit(cu_config, params);
+        for node_config in params.global_config.nodes.iter() {
+            if node_config.name == name {
+                return NodeBuilder::from_config(node_config, params);
             }
         }
 

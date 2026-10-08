@@ -14,8 +14,9 @@ optimization:
   threads: 1
 environment:
   map: !include "maps/landmarks_square.yaml"
-robots:
+nodes:
   - name: "robot1"
+    type: Robot
     navigator: 
       type: TrajectoryFollower
       trajectory: !include "paths/path1.yaml"
@@ -85,6 +86,7 @@ robots:
                     mean: [0, 0]
                     covariance: [0.1, 0, 0, 0.01]                    
   - name: "robot2"
+    type: Robot
     navigator:
       type: TrajectoryFollower
       trajectory: !include "paths/path1.yaml"
@@ -107,6 +109,7 @@ robots:
               period: {type: Num, value: 0.1}
             detection_distance: 100.0
   - name: "robot3"
+    type: Robot
     navigator:
       type: TrajectoryFollower
       trajectory: !include "paths/path1.yaml"
@@ -121,8 +124,8 @@ robots:
     controller: 
       type: PID
       proportional_gains: [1.0, 3.0]
-computation_units:
   - name: "Central Unit"
+    type: ComputationUnit
     network:
       reception_delay: 0.
     state_estimators:

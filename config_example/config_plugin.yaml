@@ -12,8 +12,9 @@ results:
     additionnal_params:
       figures_path: "figures"
 max_time: 60.
-robots:
+nodes:
   - name: "robot1"
+    type: Robot
     navigator: 
       type: Plugin
       config: {}

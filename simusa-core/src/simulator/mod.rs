@@ -48,6 +48,7 @@ use crate::context::Context;
 use crate::error;
 use crate::info;
 use crate::internal;
+use crate::node::node_factory::NodeConfig;
 use crate::physics::Physics;
 use crate::result_analyser::ResultAnalyser;
 use crate::utils::SharedRoLock;
@@ -332,29 +333,17 @@ impl Simulator {
             &self.determinist_va_factory,
         )?);
 
-        // Create robots
-        for robot_config in &config.robots {
-            if robot_config.autospawn {
-                self.add_robot(
-                    robot_config,
+        // Create nodes
+        for node_config in &config.nodes {
+            if node_config.autospawn {
+                self.add_node(
+                    node_config,
                     &config,
                     self.force_send_results,
                     0.,
                     &self.context.clone(),
                 )?;
-                let node = self.nodes.last().unwrap();
             }
-        }
-        // Create computation units
-        for computation_unit_config in &config.computation_units {
-            self.add_computation_unit(
-                computation_unit_config,
-                &config,
-                self.force_send_results,
-                0.,
-                &self.context.clone(),
-            )?;
-            let node = self.nodes.last().unwrap();
         }
 
         self.scenario = Arc::new(Mutex::new(Scenario::from_config(
@@ -478,28 +467,28 @@ impl Simulator {
         Ok(())
     }
 
-    /// Add a [`Node`] of type [`Robot`](crate::node::node_factory::NodeType::Robot) to the [`Simulator`].
+    /// Add a [`Node`] to the [`Simulator`].
     ///
     /// This function add the [`Node`] to the [`Simulator`] list and to the [`NetworkManager`].
     /// It also adds the [`NetworkManager`] to the new [`Node`].
     ///
     /// ## Arguments
-    /// * `robot_config` - Configuration of the [`Robot`](crate::node::node_factory::NodeType::Robot).
+    /// * `node_config` - Configuration of the [`Node`](crate::node::node_factory::NodeType::Node).
     /// * `global_config` - Full configuration of the simulation.
     /// * `force_send_results` - Whether the node should send results to the simulator even if the results are not used for the scenario or the analysis. This can be used to force the sending of results for a node, even if it is not required, for example to be able to show its state in the GUI.
     /// * `initial_time` - Initial time for the node, can be not null if the node is added during the simulation (for example in a scenario spawn event).
-    fn add_robot(
+    fn add_node(
         &mut self,
-        robot_config: &RobotConfig,
+        node_config: &NodeConfig,
         global_config: &SimulatorConfig,
         force_send_results: bool,
         initial_time: f32,
         context: &Context,
     ) -> SimusaResult<()> {
         let context: Context =
-            context.new_callstack_level(&format!("add_robot({})", robot_config.name));
-        let new_node = NodeFactory::make_robot(
-            robot_config,
+            context.new_callstack_level(&format!("add_node({})", node_config.name));
+        let new_node = NodeFactory::make_node(
+            node_config,
             &mut MakeNodeParams {
                 plugin_api: &self.plugin_api,
                 global_config,
@@ -509,53 +498,6 @@ impl Simulator {
                 new_name: None,
                 broker: &self.network_manager.broker(),
                 initial_time,
-                environment: self.environment.clone(),
-                context,
-            },
-        )?;
-        let meta_data = new_node.meta_data();
-        let name = meta_data.read().unwrap().name.clone();
-        self.environment.insert_meta_data(name, meta_data);
-        if new_node.state() != NodeState::Running {
-            return Ok(());
-        }
-        self.nodes.push(new_node);
-        Ok(())
-    }
-
-    /// Add a [`Node`] of type [`ComputationUnit`](crate::node::node_factory::NodeType::ComputationUnit) to the [`Simulator`].
-    ///
-    /// This function add the [`Node`] to the [`Simulator`] list and to the [`NetworkManager`].
-    /// It also adds the [`NetworkManager`] to the new [`Node`].
-    ///
-    /// ## Arguments
-    /// * `computation_unit_config` - Configuration of the [`ComputationUnit`](crate::node::node_factory::NodeType::ComputationUnit).
-    /// * `global_config` - Full configuration of the simulation.
-    /// * `force_send_results` - Whether the node should send results to the simulator even if the results are not used for the scenario or the analysis. This can be used to force the sending of results for a node, even if it is not required, for example to be able to show its state in the GUI.
-    /// * `initial_time` - Initial time for the node, can be not null if the node is added during the simulation (for example in a scenario spawn event).
-    fn add_computation_unit(
-        &mut self,
-        computation_unit_config: &ComputationUnitConfig,
-        global_config: &SimulatorConfig,
-        force_send_results: bool,
-        initial_time: f32,
-        context: &Context,
-    ) -> SimusaResult<()> {
-        let context = context.new_callstack_level(&format!(
-            "add_computation_unit({})",
-            computation_unit_config.name
-        ));
-        let new_node = NodeFactory::make_computation_unit(
-            computation_unit_config,
-            &mut MakeNodeParams {
-                plugin_api: &self.plugin_api,
-                global_config,
-                va_factory: &self.determinist_va_factory,
-                time_analysis_factory: self.time_analysis_factory.as_mut(),
-                force_send_results,
-                new_name: None,
-                initial_time,
-                broker: &self.network_manager.broker(),
                 environment: self.environment.clone(),
                 context,
             },

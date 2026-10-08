@@ -19,7 +19,7 @@ use crate::{
 };
 
 #[cfg(feature = "gui")]
-use crate::gui::{UIComponent, utils::string_checkbox};
+use crate::{gui::{UIComponent, utils::string_checkbox}, node::node_factory::NodeTypeConfig};
 use crate::recordable::Recordable;
 use crate::sensors::Observation;
 use crate::simulator::SimulatorConfig;
@@ -103,7 +103,10 @@ impl UIComponent for PerfectEstimatorConfig {
                 });
 
                 let mut possible_targets =
-                    Vec::from_iter(global_config.robots.iter().map(|x| x.name.clone()));
+                    Vec::from_iter(global_config.nodes.iter().filter_map(|x| match x.node_type {
+                        NodeTypeConfig::Robot(_) => Some(x.name.clone()),
+                        NodeTypeConfig::ComputationUnit(_) => None,
+                    }));
                 possible_targets.insert(0, "self".to_string());
                 if let Some(idx) = possible_targets
                     .iter()

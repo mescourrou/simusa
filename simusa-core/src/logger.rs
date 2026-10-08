@@ -213,12 +213,7 @@ impl UIComponent for LoggerConfig {
             });
 
             let mut node_list = Vec::from_iter(
-                global_config.robots.iter().map(|x| x.name.clone()).chain(
-                    global_config
-                        .computation_units
-                        .iter()
-                        .map(|x| x.name.clone()),
-                ),
+                global_config.nodes.iter().map(|x| x.name.clone())
             );
             node_list.push("simulator".to_string());
             ui.horizontal_wrapped(|ui| {
