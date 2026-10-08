@@ -18,12 +18,11 @@ use simusa_macros::{UIComponent, config_derives};
 use crate::gui::{UIComponent, utils::text_singleline_with_apply};
 
 use crate::{
-    api::internal_api::NodeServer, context::Context, controllers::{self, ControllerConfig, ControllerRecord, pid}, environment::{Environment, map::MapRecord}, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, internal, navigators::{self, NavigatorConfig, NavigatorRecord, go_to}, networking::{
+    api::internal_api::NodeServer, context::Context, controllers::{self, ControllerConfig, ControllerError, ControllerRecord, pid}, environment::{Environment, map::MapRecord}, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, internal, navigators::{self, NavigatorConfig, NavigatorRecord, go_to}, networking::{
         self,
         network::{Network, NetworkConfig},
-    }, node::{Node, NodeMetaData, NodeState}, physics::{self, PhysicsConfig, PhysicsRecord, internal_physics}, plugin_api::PluginAPI, scenario::config::EventRecord, sensors::sensor_manager::{SensorManager, SensorManagerConfig, SensorManagerRecord}, simulator::{SimulatorConfig, SimusaBroker, SimusaBrokerMultiClient}, state_estimators::{
-        self, BenchStateEstimator, BenchStateEstimatorConfig, BenchStateEstimatorRecord, State,
-        StateEstimatorConfig, StateEstimatorRecord, perfect_estimator,
+    }, node::{Node, NodeMetaData, NodeState}, physics::{self, PhysicsConfig, PhysicsRecord, internal_physics, robot_models::Command}, plugin_api::PluginAPI, scenario::config::EventRecord, sensors::sensor_manager::{SensorManager, SensorManagerConfig, SensorManagerRecord}, simulator::{SimulatorConfig, SimusaBroker, SimusaBrokerMultiClient}, state_estimators::{
+        self, BenchStateEstimator, BenchStateEstimatorConfig, BenchStateEstimatorRecord, State, StateEstimatorConfig, StateEstimatorRecord, WorldStateRecord, perfect_estimator,
     }, time_analysis::{TimeAnalysisFactory, TimeAnalysisNode}, utils::{SharedMutex, SharedRoLock, SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
 };
 
@@ -145,7 +144,7 @@ impl RecordType {
     /// Returns the navigator record when available.
     pub fn navigator(&self) -> Option<&NavigatorRecord> {
         match &self {
-            Self::Robot(robot_record) => Some(&robot_record.navigator),
+            Self::Robot(robot_record) => robot_record.navigator.as_ref(),
             Self::ComputationUnit(_) => None,
             _ => None,
         }
@@ -154,7 +153,7 @@ impl RecordType {
     /// Returns the controller record when available.
     pub fn controller(&self) -> Option<&ControllerRecord> {
         match &self {
-            Self::Robot(robot_record) => Some(&robot_record.controller),
+            Self::Robot(robot_record) => robot_record.controller.as_ref(),
             Self::ComputationUnit(_) => None,
             _ => None,
         }
@@ -172,7 +171,7 @@ impl RecordType {
     /// Returns the state-estimator record when available.
     pub fn state_estimator(&self) -> Option<&StateEstimatorRecord> {
         match &self {
-            Self::Robot(robot_record) => Some(&robot_record.state_estimator),
+            Self::Robot(robot_record) => robot_record.state_estimator.as_ref(),
             Self::ComputationUnit(_) => None,
             _ => None,
         }
@@ -590,14 +589,20 @@ pub struct RobotRecord {
     /// Config/model name used to instantiate the robot. It corresponds to the name of the robot
     /// in the configuration file.
     pub model_name: String,
-    /// Record of the [`Navigator`](crate::navigators::Navigator) module.
-    pub navigator: NavigatorRecord,
-    /// Record of the [`Controller`](crate::controllers::Controller) module.
-    pub controller: ControllerRecord,
+    /// Record of the [`Navigator`](crate::navigators::Navigator) module if it was called.
+    pub navigator: Option<NavigatorRecord>,
+    /// Output of the [`Navigator`](crate::navigators::Navigator) if it was called.
+    pub controller_error: Option<ControllerError>,
+    /// Record of the [`Controller`](crate::controllers::Controller) module if it was called.
+    pub controller: Option<ControllerRecord>,
+    /// Output of the [`Controller`](crate::controllers::Controller) if it was called.
+    pub command: Option<Command>,
     /// Record of the [`Physics`](crate::physics::Physics) module.
     pub physics: PhysicsRecord,
-    /// Record of the [`StateEstimator`](crate::state_estimators::StateEstimator) module.
-    pub state_estimator: StateEstimatorRecord,
+    /// Record of the [`StateEstimator`](crate::state_estimators::StateEstimator) module if prediction_step or correction_step was called.
+    pub state_estimator: Option<StateEstimatorRecord>,
+    /// Output of the loop [`StateEstimator`](crate::state_estimators::StateEstimator) if it was called.
+    pub estimated_world_state: Option<WorldStateRecord>,
     /// Record of the additionnal [`StateEstimator`](crate::state_estimators::StateEstimator)s, only to evaluate them.
     pub state_estimator_bench: Vec<BenchStateEstimatorRecord>,
 
@@ -626,21 +631,33 @@ impl UIComponent for RobotRecord {
 
             ui.label(format!("State: {}", self.state));
 
-            egui::CollapsingHeader::new("Navigator").show(ui, |ui| {
-                self.navigator.show(ui, ctx, unique_id);
-            });
-
-            egui::CollapsingHeader::new("Controller").show(ui, |ui| {
-                self.controller.show(ui, ctx, unique_id);
-            });
+            if let Some(navigator) = &self.navigator {
+                egui::CollapsingHeader::new("Navigator").show(ui, |ui| {
+                    navigator.show(ui, ctx, unique_id);
+                });
+            } else {
+                ui.label("Navigator was not called.");
+            }
+            
+            if let Some(controller) = &self.controller {
+                egui::CollapsingHeader::new("Controller").show(ui, |ui| {
+                    controller.show(ui, ctx, unique_id);
+                });
+            } else {
+                ui.label("Controller was not called.");
+            }
 
             egui::CollapsingHeader::new("Physics").show(ui, |ui| {
                 self.physics.show(ui, ctx, unique_id);
             });
 
-            egui::CollapsingHeader::new("State Estimator").show(ui, |ui| {
-                self.state_estimator.show(ui, ctx, unique_id);
-            });
+            if let Some(state_estimator) = &self.state_estimator {
+                egui::CollapsingHeader::new("State Estimator").show(ui, |ui| {
+                    state_estimator.show(ui, ctx, unique_id);
+                });
+            } else {
+                ui.label("State estimator was not called.");
+            }
 
             ui.label("State Estimator bench:");
             for se in &self.state_estimator_bench {
@@ -1035,6 +1052,9 @@ impl NodeBuilder {
             meta_data_list: self.meta_data_list,
             node_message_client: self.node_message_client,
             environment: self.environment,
+            last_command: None,
+            last_error: None,
+            last_estimation: None,
         };
 
         for state_estimator_config in &config.state_estimator_bench {
@@ -1103,6 +1123,9 @@ impl NodeBuilder {
             meta_data_list: self.meta_data_list,
             node_message_client: self.node_message_client,
             environment: self.environment,
+            last_command: None,
+            last_error: None,
+            last_estimation: None,
         };
 
         for state_estimator_config in &config.state_estimators {

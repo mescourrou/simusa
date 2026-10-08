@@ -21,11 +21,12 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::context::Context;
+use crate::controllers::ControllerError;
 use crate::environment::Environment;
 use crate::networking::network::MessageFlag;
 use crate::physics::robot_models::Command;
 use crate::simulator::SimusaBrokerMultiClient;
-use crate::state_estimators::State;
+use crate::state_estimators::{State, WorldStateRecord};
 use crate::time_analysis::TimeAnalysisNode;
 use crate::utils::read_only_lock::RoLock;
 use crate::utils::{SharedMutex, SharedRoLock, SharedRwLock};
@@ -129,6 +130,10 @@ pub struct Node {
     pub(self) current_command: Option<Command>,
 
     pub(self) environment: Arc<Environment>,
+
+    pub(self) last_estimation: Option<WorldStateRecord>,
+    pub(self) last_error: Option<ControllerError>,
+    pub(self) last_command: Option<Command>,
 }
 
 impl Node {
@@ -359,6 +364,9 @@ impl Node {
 
     pub(crate) fn pre_loop_hooks(&mut self, time: f32, context: &Context) {
         let context = context.new_callstack_level("pre_loop_hooks");
+        self.last_command = None;
+        self.last_error = None;
+        self.last_estimation = None;
         if let Some(state_estimator) = self.state_estimator() {
             state_estimator
                 .write()
@@ -442,6 +450,7 @@ impl Node {
                     .unwrap()
                     .finished_time_analysis(ta.unwrap());
             }
+            self.last_estimation = Some(state_estimator.read().unwrap().world_state(&context).record(&context));
             true
         } else {
             false
@@ -498,6 +507,7 @@ impl Node {
                             .unwrap()
                             .finished_time_analysis(ta.unwrap());
                     }
+                    self.last_estimation = Some(state_estimator.read().unwrap().world_state(&context).record(&context));
                 }
 
                 if let Some(state_estimator_bench) = &self.state_estimator_bench() {
@@ -578,6 +588,7 @@ impl Node {
                     .finished_time_analysis(ta.unwrap());
             }
 
+            self.last_error = Some(error.clone());
             // Compute the command from the error
             let ta = self.time_analysis.as_ref().map(|time_analysis| {
                 time_analysis
@@ -598,7 +609,7 @@ impl Node {
                     .unwrap()
                     .finished_time_analysis(ta.unwrap());
             }
-
+            self.last_command = Some(command.clone());
             // Apply the command to the physics
             self.physics
                 .as_ref()
@@ -750,20 +761,28 @@ impl Node {
             name: meta_data.name.clone(),
             model_name: meta_data.model_name.clone(),
             labels: meta_data.labels.clone(),
-            navigator: self
-                .navigator
-                .as_ref()
-                .unwrap()
-                .read()
-                .unwrap()
-                .record(&context),
-            controller: self
-                .controller
-                .as_ref()
-                .unwrap()
-                .read()
-                .unwrap()
-                .record(&context),
+            navigator: if self.last_error.is_some() {
+                Some(self
+                    .navigator
+                    .as_ref()
+                    .unwrap()
+                    .read()
+                    .unwrap()
+                    .record(&context))
+                } else {
+                    None
+                },
+            controller: if self.last_command.is_some() {
+                Some(self
+                    .controller
+                    .as_ref()
+                    .unwrap()
+                    .read()
+                    .unwrap()
+                    .record(&context))
+                } else {
+                    None
+                },
             physics: self
                 .physics
                 .as_ref()
@@ -771,13 +790,17 @@ impl Node {
                 .read()
                 .unwrap()
                 .record(&context),
-            state_estimator: self
-                .state_estimator
-                .as_ref()
-                .unwrap()
-                .read()
-                .unwrap()
-                .record(&context),
+            state_estimator: if self.last_estimation.is_some() {
+                Some(self
+                    .state_estimator
+                    .as_ref()
+                    .unwrap()
+                    .read()
+                    .unwrap()
+                    .record(&context))
+                } else {
+                    None
+                },
             state_estimator_bench: Vec::new(),
             sensors: self
                 .sensor_manager
@@ -787,6 +810,9 @@ impl Node {
                 .unwrap()
                 .record(&context),
             state: meta_data.state.clone(),
+            command: self.last_command.clone(),
+            controller_error: self.last_error.clone(),
+            estimated_world_state: self.last_estimation.clone(),
         };
         let other_state_estimators = self.state_estimator_bench.clone();
         for additional_state_estimator in other_state_estimators
