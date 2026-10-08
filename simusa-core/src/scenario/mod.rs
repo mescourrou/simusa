@@ -20,8 +20,10 @@ use crate::{
     config::NumberConfig, constants::TIME_ROUND, context::Context, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, info, internal, logger::InternalLog, networking::{self, message_types::MessageType, network::Envelope}, node::node_factory::RecordType, scenario::config::{
         AreaEventTriggerConfig, EventConfig, EventRecord, EventTriggerConfig, EventTypeConfig,
         ProximityEventTriggerConfig, ScenarioConfig, SpawnEventConfig, TimeEventTriggerConfig,
-    }, simulator::{Record, RunningParameters, Simulator, SimulatorConfig, SimusaBroker}, utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory}, warning,
+    }, simulator::{Record, Simulator, SimulatorConfig, SimusaBroker}, utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory}, warning,
 };
+#[cfg(feature = "deprecated_thread_separation")]
+use crate::simulator::RunningParameters;
 
 use crate::networking::network::MessageFlag;
 
@@ -106,6 +108,7 @@ impl Scenario {
         &mut self,
         simulator: &mut Simulator,
         node_states: &BTreeMap<String, Option<[f32; 2]>>,
+        #[cfg(feature = "deprecated_thread_separation")]
         running_parameters: &mut RunningParameters,
         context: &Context,
     ) -> SimusaResult<()> {
@@ -126,6 +129,7 @@ impl Scenario {
                     time: NumberConfig::Num(time),
                     occurences: NumberConfig::Num(event.0 as f32),
                 }),
+                #[cfg(feature = "deprecated_thread_separation")]
                 running_parameters,
                 &context,
             )? {
@@ -154,6 +158,7 @@ impl Scenario {
                             simulator,
                             &nodes,
                             &EventTriggerConfig::Proximity(proximity_config.clone()),
+                            #[cfg(feature = "deprecated_thread_separation")]
                             running_parameters,
                             &context,
                         )? {
@@ -178,6 +183,7 @@ impl Scenario {
                             simulator,
                             &nodes,
                             &EventTriggerConfig::Area(area_config.clone()),
+                            #[cfg(feature = "deprecated_thread_separation")]
                             running_parameters,
                             &context,
                         )? {
@@ -210,6 +216,7 @@ impl Scenario {
         simulator: &mut Simulator,
         trigger_variables: &[String],
         trigger: &EventTriggerConfig,
+        #[cfg(feature = "deprecated_thread_separation")]
         running_parameters: &mut RunningParameters,
         context: &Context,
     ) -> SimusaResult<Option<EventRecord>> {
@@ -272,6 +279,7 @@ impl Scenario {
                 if let Err(e) = simulator.spawn_node_from_name(
                     &model_name,
                     &node_name,
+                    #[cfg(feature = "deprecated_thread_separation")]
                     running_parameters,
                     time,
                     &context,

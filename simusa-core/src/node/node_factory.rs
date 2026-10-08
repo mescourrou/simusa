@@ -828,6 +828,7 @@ pub struct MakeNodeParams<'a> {
     /// Optional time-analysis factory used to create node profilers.
     pub time_analysis_factory: Option<&'a mut TimeAnalysisFactory>,
     /// Simulator time condition variable shared across node services.
+    #[cfg(feature = "deprecated_thread_separation")]
     pub time_cv: Arc<TimeCv>,
     /// If `true`, forces record transmission even without results configuration.
     pub force_send_results: bool,

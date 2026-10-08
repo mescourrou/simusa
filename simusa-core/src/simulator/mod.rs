@@ -179,19 +179,14 @@ impl Default for TimeCv {
     }
 }
 
+#[cfg(feature = "deprecated_thread_separation")]
 pub(crate) struct RunningParameters {
     max_time: f32,
-    #[cfg(all(not(feature = "monothreaded"), feature = "deprecated_thread_separation"))]
     nb_nodes: SharedRwLock<usize>,
-    #[cfg(all(not(feature = "monothreaded"), feature = "deprecated_thread_separation"))]
     finishing_cv: Arc<(Mutex<usize>, Condvar)>,
-    #[cfg(all(not(feature = "monothreaded"), feature = "deprecated_thread_separation"))]
     barrier: Arc<Barrier>,
-    #[cfg(all(not(feature = "monothreaded"), feature = "deprecated_thread_separation"))]
     handles: Vec<JoinHandle<SimusaResult<Node>>>,
-    #[cfg(all(not(feature = "monothreaded"), feature = "deprecated_thread_separation"))]
     end_time_step_syncs: Vec<Arc<Mutex<bool>>>,
-    #[cfg(all(not(feature = "monothreaded"), feature = "deprecated_thread_separation"))]
     running_nodes_names: Vec<String>,
     nb_threads: usize,
     last_sim_time: f32,
@@ -598,6 +593,7 @@ impl Simulator {
                 global_config,
                 va_factory: &self.determinist_va_factory,
                 time_analysis_factory: self.time_analysis_factory.as_mut(),
+                #[cfg(feature = "deprecated_thread_separation")]
                 time_cv: self.time_cv.clone(),
                 force_send_results,
                 new_name: None,
@@ -646,6 +642,7 @@ impl Simulator {
                 global_config,
                 va_factory: &self.determinist_va_factory,
                 time_analysis_factory: self.time_analysis_factory.as_mut(),
+                #[cfg(feature = "deprecated_thread_separation")]
                 time_cv: self.time_cv.clone(),
                 force_send_results,
                 new_name: None,
@@ -708,6 +705,7 @@ impl Simulator {
     /// After the scenario is done, the results are not processed. Use [`Simulator::compute_results`] to process the results and compute the analysis.
     pub fn run(&mut self) -> SimusaResult<()> {
         let context = self.context.new_callstack_level("run");
+        #[cfg(feature = "deprecated_thread_separation")]
         let mut running_parameters = RunningParameters {
             max_time: self.config.max_time,
             last_sim_time: self.last_sim_time,
@@ -725,6 +723,8 @@ impl Simulator {
             running_nodes_names: Vec::new(),
             nb_threads: self.max_threads,
         };
+        #[cfg(not(feature = "deprecated_thread_separation"))]
+        let max_time = self.config.max_time;
 
         if let Some(data) = &self.result_saving_data {
             match data.save_mode {
@@ -796,7 +796,12 @@ impl Simulator {
                 for context in node_contexts.values_mut() {
                     context.update_time(time);
                 }
+                #[cfg(feature = "deprecated_thread_separation")]
                 if time > running_parameters.max_time + TIME_ROUND / 2. {
+                    break;
+                }
+                #[cfg(not(feature = "deprecated_thread_separation"))]
+                if time > max_time + TIME_ROUND / 2. {
                     break;
                 }
 
@@ -885,7 +890,12 @@ impl Simulator {
 
                 let node_states = self.node_states();
                 if let Err(e) =
-                    self.end_of_time_step_procedure(&node_states, &mut running_parameters, &context)
+                    self.end_of_time_step_procedure(
+                        &node_states,
+                        #[cfg(feature = "deprecated_thread_separation")]
+                        &mut running_parameters,
+                        &context
+                    )
                 {
                     error = Some(e);
                     break;
@@ -1023,7 +1033,12 @@ impl Simulator {
                         for context in node_contexts.values_mut() {
                             context.update_time(time);
                         }
+                        #[cfg(feature = "deprecated_thread_separation")]
                         if time > running_parameters.max_time + TIME_ROUND / 2. {
+                            break;
+                        }
+                        #[cfg(not(feature = "deprecated_thread_separation"))]
+                        if time > max_time + TIME_ROUND / 2. {
                             break;
                         }
 
@@ -1153,6 +1168,7 @@ impl Simulator {
                         let node_states = self.node_states();
                         if let Err(e) = self.end_of_time_step_procedure(
                             &node_states,
+                            #[cfg(feature = "deprecated_thread_separation")]
                             &mut running_parameters,
                             &context,
                         ) {
@@ -1209,6 +1225,7 @@ impl Simulator {
         &mut self,
         node_name: &str,
         new_node_name: &str,
+        #[cfg(feature = "deprecated_thread_separation")]
         running_parameters: &mut RunningParameters,
         time: f32,
         context: &Context,
@@ -1220,6 +1237,7 @@ impl Simulator {
                 global_config: &self.config,
                 va_factory: &self.determinist_va_factory,
                 time_analysis_factory: self.time_analysis_factory.as_mut(),
+                #[cfg(feature = "deprecated_thread_separation")]
                 time_cv: self.time_cv.clone(),
                 force_send_results: self.force_send_results,
                 new_name: Some(new_node_name),
@@ -1873,19 +1891,25 @@ impl Simulator {
     fn end_of_time_step_procedure(
         &mut self,
         node_states: &BTreeMap<String, Option<[f32; 2]>>,
+        #[cfg(feature = "deprecated_thread_separation")]
         running_parameters: &mut RunningParameters,
         context: &Context,
     ) -> SimusaResult<()> {
         let current_time = context.get_time().expect("Simulator context has no time!!");
-        running_parameters.last_sim_time = current_time;
+        #[cfg(feature = "deprecated_thread_separation")]
+        {running_parameters.last_sim_time = current_time;}
         self.last_sim_time = current_time;
         
         let scenario = self.scenario.clone();
         scenario
             .lock()
             .unwrap()
-            .execute_scenario(self, node_states, running_parameters, context)
-            .unwrap();
+            .execute_scenario(self,
+                node_states, 
+                #[cfg(feature = "deprecated_thread_separation")]
+                running_parameters, 
+                context
+            ).unwrap();
         self.network_manager
             .process_messages(node_states, context)
             .unwrap();
