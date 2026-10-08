@@ -6,15 +6,10 @@ by the controller should be perfect.
 
 use super::{State, WorldState, WorldStateRecord};
 use crate::{
-    constants::TIME_ROUND,
-    context::Context,
-    error, info,
-    physics::robot_models::Command,
-    utils::{
+    constants::TIME_ROUND, context::Context, error, info, node::NodeState, physics::robot_models::Command, utils::{
         determinist_random_variable::DeterministRandomVariableFactory,
         periodicity::{Periodicity, PeriodicityConfig},
-    },
-    warning,
+    }, warning,
 };
 
 #[cfg(feature = "gui")]
@@ -237,11 +232,13 @@ impl StateEstimator for PerfectEstimator {
                 .expect("Node with state_estimator should have physics");
             let physic = arc_physic.read().unwrap();
 
-            *ego = physic.state(time, context).clone();
+            *ego = physic.state(time, context).unwrap();
         }
         let mut objects_to_delete = Vec::new();
         for (target, state) in &mut self.world_state.objects {
-            *state = match node.get_other_node_physics(target) {
+            let meta_data_list = node.meta_data_list().unwrap();
+            let other_node_meta_data_list = meta_data_list.read().unwrap();
+            *state = match other_node_meta_data_list.get(target) {
                 None => {
                     warning!(
                         context,
@@ -251,7 +248,15 @@ impl StateEstimator for PerfectEstimator {
                     objects_to_delete.push(target.clone());
                     state.clone()
                 }
-                Some(s) => s.read().unwrap().state(time, context).clone(),
+                Some(s) => {
+                    let md = s.read().unwrap();
+                    if md.state == NodeState::Terminated {
+                        objects_to_delete.push(target.clone());
+                        state.clone()
+                    } else {
+                        md.physics.as_ref().unwrap().read().unwrap().state(time, context).expect("Node that are not Terminated and have physics should have a state at the current time")
+                    }
+                }
             };
         }
         for obj in objects_to_delete {

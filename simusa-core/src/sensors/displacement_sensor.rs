@@ -481,7 +481,7 @@ impl Sensor for DisplacementSensor {
             .expect("Node with Speed sensor should have Physics")
             .read()
             .unwrap()
-            .state(initial_time, context)
+            .state(initial_time, context).unwrap()
             .clone();
         for filter in self.filters.iter_mut() {
             filter.post_init(node, initial_time, context)?;
@@ -508,7 +508,7 @@ impl Sensor for DisplacementSensor {
             .physics()
             .expect("Node with Displacement sensor should have Physics");
         let physic = arc_physic.read().unwrap();
-        let state = physic.state(time, context);
+        let state = physic.state(time, context).unwrap();
         let attached_frame = frame.attach_to_state(&state);
         let state = attached_frame.state();
 

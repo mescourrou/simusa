@@ -556,7 +556,7 @@ impl eframe::App for SimusaApp {
                                 self.duration = c.max_time;
                                 self.p.config = Some(c);
                                 if let Some(cfg) = &self.p.config.as_ref().unwrap().results && let Some(path) = &cfg.result_path {
-                                    self.result_path = self.p.config.as_ref().unwrap().base_path.join(Path::new(&path)).to_str().unwrap().to_string();
+                                    self.result_path = path.clone();
                                 }
                                 self.drawable_manager.init_drawables(self.p.config.as_ref().unwrap(), &self.p.plugin_api, &self.p.server, self.p.context.as_ref().unwrap());
                             }

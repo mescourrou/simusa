@@ -643,7 +643,7 @@ impl Sensor for OrientedLandmarkSensor {
         }
         let state = if let Some(arc_physic) = node.physics() {
             let physic = arc_physic.read().unwrap();
-            physic.state(time, context).clone()
+            physic.state(time, context).unwrap()
         } else {
             State::new() // 0
         };

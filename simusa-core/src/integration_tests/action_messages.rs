@@ -332,10 +332,21 @@ mod trigger_sensor {
 }
 
 #[test]
-fn trigger_sensor() {
+fn trigger_sensor_pooled() {
+    trigger_sensor(4);
+}
+
+#[test]
+fn trigger_sensor_monothreaded() {
+    trigger_sensor(1);
+}
+
+
+fn trigger_sensor(nb_threads: usize) {
     let trigger_times = VecDeque::<f32>::from(vec![3.2, 5., 6., 7.5, 9.1, 9.9, 10.0, 21.3]);
 
     let mut config = SimulatorConfig::default();
+    config.optimization.threads = nb_threads;
     config.log.log_level = LogLevel::Off;
     // config.log.included_nodes = vec!["robot1".to_string()];
     // config.log.excluded_nodes = vec!["simulator".to_string()];

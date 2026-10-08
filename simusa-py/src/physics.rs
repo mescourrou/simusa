@@ -39,8 +39,8 @@ impl Physics for PythonPhysicAsyncClient {
         self.post_init.call(pynode).unwrap()
     }
 
-    fn state(&self, _time: f32, _context: &Context) -> State {
-        self.last_state.clone()
+    fn state(&self, _time: f32, _context: &Context) -> Option<State> {
+        Some(self.last_state.clone())
     }
 
     fn update_state(&mut self, time: f32, _context: &Context) {

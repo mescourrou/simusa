@@ -166,7 +166,9 @@ pub trait Physics:
     /// Get the current real state, the groundtruth.
     ///
     /// `context` can be used for logging or diagnostics while retrieving the state.
-    fn state(&self, time: f32, context: &Context) -> State;
+    /// 
+    /// Optional: return None if the state is not available at the current time (e.g., if the node is terminated).
+    fn state(&self, time: f32, context: &Context) -> Option<State>;
 
     /// Optional: return the time of the next time step. Needed if using messages
     #[allow(unused_variables)]

@@ -240,7 +240,7 @@ impl MisassociationFault {
         old_label: String,
         position: Vector2<f32>,
         environment: &Arc<Environment>,
-        _context: &Context,
+        context: &Context,
     ) -> String {
         let mut id_list: Vec<(String, Vector2<f32>)> = match &self.source {
             Source::Robots => environment
@@ -250,9 +250,14 @@ impl MisassociationFault {
                 .iter()
                 .filter_map(|(name, data)| {
                     if matches!(data.read().unwrap().state, NodeState::Running)
-                        && let Some(position) = data.read().unwrap().position
+                        && let Some(physics) = &data.read().unwrap().physics
                     {
-                        Some((name.clone(), Vector2::new(position[0], position[1])))
+                        let time = context.get_time().unwrap();
+                        if let Some(state) = physics.read().unwrap().state(time, context) {
+                            Some((name.clone(), Vector2::new(state.pose.x, state.pose.y)))
+                        } else {
+                            None
+                        }
                     } else {
                         None
                     }

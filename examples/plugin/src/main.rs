@@ -146,8 +146,8 @@ impl MyWonderfulPhysics {
 impl Physics for MyWonderfulPhysics {
     fn apply_command(&mut self, _command: &Command, _time: f32, _context: &Context) {}
 
-    fn state(&self, _time: f32, _context: &Context) -> State {
-        self.state.clone()
+    fn state(&self, _time: f32, _context: &Context) -> Option<State> {
+        Some(self.state.clone())
     }
 
     fn update_state(&mut self, _time: f32, _context: &Context) {}

@@ -10,6 +10,8 @@ time_analysis:
 results: {} #default results
 max_time: 60.
 random_seed: 85646513.6849618
+optimization:
+  threads: 1
 environment:
   map: !include "maps/landmarks_square.yaml"
 robots:

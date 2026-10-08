@@ -22,8 +22,6 @@ use crate::{
         ProximityEventTriggerConfig, ScenarioConfig, SpawnEventConfig, TimeEventTriggerConfig,
     }, simulator::{Record, Simulator, SimulatorConfig, SimusaBroker}, utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory}, warning,
 };
-#[cfg(feature = "deprecated_thread_separation")]
-use crate::simulator::RunningParameters;
 
 use crate::networking::network::MessageFlag;
 
@@ -108,8 +106,6 @@ impl Scenario {
         &mut self,
         simulator: &mut Simulator,
         node_states: &BTreeMap<String, Option<[f32; 2]>>,
-        #[cfg(feature = "deprecated_thread_separation")]
-        running_parameters: &mut RunningParameters,
         context: &Context,
     ) -> SimusaResult<()> {
         let context = context.new_callstack_level("execute_scenario");
@@ -129,8 +125,6 @@ impl Scenario {
                     time: NumberConfig::Num(time),
                     occurences: NumberConfig::Num(event.0 as f32),
                 }),
-                #[cfg(feature = "deprecated_thread_separation")]
-                running_parameters,
                 &context,
             )? {
                 simulator.add_record(Record {
@@ -158,8 +152,6 @@ impl Scenario {
                             simulator,
                             &nodes,
                             &EventTriggerConfig::Proximity(proximity_config.clone()),
-                            #[cfg(feature = "deprecated_thread_separation")]
-                            running_parameters,
                             &context,
                         )? {
                             simulator.add_record(Record {
@@ -183,8 +175,6 @@ impl Scenario {
                             simulator,
                             &nodes,
                             &EventTriggerConfig::Area(area_config.clone()),
-                            #[cfg(feature = "deprecated_thread_separation")]
-                            running_parameters,
                             &context,
                         )? {
                             simulator.add_record(Record {
@@ -216,8 +206,6 @@ impl Scenario {
         simulator: &mut Simulator,
         trigger_variables: &[String],
         trigger: &EventTriggerConfig,
-        #[cfg(feature = "deprecated_thread_separation")]
-        running_parameters: &mut RunningParameters,
         context: &Context,
     ) -> SimusaResult<Option<EventRecord>> {
         let context = context.new_callstack_level("execute_event");
@@ -279,8 +267,6 @@ impl Scenario {
                 if let Err(e) = simulator.spawn_node_from_name(
                     &model_name,
                     &node_name,
-                    #[cfg(feature = "deprecated_thread_separation")]
-                    running_parameters,
                     time,
                     &context,
                 ) {

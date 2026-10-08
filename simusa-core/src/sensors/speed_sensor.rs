@@ -443,7 +443,7 @@ impl Sensor for SpeedSensor {
             .read()
             .unwrap()
             .state(initial_time, context)
-            .clone();
+            .unwrap();
         for filter in self.filters.iter_mut() {
             filter.post_init(node, initial_time, context)?;
         }
@@ -469,7 +469,7 @@ impl Sensor for SpeedSensor {
             .physics()
             .expect("Node with Speed sensor should have Physics");
         let physic = arc_physic.read().unwrap();
-        let state = physic.state(time, context);
+        let state = physic.state(time, context).unwrap();
         let attached_frame = frame.attach_to_state(&state);
         let state = attached_frame.state();
 

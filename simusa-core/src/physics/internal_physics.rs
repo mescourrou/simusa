@@ -244,20 +244,12 @@ impl Physics for InternalPhysics {
     }
 
     /// Return the current state. Do not compute the state again.
-    fn state(&self, time: f32, context: &Context) -> State {
+    fn state(&self, time: f32, context: &Context) -> Option<State> {
         if time != self.last_time_update {
-            error!(
-                context,
-                "State should be requested at the same time as the last update: {} != {}",
-                time,
-                self.last_time_update
-            );
-            panic!(
-                "State should be requested at the same time as the last update: {} != {}",
-                time, self.last_time_update
-            );
+            None
+        } else {
+            Some(self.state.clone())
         }
-        self.state.clone()
     }
 }
 

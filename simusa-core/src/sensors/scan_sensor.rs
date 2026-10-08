@@ -710,7 +710,7 @@ impl Sensor for ScanSensor {
 
         let state = if let Some(arc_physics) = node.physics() {
             let physics = arc_physics.read().unwrap();
-            physics.state(time, context).clone()
+            physics.state(time, context).unwrap()
         } else {
             State::new() // 0
         };

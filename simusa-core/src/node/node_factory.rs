@@ -33,7 +33,7 @@ use crate::{
     plugin_api::PluginAPI,
     scenario::config::EventRecord,
     sensors::sensor_manager::{SensorManager, SensorManagerConfig, SensorManagerRecord},
-    simulator::{SimulatorConfig, SimusaBroker, SimusaBrokerMultiClient, TimeCv},
+    simulator::{SimulatorConfig, SimusaBroker, SimusaBrokerMultiClient},
     state_estimators::{
         self, BenchStateEstimator, BenchStateEstimatorConfig, BenchStateEstimatorRecord, State,
         StateEstimatorConfig, StateEstimatorRecord, perfect_estimator,
@@ -827,9 +827,6 @@ pub struct MakeNodeParams<'a> {
     pub va_factory: &'a Arc<DeterministRandomVariableFactory>,
     /// Optional time-analysis factory used to create node profilers.
     pub time_analysis_factory: Option<&'a mut TimeAnalysisFactory>,
-    /// Simulator time condition variable shared across node services.
-    #[cfg(feature = "deprecated_thread_separation")]
-    pub time_cv: Arc<TimeCv>,
     /// If `true`, forces record transmission even without results configuration.
     pub force_send_results: bool,
     /// Optional override name for the created node.
@@ -947,7 +944,7 @@ impl NodeFactory {
         let initial_state = physics
             .read()
             .unwrap()
-            .state(params.initial_time, &params.context)
+            .state(params.initial_time, &params.context).unwrap()
             .clone();
         let node = Node {
             node_meta_data: Arc::new(RwLock::new(NodeMetaData {
@@ -960,14 +957,7 @@ impl NodeFactory {
                 } else {
                     NodeState::Created
                 },
-                position: {
-                    let pose = physics
-                        .read()
-                        .unwrap()
-                        .state(params.initial_time, &params.context)
-                        .pose;
-                    Some([pose.x, pose.y])
-                },
+                physics: Some(physics.clone()),
             })),
             navigator: Some(navigators::make_navigator_from_config(
                 &config.navigator,
@@ -997,7 +987,6 @@ impl NodeFactory {
             )))),
             node_server: None,
             other_node_names: Vec::new(),
-            other_node_physics: Arc::new(RwLock::new(BTreeMap::new())),
             time_analysis: params
                 .time_analysis_factory
                 .as_mut()
@@ -1061,7 +1050,7 @@ impl NodeFactory {
                 model_name: config.name.clone(),
                 labels: config.labels.clone(),
                 state: NodeState::Running,
-                position: None,
+                physics: None,
             })),
             navigator: None,
             controller: None,
@@ -1079,7 +1068,6 @@ impl NodeFactory {
             )))),
             node_server: None,
             other_node_names: Vec::new(),
-            other_node_physics: Arc::new(RwLock::new(BTreeMap::new())),
             time_analysis: params
                 .time_analysis_factory
                 .as_mut()

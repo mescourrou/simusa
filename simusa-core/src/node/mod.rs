@@ -25,8 +25,6 @@ use crate::environment::Environment;
 use crate::networking::network::MessageFlag;
 use crate::physics::robot_models::Command;
 use crate::simulator::SimusaBrokerMultiClient;
-#[cfg(all(not(feature = "monothreaded"), feature = "deprecated_thread_separation"))]
-use crate::simulator::TimeCv;
 use crate::state_estimators::State;
 use crate::time_analysis::TimeAnalysisNode;
 use crate::utils::read_only_lock::RoLock;
@@ -74,8 +72,11 @@ pub struct NodeMetaData {
     pub labels: Vec<String>,
     /// Current lifecycle state of the node.
     pub state: NodeState,
-    /// Current ground-truth planar position when available.
-    pub position: Option<[f32; 2]>,
+    /// Physics of the node if it has one.
+    /// 
+    /// WARNING: When the node is terminated, the physics is still available but the
+    /// state() function will return None if called in the future. 
+    pub physics: Option<Arc<dyn RoLock<Box<dyn Physics>>>>,
 }
 
 // Node itself
@@ -118,7 +119,6 @@ pub struct Node {
     pub(self) node_server: Option<NodeServer>,
 
     pub(self) other_node_names: Vec<String>,
-    pub(self) other_node_physics: SharedRoLock<BTreeMap<String, SharedRoLock<Box<dyn Physics>>>>,
     pub(self) time_analysis: Option<SharedMutex<TimeAnalysisNode>>,
     pub(self) send_records: bool,
 
@@ -137,7 +137,6 @@ impl Node {
     /// It is used to initialize the sensor manager, which need to know the list of all nodes.
     pub(crate) fn post_creation_init(
         &mut self,
-        physics_list: SharedRoLock<BTreeMap<String, SharedRoLock<Box<dyn Physics>>>>,
         meta_data_list: SharedRoLock<BTreeMap<String, SharedRoLock<NodeMetaData>>>,
         initial_time: f32,
         context: &Context,
@@ -148,8 +147,6 @@ impl Node {
             crate::logger::InternalLog::SetupSteps,
             "Node post-creation initialization"
         );
-
-        self.other_node_physics = physics_list;
 
         // Using meta_data_list to get names as only nodes with physics are in physics_list.
         for name in meta_data_list.read().unwrap().keys() {
@@ -216,199 +213,12 @@ impl Node {
         node_client
     }
 
-    /// Run the node to reach the given time.
-    ///
-    /// ## Arguments
-    /// * `time` -- Time to reach.
-    #[cfg(all(not(feature = "monothreaded"), feature = "deprecated_thread_separation"))]
-    pub(crate) fn run_next_time_step(
-        &mut self,
-        time: f32,
-        time_cv: &TimeCv,
-        context: &Context,
-    ) -> SimusaResult<()> {
-        self.process_messages();
-        self.run_time_step(time, time_cv, context)
-    }
-
     /// Process all the messages: one-way (network) and two-way (services).
     ///
     /// Processing messages mean here to transfer all the pending messages from the network to the corresponding modules (physics, state estimator, navigator, controller, sensor manager).
     pub(crate) fn process_messages(&self) -> bool {
         self.node_message_client.next_message_time().is_some()
     }
-
-    /// Run only one time step.
-    ///
-    /// The update step is done in this order:
-    /// 1. Update the physics
-    /// 2. Call to `pre_loop_hook`s.
-    /// 3. Prediction step of the state estimators
-    /// 4. Generate the observations (and send them)
-    /// 5. Correction step of the state estimator
-    /// 6. If it is the time for the state estimator to do its prediction step or required by either controller or navigator:
-    ///     1. The navigator computes the error from the state estimation
-    ///     2. The command is computed by the Controller
-    ///     3. The command is applied to the Physics (but Physics state is not updated yet).
-    ///
-    /// The network messages are handled between each steps.
-    ///
-    /// Then, the node state is saved.
-    #[cfg(all(not(feature = "monothreaded"), feature = "deprecated_thread_separation"))]
-    fn run_time_step(
-        &mut self,
-        time: f32,
-        time_cv: &TimeCv,
-        context: &Context,
-    ) -> SimusaResult<()> {
-        use crate::errors::{SimusaError, SimusaErrorTypes};
-        use crate::info;
-
-        let context = context.new_callstack_level("run_time_step");
-        if self.node_meta_data.read().unwrap().state != NodeState::Running {
-            return Err(SimusaError::new(
-                SimusaErrorTypes::ImplementationError,
-                "Only a Running node should be run!".to_string(),
-            ));
-        }
-        info!(context, "Run time {}", time);
-
-        // Update the true state
-        self.physics_update(time, &context);
-
-        self.handle_messages(time, &context);
-        // self.sync_with_others(time_cv, time, &context);
-        time_cv.barrier.wait();
-        if self.process_messages() {
-            self.handle_messages(time, &context);
-        }
-
-        // Pre loop calls to manage messages
-        self.pre_loop_hooks(time, &context);
-
-        self.handle_messages(time, &context);
-        internal!(
-            context,
-            crate::logger::InternalLog::NodeSyncDetailed,
-            "Pre prediction step wait"
-        );
-        // self.sync_with_others(time_cv, time, &context);
-        time_cv.barrier.wait();
-        if self.process_messages() {
-            self.handle_messages(time, &context);
-        }
-
-        let do_control_loop = self.prediction_step(time, &context);
-
-        self.handle_messages(time, &context);
-        internal!(
-            context,
-            crate::logger::InternalLog::NodeSyncDetailed,
-            "Post prediction step wait"
-        );
-        // self.sync_with_others(time_cv, time, &context);
-        time_cv.barrier.wait();
-        if self.process_messages() {
-            self.handle_messages(time, &context);
-        }
-
-        self.make_observations(time, &context);
-
-        self.handle_messages(time, &context);
-        internal!(
-            context,
-            crate::logger::InternalLog::NodeSyncDetailed,
-            "Post observation wait"
-        );
-        // self.sync_with_others(time_cv, time, &context);
-        time_cv.barrier.wait();
-        if self.process_messages() {
-            self.handle_messages(time, &context);
-        }
-
-        self.correction_step(time, &context);
-
-        self.handle_messages(time, &context);
-        internal!(
-            context,
-            crate::logger::InternalLog::NodeSyncDetailed,
-            "Post correction step wait"
-        );
-        // self.sync_with_others(time_cv, time, &context);
-        time_cv.barrier.wait();
-        if self.process_messages() {
-            self.handle_messages(time, &context);
-        }
-
-        self.nav_and_control_step(time, do_control_loop, &context);
-
-        self.handle_messages(time, &context);
-        internal!(
-            context,
-            crate::logger::InternalLog::NodeSyncDetailed,
-            "Pre-save wait"
-        );
-        // self.sync_with_others(time_cv, time, &context);
-        time_cv.barrier.wait();
-        if self.process_messages() {
-            self.handle_messages(time, &context);
-        }
-
-        Ok(())
-    }
-
-    /// Synchronize this node with the other nodes at an intermediate barrier.
-    ///
-    /// The method repeatedly processes pending messages while waiting for the
-    /// synchronization parity to change.
-    #[cfg(all(not(feature = "monothreaded"), feature = "deprecated_thread_separation"))]
-    pub(crate) fn sync_with_others(&mut self, time_cv: &TimeCv, time: f32, context: &Context) {
-        let context = context.new_callstack_level("sync_with_others");
-    }
-    // #[cfg(all(not(feature = "monothreaded"), feature = "deprecated_thread_separation"))]
-    // pub(crate) fn sync_with_others(&mut self, time_cv: &TimeCv, time: f32, context: &Context) {
-    //     let context = context.new_callstack_level("sync_with_others");
-    //     let mut waiting_lk = time_cv.waiting.lock().unwrap();
-    //     let waiting_parity = *time_cv.intermediate_parity.lock().unwrap();
-    //     *waiting_lk += 1;
-    //     internal!(
-    //         context,
-    //         crate::logger::InternalLog::NodeSyncDetailed,
-    //         "Increase intermediate waiting nodes: {}",
-    //         *waiting_lk
-    //     );
-
-    //     loop {
-    //         while self.process_messages() {
-    //             *waiting_lk -= 1;
-    //             internal!(
-    //                 context,
-    //                 crate::logger::InternalLog::NodeSyncDetailed,
-    //                 "Messages to process: handle messages"
-    //             );
-    //             self.handle_messages(time, &context);
-    //             *waiting_lk += 1;
-    //         }
-    //         time_cv.condvar.notify_all();
-    //         if !self.process_messages() {
-    //             waiting_lk = time_cv.condvar.wait(waiting_lk).unwrap();
-    //         }
-    //         if waiting_parity != *time_cv.intermediate_parity.lock().unwrap() {
-    //             internal!(
-    //                 context,
-    //                 crate::logger::InternalLog::NodeSyncDetailed,
-    //                 "End wait"
-    //             );
-    //             return;
-    //         }
-    //         internal!(
-    //             context,
-    //             crate::logger::InternalLog::NodeSyncDetailed,
-    //             "New loop: waiting = {}",
-    //             *waiting_lk
-    //         );
-    //     }
-    // }
 
     /// Handle all pending service and network messages up to `time`.
     ///
@@ -544,8 +354,6 @@ impl Node {
         let context = context.new_callstack_level("physics_update");
         if let Some(physics) = &self.physics {
             physics.write().unwrap().update_state(time, &context);
-            let pose = physics.read().unwrap().state(time, &context).pose;
-            self.node_meta_data.write().unwrap().position = Some([pose[0], pose[1]]);
         }
     }
 
@@ -893,29 +701,6 @@ impl Node {
     /// Get the shared simulation [`Environment`].
     pub fn environment(&self) -> &Arc<Environment> {
         &self.environment
-    }
-
-    /// Get shared read-only access to the physics module of another node by name.
-    /// Returns `None` if the node name is not found or if the physics module is not available.
-    pub fn get_other_node_physics(
-        &self,
-        node_name: &str,
-    ) -> Option<SharedRoLock<Box<dyn Physics>>> {
-        self.other_node_physics
-            .read()
-            .unwrap()
-            .get(node_name)
-            .cloned()
-    }
-
-    /// Get shared read-only access to the physics modules of all other nodes.
-    /// The returned map is keyed by node name and contains shared read-only locks to the physics modules.
-    /// The map is maintained by the simulator and updated as nodes are added or removed.
-    /// It allows this node to query the physics state of other nodes for coordination, collision checking, or other purposes.
-    pub fn get_all_node_physics(
-        &self,
-    ) -> &SharedRoLock<BTreeMap<String, SharedRoLock<Box<dyn Physics>>>> {
-        &self.other_node_physics
     }
 
     /// Get shared read-only access to this node metadata.

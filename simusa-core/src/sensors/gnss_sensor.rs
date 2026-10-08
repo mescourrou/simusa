@@ -479,7 +479,7 @@ impl Sensor for GNSSSensor {
             .physics()
             .expect("Node with GNSS sensor should have Physics");
         let physic = arc_physic.read().unwrap();
-        let state = physic.state(time, context);
+        let state = physic.state(time, context).unwrap();
         let attached_frame = frame.attach_to_state(&state);
         let state = attached_frame.state();
 

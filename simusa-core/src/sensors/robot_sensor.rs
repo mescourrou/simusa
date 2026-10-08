@@ -549,7 +549,7 @@ impl RobotSensor {
     }
 }
 
-use crate::node::Node;
+use crate::node::{Node, NodeState};
 
 impl Sensor for RobotSensor {
     fn post_init(
@@ -587,7 +587,7 @@ impl Sensor for RobotSensor {
         );
         let state = if let Some(arc_physics) = node.physics() {
             let physics = arc_physics.read().unwrap();
-            physics.state(time, context).clone()
+            physics.state(time, context).unwrap()
         } else {
             State::new() // 0
         };
@@ -603,8 +603,8 @@ impl Sensor for RobotSensor {
             rotation_matrix
         );
 
-        for (i, (other_node_name, other_node_physics)) in node
-            .get_all_node_physics()
+        for (i, (other_node_name, other_node_meta_data)) in node
+            .meta_data_list().unwrap()
             .read()
             .unwrap()
             .iter()
@@ -613,6 +613,20 @@ impl Sensor for RobotSensor {
             if other_node_name == &node.name() {
                 continue;
             }
+            let other_node_meta_data = other_node_meta_data.read().unwrap();
+            if other_node_meta_data.state == NodeState::Terminated {
+                continue;
+            }
+            let other_state = if let Some(other_node_physics) = other_node_meta_data
+                .physics.as_ref() {
+                other_node_physics
+                    .read()
+                    .unwrap()
+                    .state(time, context).expect("Node that are not Terminated and have physics should have a state at the current time")
+            } else {
+                // Node without physics, skip it
+                continue;
+            };
             internal!(
                 context,
                 crate::logger::InternalLog::SensorManagerDetailed,
@@ -620,11 +634,8 @@ impl Sensor for RobotSensor {
                 other_node_name
             );
 
-            let other_state = other_node_physics
-                .read()
-                .unwrap()
-                .state(time, context)
-                .clone();
+
+            
             if node.environment().is_target_observable(
                 &other_state.pose.fixed_rows::<2>(0).clone_owned(),
                 Some(0.),
