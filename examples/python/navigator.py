@@ -23,8 +23,8 @@ class Navigator(simusa.Navigator):
         print("This is record from python!")
         return json.dumps({})
 
-    def compute_error(self, node: simusa.Node, world_state: simusa.WorldState) -> simusa.ControllerError:
-        error = simusa.ControllerError()
+    def compute_output(self, node: simusa.Node, world_state: simusa.WorldState) -> simusa.ControllerInput:
+        output = simusa.ControllerInput()
         v = world_state.ego.velocity.x
         x = world_state.ego.pose.x
         y = world_state.ego.pose.y
@@ -33,11 +33,12 @@ class Navigator(simusa.Navigator):
         # Very bad error computation, but that's an example
         pose = np.array([x, y, theta])
         r = np.linalg.norm(pose[:2])
-        error.lateral = self.radius - r
+        output.error_lateral = self.radius - r
+        output.error_longitudinal = 0.
         targetted_theta = math.atan2(y, x) + np.pi/2
-        error.theta = ((targetted_theta - theta) + np.pi) % (2*np.pi)
-        error.velocity = self.velocity - v
-        return error
+        output.error_angular = ((targetted_theta - theta) + np.pi) % (2*np.pi)
+        output.error_linear_velocity = self.velocity - v
+        return output
 
     def pre_loop_hook(self, node: simusa.Node, time: float):
         pass

@@ -10,14 +10,12 @@
 use crate::gui::UIComponent;
 
 use crate::{
-    context::Context,
-    navigators::{
+    context::Context, errors::{SimusaError, SimusaResult}, navigators::{
         Navigator, NavigatorRecord,
         trajectory::{Trajectory, TrajectoryConfig, TrajectoryRecord},
-    },
-    simulator::SimulatorConfig,
-    utils::geometry::{mod2pi, smallest_theta_diff},
+    }, simulator::SimulatorConfig, utils::geometry::{mod2pi, smallest_theta_diff},
 };
+use crate::interfaces::navigator_controller::declare_navigator_output;
 
 extern crate nalgebra as na;
 use na::Vector3;
@@ -193,8 +191,6 @@ impl UIComponent for TrajectoryFollowerConfig {
 /// Record of the [`TrajectoryFollower`].
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TrajectoryFollowerRecord {
-    /// Current error
-    pub error: ControllerError,
     /// Trajectory dynamic record.
     pub trajectory: TrajectoryRecord,
     /// Last projected point on the matched trajectory segment, in world coordinates `[x, y]`.
@@ -204,7 +200,6 @@ pub struct TrajectoryFollowerRecord {
 impl Default for TrajectoryFollowerRecord {
     fn default() -> Self {
         Self {
-            error: ControllerError::default(),
             trajectory: TrajectoryRecord::default(),
             projected_point: [0., 0.],
         }
@@ -215,10 +210,6 @@ impl Default for TrajectoryFollowerRecord {
 impl UIComponent for TrajectoryFollowerRecord {
     fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
         ui.vertical(|ui| {
-            egui::CollapsingHeader::new("Error").show(ui, |ui| {
-                self.error.show(ui, ctx, unique_id);
-            });
-
             egui::CollapsingHeader::new("Trajectory").show(ui, |ui| {
                 self.trajectory.show(ui, ctx, unique_id);
             });
@@ -247,8 +238,6 @@ pub struct TrajectoryFollower {
     forward_distance: f32,
     /// Speed to reach in m/s
     target_speed: f32,
-    /// Last error, stored to make the [`TrajectoryFollowerRecord`]
-    error: ControllerError,
     projected_point: [f32; 2],
     /// Distance where to stop when reaching the end of the trajectory
     stop_distance: f32,
@@ -265,7 +254,6 @@ impl TrajectoryFollower {
             target_speed: 0.5,
             stop_distance: 0.2,
             stop_ramp_coefficient: 0.5,
-            error: ControllerError::default(),
             projected_point: [0., 0.],
         }
     }
@@ -287,7 +275,6 @@ impl TrajectoryFollower {
             trajectory,
             forward_distance: config.forward_distance,
             target_speed: config.target_speed,
-            error: ControllerError::default(),
             projected_point: [0., 0.],
             stop_distance: config.stop_distance,
             stop_ramp_coefficient: config.stop_ramp_coefficient,
@@ -301,11 +288,34 @@ impl Default for TrajectoryFollower {
     }
 }
 
-use crate::controllers::ControllerError;
 use crate::node::Node;
 use crate::state_estimators::WorldState;
 
+
+declare_navigator_output! {
+    #[derive(Default)]
+    TrajectoryFollowerOutput;
+    node_position,
+    node_orientation,
+    node_linear_velocity,
+    node_angular_velocity,
+    node_longitudinal_lateral_velocities,
+    target_position,
+    target_orientation,
+    target_linear_velocity,
+    target_angular_velocity,
+    target_longitudinal_lateral_velocities,
+    error_longitudinal,
+    error_lateral,
+    error_angular,
+    error_linear_velocity,
+    error_angular_velocity,
+    error_longitudinal_lateral_velocities,
+    world_state,
+}
+
 impl Navigator for TrajectoryFollower {
+    type OutputType = TrajectoryFollowerOutput;
     /// Compute the error between the given `state` and the current trajectory.
     ///
     /// This error is computed through the following steps:
@@ -315,19 +325,19 @@ impl Navigator for TrajectoryFollower {
     /// 3. Compute the orientation of the point to orient the robot to the projected point.
     /// 4. Compute the lateral error
     /// 5. Compute the velocity error
-    fn compute_error(
+    fn compute_output(
         &mut self,
         _robot: &mut Node,
         world_state: WorldState,
         context: &Context,
-    ) -> ControllerError {
+    ) -> SimusaResult<TrajectoryFollowerOutput> {
         if world_state.ego.is_none() {
             panic!(
                 "StateEstimator should provide an ego estimate for TrajectoryFollower navigator."
             )
         }
 
-        let state = world_state.ego.unwrap().theta_modulo();
+        let state = world_state.ego.clone().unwrap().theta_modulo();
 
         // let forward_pose = state.pose
         //     + self.forward_distance * Vector3::new(state.pose.z.cos(), state.pose.z.sin(), 0.);
@@ -336,16 +346,16 @@ impl Navigator for TrajectoryFollower {
             self.forward_distance,
             context,
         );
-        if end {
+        let actual_target_speed = if end {
             let distance_to_final = (state.pose.fixed_view::<2, 1>(0, 0) - segment.1).norm();
-            self.target_speed = self
-                .target_speed
-                .min(distance_to_final * self.stop_ramp_coefficient);
-
             if distance_to_final < self.stop_distance {
-                self.target_speed = 0.;
+                0.
+            } else {
+                self.target_speed.min(distance_to_final * self.stop_ramp_coefficient)
             }
-        }
+        } else {
+            self.target_speed
+        };
         let segment_angle: f32 = (segment.1.y - segment.0.y).atan2(segment.1.x - segment.0.x);
         let projected_point = Vector3::new(projected_point.x, projected_point.y, segment_angle);
         let projection_vector =
@@ -360,17 +370,46 @@ impl Navigator for TrajectoryFollower {
         let theta_error = smallest_theta_diff(projected_point_direction, state.pose.z);
 
         let theta_error = mod2pi(theta_error);
-        self.error.theta = theta_error;
+
+        // Compute target lat lon velocities
+        let segment_vector = segment.1 - segment.0;
+        let segment_orientation = segment_vector.y.atan2(segment_vector.x);
+        let rot = na::Rotation2::new(-segment_orientation - world_state.ego.as_ref().unwrap().pose.z);
+        let vel = world_state.ego.as_ref().unwrap().velocity.fixed_rows::<2>(0);
+        let vel = rot * vel;
 
         let rot = na::Rotation2::new(-state.pose.z);
         let local_projection = rot * projection_vector.fixed_view::<2, 1>(0, 0);
-        self.error.lateral = local_projection.y;
-        self.error.longitudinal = local_projection.x;
 
-        // Compute the velocity error
-        self.error.velocity = self.target_speed - state.velocity.fixed_rows::<2>(0).norm();
+        let normalized_vel = world_state.ego.as_ref().unwrap().velocity.fixed_rows::<2>(0).normalize();
+        let linear_vel_error = actual_target_speed - state.velocity.fixed_rows::<2>(0).norm();
+        let error_longitudinal_lateral_velocities = if normalized_vel.norm().is_nan() {
+            // No velocity => no direction. Considering all linear velocity error on the longitudinal direction
+            (linear_vel_error, 0.)
+        } else {
+            let vel_error_vec = normalized_vel * linear_vel_error;
+            (vel_error_vec.x, vel_error_vec.y)
+        };
 
-        self.error.clone()
+        Ok(TrajectoryFollowerOutput {
+            node_position: (state.pose.x, state.pose.y),
+            node_orientation: state.pose.z,
+            node_linear_velocity: state.velocity.fixed_rows::<2>(0).norm(),
+            node_angular_velocity: state.velocity.z,
+            node_longitudinal_lateral_velocities: (state.velocity.x, state.velocity.y),
+            target_position: (projected_point.x, projected_point.y),
+            target_orientation: projected_point_direction,
+            target_linear_velocity: actual_target_speed,
+            target_angular_velocity: 0.,
+            target_longitudinal_lateral_velocities: (vel.x, vel.y),
+            error_longitudinal: local_projection.x,
+            error_lateral: local_projection.y,
+            error_angular: theta_error,
+            error_longitudinal_lateral_velocities,
+            error_linear_velocity: linear_vel_error,
+            error_angular_velocity: 0. - state.velocity.z,
+            world_state,
+        })
     }
 
     fn pre_loop_hook(&mut self, _node: &mut Node, _time: f32, _context: &Context) {}
@@ -381,7 +420,6 @@ use crate::recordable::Recordable;
 impl Recordable<NavigatorRecord> for TrajectoryFollower {
     fn record(&self, context: &Context) -> NavigatorRecord {
         NavigatorRecord::TrajectoryFollower(TrajectoryFollowerRecord {
-            error: self.error.clone(),
             trajectory: self.trajectory.record(context),
             projected_point: self.projected_point,
         })

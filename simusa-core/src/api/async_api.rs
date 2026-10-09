@@ -10,17 +10,7 @@ use std::{
 use simusa_com::rfc::{self, RemoteFunctionCall, RemoteFunctionCallHost};
 
 use crate::{
-    context::Context,
-    controllers::Controller,
-    errors::SimusaResult,
-    info,
-    navigators::Navigator,
-    networking::network::Network,
-    physics::Physics,
-    plugin_api::PluginAPI,
-    simulator::{Record, Simulator, SimulatorAsyncApi, SimulatorConfig},
-    state_estimators::StateEstimator,
-    utils::{
+    context::Context, controllers::{AbstractController, Controller}, errors::SimusaResult, info, navigators::{AbstractNavigator, Navigator}, networking::network::Network, physics::Physics, plugin_api::PluginAPI, simulator::{Record, Simulator, SimulatorAsyncApi, SimulatorConfig}, state_estimators::StateEstimator, utils::{
         SharedMutex, SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory,
     },
 };
@@ -318,8 +308,8 @@ pub struct PluginAsyncAPI {
     get_state_estimator:
         Arc<RemoteFunctionCall<PluginAsyncAPIGetStateEstimatorRequest, Box<dyn StateEstimator>>>,
     get_controller:
-        Arc<RemoteFunctionCall<PluginAsyncAPIGetControllerRequest, Box<dyn Controller>>>,
-    get_navigator: Arc<RemoteFunctionCall<PluginAsyncAPIGetNavigatorRequest, Box<dyn Navigator>>>,
+        Arc<RemoteFunctionCall<PluginAsyncAPIGetControllerRequest, Box<dyn AbstractController>>>,
+    get_navigator: Arc<RemoteFunctionCall<PluginAsyncAPIGetNavigatorRequest, Box<dyn AbstractNavigator>>>,
     get_physics: Arc<RemoteFunctionCall<PluginAsyncAPIGetPhysicsRequest, Box<dyn Physics>>>,
 }
 
@@ -386,7 +376,7 @@ impl PluginAPI for PluginAsyncAPI {
         network: &SharedRwLock<Network>,
         initial_time: f32,
         _context: &Context,
-    ) -> Box<dyn Controller> {
+    ) -> Box<dyn AbstractController> {
         self.get_controller
             .call(PluginAsyncAPIGetControllerRequest {
                 config: config.clone(),
@@ -406,7 +396,7 @@ impl PluginAPI for PluginAsyncAPI {
         network: &SharedRwLock<Network>,
         initial_time: f32,
         _context: &Context,
-    ) -> Box<dyn Navigator> {
+    ) -> Box<dyn AbstractNavigator> {
         self.get_navigator
             .call(PluginAsyncAPIGetNavigatorRequest {
                 config: config.clone(),
@@ -448,10 +438,10 @@ pub struct PluginAsyncAPIClient {
     >,
     /// Get a controller from the plugin API, with the given configuration, global configuration, random variable factory, network and initial time. It returns a controller to use in the simulator.
     pub get_controller:
-        Arc<RemoteFunctionCallHost<PluginAsyncAPIGetControllerRequest, Box<dyn Controller>>>,
+        Arc<RemoteFunctionCallHost<PluginAsyncAPIGetControllerRequest, Box<dyn AbstractController>>>,
     /// Get a navigator from the plugin API, with the given configuration, global configuration, random variable factory, network and initial time. It returns a navigator to use in the simulator.
     pub get_navigator:
-        Arc<RemoteFunctionCallHost<PluginAsyncAPIGetNavigatorRequest, Box<dyn Navigator>>>,
+        Arc<RemoteFunctionCallHost<PluginAsyncAPIGetNavigatorRequest, Box<dyn AbstractNavigator>>>,
     /// Get a physics engine from the plugin API, with the given configuration, global configuration, random variable factory, network and initial time. It returns a physics engine to use in the simulator.
     pub get_physics: Arc<RemoteFunctionCallHost<PluginAsyncAPIGetPhysicsRequest, Box<dyn Physics>>>,
 }

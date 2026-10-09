@@ -159,7 +159,7 @@ impl PythonPhysics {
         call_py_method_void!(
             self.model,
             "apply_command",
-            CommandWrapper::from_rust(command),
+            CommandWrapper::from(command),
             time
         );
     }
@@ -181,7 +181,7 @@ impl PythonPhysics {
         );
         // let robot_record = robot.record();
         let state = call_py_method!(self.model, "state", StateWrapper, (time,));
-        state.to_rust()
+        state.into()
     }
 
     fn record(&self, context: &Context) -> PhysicsRecord {

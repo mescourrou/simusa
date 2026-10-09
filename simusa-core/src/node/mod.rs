@@ -21,8 +21,10 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::context::Context;
-use crate::controllers::ControllerError;
+use crate::controllers::AbstractController;
 use crate::environment::Environment;
+use crate::interfaces::navigator_controller::ControllerInputVariables;
+use crate::navigators::AbstractNavigator;
 use crate::networking::network::MessageFlag;
 use crate::physics::robot_models::Command;
 use crate::simulator::SimusaBrokerMultiClient;
@@ -103,9 +105,9 @@ pub struct NodeMetaData {
 #[derive(Debug)]
 pub struct Node {
     /// [`Navigator`] module, implementing the navigation strategy.
-    pub(self) navigator: Option<SharedRwLock<Box<dyn Navigator>>>,
+    pub(self) navigator: Option<SharedRwLock<Box<dyn AbstractNavigator>>>,
     /// [`Controller`] module, implementing the control strategy.
-    pub(self) controller: Option<SharedRwLock<Box<dyn Controller>>>,
+    pub(self) controller: Option<SharedRwLock<Box<dyn AbstractController>>>,
     /// [`Physics`] module, implementing the physics strategy.
     pub(self) physics: Option<SharedRwLock<Box<dyn Physics>>>,
     /// [`StateEstimator`] module, implementing the state estimation strategy.
@@ -132,7 +134,7 @@ pub struct Node {
     pub(self) environment: Arc<Environment>,
 
     pub(self) last_estimation: Option<WorldStateRecord>,
-    pub(self) last_error: Option<ControllerError>,
+    pub(self) last_controller_input: Option<ControllerInputVariables>,
     pub(self) last_command: Option<Command>,
 }
 
@@ -192,7 +194,7 @@ impl Node {
             navigator
                 .write()
                 .unwrap()
-                .post_init(self, &context)
+                .call_post_init(self, &context)
                 .unwrap();
         }
 
@@ -200,7 +202,7 @@ impl Node {
             controller
                 .write()
                 .unwrap()
-                .post_init(self, &context)
+                .call_post_init(self, &context)
                 .unwrap();
         }
 
@@ -274,7 +276,7 @@ impl Node {
             );
         }
         if let Some(navigator) = &self.navigator
-            && let Some(next_time) = navigator.read().unwrap().next_time_step(&context)
+            && let Some(next_time) = navigator.read().unwrap().call_next_time_step(&context)
         {
             if next_time > min_time_excluded {
                 next_time_step = next_time_step.min(next_time);
@@ -286,7 +288,7 @@ impl Node {
             );
         }
         if let Some(controller) = &self.controller
-            && let Some(next_time) = controller.read().unwrap().next_time_step(&context)
+            && let Some(next_time) = controller.read().unwrap().call_next_time_step(&context)
         {
             if next_time > min_time_excluded {
                 next_time_step = next_time_step.min(next_time);
@@ -365,7 +367,7 @@ impl Node {
     pub(crate) fn pre_loop_hooks(&mut self, time: f32, context: &Context) {
         let context = context.new_callstack_level("pre_loop_hooks");
         self.last_command = None;
-        self.last_error = None;
+        self.last_controller_input = None;
         self.last_estimation = None;
         if let Some(state_estimator) = self.state_estimator() {
             state_estimator
@@ -386,13 +388,13 @@ impl Node {
             controller
                 .write()
                 .unwrap()
-                .pre_loop_hook(self, time, &context);
+                .call_pre_loop_hook(self, time, &context);
         }
         if let Some(navigator) = self.navigator() {
             navigator
                 .write()
                 .unwrap()
-                .pre_loop_hook(self, time, &context);
+                .call_pre_loop_hook(self, time, &context);
         }
     }
 
@@ -540,7 +542,7 @@ impl Node {
         time: f32,
         do_control_loop: bool,
         context: &Context,
-    ) {
+    ) -> SimusaResult<()> {
         let context = context.new_callstack_level("nav_and_control_step");
         if do_control_loop
             || (self.navigator().is_some()
@@ -551,7 +553,7 @@ impl Node {
                         .unwrap()
                         .read()
                         .unwrap()
-                        .next_time_step(&context)
+                        .call_next_time_step(&context)
                         .unwrap_or(f32::INFINITY))
             || (self.controller().is_some()
                 && time
@@ -561,12 +563,13 @@ impl Node {
                         .unwrap()
                         .read()
                         .unwrap()
-                        .next_time_step(&context)
+                        .call_next_time_step(&context)
                         .unwrap_or(f32::INFINITY))
         {
             let state_estimator = &self.state_estimator().unwrap();
             let world_state = state_estimator.read().unwrap().world_state(&context);
 
+            let requested_variables = self.controller().as_ref().unwrap().read().unwrap().call_required_variables().to_vec();
             // Compute the error to the planned path
             let ta = self.time_analysis.as_ref().map(|time_analysis| {
                 time_analysis
@@ -574,13 +577,13 @@ impl Node {
                     .unwrap()
                     .time_analysis(time, "control_loop_navigator_compute_error".to_string())
             });
-            let error = self
+            let controller_input = self
                 .navigator()
                 .as_ref()
                 .unwrap()
                 .write()
                 .unwrap()
-                .compute_error(self, world_state, &context);
+                .call_compute_output(self, world_state, &context, &requested_variables)?;
             if let Some(time_analysis) = &self.time_analysis {
                 time_analysis
                     .lock()
@@ -588,8 +591,8 @@ impl Node {
                     .finished_time_analysis(ta.unwrap());
             }
 
-            self.last_error = Some(error.clone());
-            // Compute the command from the error
+            self.last_controller_input = Some(controller_input.clone());
+            // Compute the command from the controller_input
             let ta = self.time_analysis.as_ref().map(|time_analysis| {
                 time_analysis
                     .lock()
@@ -602,7 +605,7 @@ impl Node {
                 .unwrap()
                 .write()
                 .unwrap()
-                .make_command(self, &error, time, &context);
+                .call_make_command(self, controller_input, time, &context);
             if let Some(time_analysis) = &self.time_analysis {
                 time_analysis
                     .lock()
@@ -619,6 +622,8 @@ impl Node {
                 .apply_command(&command, time, &context);
             self.current_command = Some(command);
         }
+
+        Ok(())
     }
 }
 
@@ -694,7 +699,7 @@ impl Node {
     }
 
     /// Get a Arc clone of navigator module.
-    pub fn navigator(&self) -> Option<SharedRwLock<Box<dyn Navigator>>> {
+    pub fn navigator(&self) -> Option<SharedRwLock<Box<dyn AbstractNavigator>>> {
         match &self.navigator {
             Some(n) => Some(Arc::clone(n)),
             None => None,
@@ -702,7 +707,7 @@ impl Node {
     }
 
     /// Get a Arc clone of controller module.
-    pub fn controller(&self) -> Option<SharedRwLock<Box<dyn Controller>>> {
+    pub fn controller(&self) -> Option<SharedRwLock<Box<dyn AbstractController>>> {
         match &self.controller {
             Some(c) => Some(Arc::clone(c)),
             None => None,
@@ -761,7 +766,7 @@ impl Node {
             name: meta_data.name.clone(),
             model_name: meta_data.model_name.clone(),
             labels: meta_data.labels.clone(),
-            navigator: if self.last_error.is_some() {
+            navigator: if self.last_controller_input.is_some() {
                 Some(self
                     .navigator
                     .as_ref()
@@ -811,7 +816,7 @@ impl Node {
                 .record(&context),
             state: meta_data.state.clone(),
             command: self.last_command.clone(),
-            controller_error: self.last_error.clone(),
+            controller_input: self.last_controller_input.as_ref().map(|c| c.record(&context)),
             estimated_world_state: self.last_estimation.clone(),
         };
         let other_state_estimators = self.state_estimator_bench.clone();

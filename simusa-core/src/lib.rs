@@ -47,6 +47,7 @@ pub mod sensors;
 pub mod simulator;
 pub mod state_estimators;
 pub mod utils;
+pub mod interfaces;
 
 pub mod plugin_api;
 

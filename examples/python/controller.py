@@ -19,7 +19,7 @@ class Controller(simusa.Controller):
         return json.dumps({
             "last_time": self.last_time})
 
-    def make_command(self, node: simusa.Node, error: simusa.ControllerError, time: float) -> simusa.Command:
+    def make_command(self, node: simusa.Node, input: simusa.ControllerInput, time: float) -> simusa.Command:
         self.last_time = time
         command = simusa.UnicycleCommand()
         command.left_wheel_speed = self.speed

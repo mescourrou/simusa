@@ -48,16 +48,7 @@ fn main() {
 use std::sync::Arc;
 
 use crate::{
-    context::Context,
-    controllers::Controller,
-    navigators::Navigator,
-    networking::network::Network,
-    physics::{Physics, fault_models::PhysicsFaultModel},
-    result_analyser::ResultAnalyserTrait,
-    sensors::{Sensor, fault_models::FaultModel, sensor_filters::SensorFilter},
-    simulator::SimulatorConfig,
-    state_estimators::StateEstimator,
-    utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
+    context::Context, controllers::{AbstractController, Controller}, navigators::{AbstractNavigator, Navigator}, networking::network::Network, physics::{Physics, fault_models::PhysicsFaultModel}, result_analyser::ResultAnalyserTrait, sensors::{Sensor, fault_models::FaultModel, sensor_filters::SensorFilter}, simulator::SimulatorConfig, state_estimators::StateEstimator, utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
 };
 
 /// Trait to link the simulator to the external implementation.
@@ -115,7 +106,7 @@ pub trait PluginAPI: Send + Sync {
         network: &SharedRwLock<Network>,
         initial_time: f32,
         context: &Context,
-    ) -> Box<dyn Controller> {
+    ) -> Box<dyn AbstractController> {
         panic!("The given PluginAPI does not provide a controller");
     }
 
@@ -143,7 +134,7 @@ pub trait PluginAPI: Send + Sync {
         network: &SharedRwLock<Network>,
         initial_time: f32,
         context: &Context,
-    ) -> Box<dyn Navigator> {
+    ) -> Box<dyn AbstractNavigator> {
         panic!("The given PluginAPI does not provide a navigator");
     }
 

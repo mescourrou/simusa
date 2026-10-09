@@ -3,11 +3,11 @@ use egui::Rect;
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
 use simusa::context::Context;
-use simusa::controllers::{Controller, ControllerError, ControllerRecord};
+use simusa::controllers::{AbstractController, Controller, ControllerRecord};
 use simusa::errors::SimusaResult;
 use simusa::gui::Drawable;
-use simusa::info;
-use simusa::navigators::{Navigator, NavigatorRecord};
+use simusa::{declare_controller_input, declare_navigator_output, info};
+use simusa::navigators::{AbstractNavigator, Navigator, NavigatorRecord};
 use simusa::networking::network::Network;
 use simusa::node::Node;
 use simusa::physics::fault_models::PhysicsFaultModel;
@@ -49,11 +49,41 @@ impl MyWonderfulController {
     }
 }
 
+declare_controller_input!(
+    MyWornderfulControllerInput;
+    // node_position,
+    // node_orientation,
+    // node_linear_velocity,
+    // node_angular_velocity,
+    // node_longitudinal_lateral_velocities,
+    // target_position,
+    // target_orientation,
+    // target_linear_velocity,
+    // target_angular_velocity,
+    // target_longitudinal_lateral_velocities,
+    error_longitudinal,
+    error_lateral,
+    error_angular,
+    error_linear_velocity,
+    // error_angular_velocity,
+    // error_longitudinal_lateral_velocities,
+    // world_state,
+    // custom // For custom navigator to custom controller
+);
+
 impl Controller for MyWonderfulController {
+    type InputType = MyWornderfulControllerInput;
+    
+    fn post_init(&mut self, _node: &mut Node, _context: &Context) -> simusa::errors::SimusaResult<()> {
+        // Optional implementation of post_init, which is called after the controller is initialized,
+        // before the begining of the simulation.
+        Ok(())
+    }
+
     fn make_command(
         &mut self,
         _robot: &mut simusa::node::Node,
-        _error: &simusa::controllers::ControllerError,
+        _input: MyWornderfulControllerInput,
         _time: f32,
         _context: &Context,
     ) -> Command {
@@ -91,22 +121,69 @@ impl MyWonderfulNavigator {
     }
 }
 
+// Variables that your navigator can compute.
+// Make a maximum to maximize compatibility.
+declare_navigator_output!(
+    MyWonderfulNavigatorOutput;
+    // node_position,
+    // node_orientation,
+    // node_linear_velocity,
+    // node_angular_velocity,
+    // node_longitudinal_lateral_velocities,
+    // target_position,
+    // target_orientation,
+    // target_linear_velocity,
+    // target_angular_velocity,
+    // target_longitudinal_lateral_velocities,
+    error_longitudinal,
+    error_lateral,
+    error_angular,
+    error_linear_velocity,
+    // error_angular_velocity,
+    // error_longitudinal_lateral_velocities,
+    // world_state,
+    // custom // For custom navigator to custom controller
+);
+
 impl Navigator for MyWonderfulNavigator {
-    fn compute_error(
+    type OutputType = MyWonderfulNavigatorOutput;
+
+    fn post_init(
+        &mut self,
+        _node: &mut Node,
+        _context: &Context,
+    ) -> simusa::errors::SimusaResult<()> {
+        // Optional implementation of post_init, which is called after the navigator is initialized,
+        // before the begining of the simulation.
+        Ok(())
+    }
+
+    fn compute_output(
         &mut self,
         _robot: &mut simusa::node::Node,
         _state: WorldState,
         _context: &Context,
-    ) -> ControllerError {
-        ControllerError {
-            lateral: 0.,
-            theta: 0.,
-            velocity: 0.,
-            longitudinal: 0.,
-        }
+    ) -> simusa::errors::SimusaResult<MyWonderfulNavigatorOutput> {
+        // Mandatory implementation of precompute_output, which returns a type that implements the [`OutputType`] trait.
+        // Use the macro `declare_easy_navigator_output!` or `declare_optimized_navigator_output` to declare the output type.
+        Ok(MyWonderfulNavigatorOutput {
+            error_longitudinal: 0.,
+            error_lateral: 0.,
+            error_angular: 0.,
+            error_linear_velocity: 0.,
+        })
     }
 
-    fn pre_loop_hook(&mut self, _node: &mut simusa::node::Node, _time: f32, _context: &Context) {}
+    fn pre_loop_hook(&mut self, _node: &mut simusa::node::Node, _time: f32, _context: &Context) {
+        // Optional implementation of pre_loop_hook, which is called at the beginning of each simulation loop, even
+        // if the navigator is not called during the loop.
+    }
+
+    fn next_time_step(&self, _context: &Context) -> Option<f32> {
+        // Optional implementation of next_time_step, which detemines the next time step of the navigator.
+        // If None is returned, the simulator will use the state estimator frequency to determine the next time step.
+        None
+    }
 }
 
 impl Recordable<NavigatorRecord> for MyWonderfulNavigator {
@@ -515,7 +592,7 @@ impl PluginAPI for MyWonderfulPlugin {
         _network: &SharedRwLock<Network>,
         initial_time: f32,
         _context: &Context,
-    ) -> Box<dyn Controller> {
+    ) -> Box<dyn AbstractController> {
         Box::new(MyWonderfulController::from_config(
             serde_json::from_value(config.clone()).unwrap(),
             initial_time,
@@ -530,7 +607,7 @@ impl PluginAPI for MyWonderfulPlugin {
         _network: &SharedRwLock<Network>,
         initial_time: f32,
         _context: &Context,
-    ) -> Box<dyn Navigator> {
+    ) -> Box<dyn AbstractNavigator> {
         Box::new(MyWonderfulNavigator::from_config(
             serde_json::from_value(config.clone()).unwrap(),
             initial_time,

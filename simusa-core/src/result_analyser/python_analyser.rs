@@ -289,13 +289,19 @@ simusa._internal.ResultAnalyser().run_server('localhost', {2}, '{3}')
             println!("{}", buf);
         }
 
-        self.command.as_mut().unwrap().kill().map_err(|e| {
+        let result = self.command.as_mut().unwrap().wait().map_err(|e| {
             SimusaError::new(
                 SimusaErrorTypes::NetworkError(NetworkError::Other),
-                format!("Impossible to stop result analyser server: {}", e),
+                format!("Impossible to end result analyser server: {}", e),
             )
         })?;
         self.command = None;
+        if !result.success() {
+            return Err(SimusaError::new(
+                SimusaErrorTypes::PythonError,
+                "Error during the call of Python Result Analyser".to_string(),
+            ));
+        }
         res
     }
 }

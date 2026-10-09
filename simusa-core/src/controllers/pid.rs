@@ -587,14 +587,24 @@ impl Default for PID {
 }
 
 use super::{Controller, ControllerRecord};
-use crate::controllers::ControllerError;
 use crate::node::Node;
+use crate::interfaces::navigator_controller::declare_controller_input;
+
+declare_controller_input!(
+    PIDInput;
+    error_linear_velocity,
+    error_angular,
+    error_longitudinal,
+    error_lateral
+);
 
 impl Controller for PID {
+    type InputType = PIDInput;
+
     fn make_command(
         &mut self,
         _robot: &mut Node,
-        error: &ControllerError,
+        input: PIDInput,
         time: f32,
         _context: &Context,
     ) -> Command {
@@ -609,17 +619,17 @@ impl Controller for PID {
 
         let command = match self.config.robot_model.as_ref().expect("Robot model should be set in PID config at least automatically from physics (if physics is internal)") {
             RobotModelConfig::Unicycle(model) => {
-                self.velocity_integrator.integrate(error.velocity, dt);
-                self.angular_integrator.integrate(error.theta, dt);
+                self.velocity_integrator.integrate(input.error_linear_velocity, dt);
+                self.angular_integrator.integrate(input.error_angular, dt);
 
-                let v_derivative = self.velocity_derivator.derivate(error.velocity, dt);
-                let theta_derivative = self.angular_derivator.derivate(error.theta, dt);
+                let v_derivative = self.velocity_derivator.derivate(input.error_linear_velocity, dt);
+                let theta_derivative = self.angular_derivator.derivate(input.error_angular, dt);
 
-                let correction_theta = (self.config.kp_angular().unwrap() * error.theta
+                let correction_theta = (self.config.kp_angular().unwrap() * input.error_angular
                     + self.config.ki_angular().unwrap() * self.angular_integrator.integral_value()
                     + self.config.kd_angular().unwrap() * theta_derivative)
                     * model.wheel_distance;
-                let correction_v = self.config.kp_longitudinal().unwrap() * error.velocity + self.config.ki_longitudinal().unwrap() * self.velocity_integrator.integral_value() + self.config.kd_longitudinal().unwrap() * v_derivative;
+                let correction_v = self.config.kp_longitudinal().unwrap() * input.error_linear_velocity + self.config.ki_longitudinal().unwrap() * self.velocity_integrator.integral_value() + self.config.kd_longitudinal().unwrap() * v_derivative;
 
                 self.velocity += correction_v;
                 self.last_command_time = time;
@@ -630,18 +640,18 @@ impl Controller for PID {
                 })
             },
             RobotModelConfig::Holonomic(_model) => {
-                self.velocity_integrator.integrate(error.velocity, dt);
-                self.lateral_integrator.integrate(error.lateral, dt);
-                self.angular_integrator.integrate(error.theta, dt);
-                self.longitudinal_integrator.integrate(error.longitudinal, dt);
+                self.velocity_integrator.integrate(input.error_linear_velocity, dt);
+                self.lateral_integrator.integrate(input.error_lateral, dt);
+                self.angular_integrator.integrate(input.error_angular, dt);
+                self.longitudinal_integrator.integrate(input.error_longitudinal, dt);
 
-                let v_derivative = self.velocity_derivator.derivate(error.velocity, dt);
-                let lateral_derivative = self.lateral_derivator.derivate(error.lateral, dt);
-                let theta_derivative = self.angular_derivator.derivate(error.theta, dt);
-                let longitudinal_derivative = self.longitudinal_derivator.derivate(error.longitudinal, dt);
-                let correction_v = self.config.kp_longitudinal().unwrap() * error.velocity + self.config.ki_longitudinal().unwrap() * self.velocity_integrator.integral_value() + self.config.kd_longitudinal().unwrap() * v_derivative;
+                let v_derivative = self.velocity_derivator.derivate(input.error_linear_velocity, dt);
+                let lateral_derivative = self.lateral_derivator.derivate(input.error_lateral, dt);
+                let theta_derivative = self.angular_derivator.derivate(input.error_angular, dt);
+                let longitudinal_derivative = self.longitudinal_derivator.derivate(input.error_longitudinal, dt);
+                let correction_v = self.config.kp_longitudinal().unwrap() * input.error_linear_velocity + self.config.ki_longitudinal().unwrap() * self.velocity_integrator.integral_value() + self.config.kd_longitudinal().unwrap() * v_derivative;
 
-                let correction_theta = self.config.kp_angular().unwrap() * error.theta
+                let correction_theta = self.config.kp_angular().unwrap() * input.error_angular
                     + self.config.ki_angular().unwrap() * self.angular_integrator.integral_value()
                     + self.config.kd_angular().unwrap() * theta_derivative;
 
@@ -650,9 +660,9 @@ impl Controller for PID {
                 self.last_command_time = time;
 
                 let correction_lateral =
-                    self.config.kp_lateral().unwrap() * error.lateral + self.config.ki_lateral().unwrap() * self.lateral_integrator.integral_value() + self.config.kd_lateral().unwrap() * lateral_derivative;
+                    self.config.kp_lateral().unwrap() * input.error_lateral + self.config.ki_lateral().unwrap() * self.lateral_integrator.integral_value() + self.config.kd_lateral().unwrap() * lateral_derivative;
                 let correction_longitudinal =
-                    self.config.kp_longitudinal().unwrap() * error.longitudinal + self.config.ki_longitudinal().unwrap() * self.longitudinal_integrator.integral_value() + self.config.kd_longitudinal().unwrap() * longitudinal_derivative;
+                    self.config.kp_longitudinal().unwrap() * input.error_longitudinal + self.config.ki_longitudinal().unwrap() * self.longitudinal_integrator.integral_value() + self.config.kd_longitudinal().unwrap() * longitudinal_derivative;
                 let displacement_vector = Vector2::new(correction_longitudinal, correction_lateral);
                 let displacement_vector = if displacement_vector.norm() > self.velocity {
                     displacement_vector.normalize() * self.velocity

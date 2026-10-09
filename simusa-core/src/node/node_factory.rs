@@ -18,7 +18,7 @@ use simusa_macros::{UIComponent, config_derives};
 use crate::gui::{UIComponent, utils::text_singleline_with_apply};
 
 use crate::{
-    api::internal_api::NodeServer, context::Context, controllers::{self, ControllerConfig, ControllerError, ControllerRecord, pid}, environment::{Environment, map::MapRecord}, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, internal, navigators::{self, NavigatorConfig, NavigatorRecord, go_to}, networking::{
+    api::internal_api::NodeServer, context::Context, controllers::{self, ControllerConfig, ControllerRecord, pid}, environment::{Environment, map::MapRecord}, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, interfaces::navigator_controller::ControllerInputRecord, internal, navigators::{self, NavigatorConfig, NavigatorRecord, go_to}, networking::{
         self,
         network::{Network, NetworkConfig},
     }, node::{Node, NodeMetaData, NodeState}, physics::{self, PhysicsConfig, PhysicsRecord, internal_physics, robot_models::Command}, plugin_api::PluginAPI, scenario::config::EventRecord, sensors::sensor_manager::{SensorManager, SensorManagerConfig, SensorManagerRecord}, simulator::{SimulatorConfig, SimusaBroker, SimusaBrokerMultiClient}, state_estimators::{
@@ -592,7 +592,7 @@ pub struct RobotRecord {
     /// Record of the [`Navigator`](crate::navigators::Navigator) module if it was called.
     pub navigator: Option<NavigatorRecord>,
     /// Output of the [`Navigator`](crate::navigators::Navigator) if it was called.
-    pub controller_error: Option<ControllerError>,
+    pub controller_input: Option<ControllerInputRecord>,
     /// Record of the [`Controller`](crate::controllers::Controller) module if it was called.
     pub controller: Option<ControllerRecord>,
     /// Output of the [`Controller`](crate::controllers::Controller) if it was called.
@@ -1053,7 +1053,7 @@ impl NodeBuilder {
             node_message_client: self.node_message_client,
             environment: self.environment,
             last_command: None,
-            last_error: None,
+            last_controller_input: None,
             last_estimation: None,
         };
 
@@ -1124,7 +1124,7 @@ impl NodeBuilder {
             node_message_client: self.node_message_client,
             environment: self.environment,
             last_command: None,
-            last_error: None,
+            last_controller_input: None,
             last_estimation: None,
         };
 

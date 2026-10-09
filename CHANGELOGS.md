@@ -7,6 +7,7 @@ Features:
 - [breaking] Python is now externalized (no Pyo3 dependency in core crate)
 - [breaking] Settable sensor frame (Sensor frame setting is moved up to ManagedSensor struct)
 - [breaking] Merge all nodes configs into a same list (.nodes) allowing ComputationUnit to be called before Robots
+- [breaking] Augment interface between navigator and controller, adding more elements to allow various controller implementations
 - Remove old threading method (separate thread with heavy sync operations), optimization.threads = 0 now spawn as many thread in the pool than system cores
 - Keep previous result files, appending .x to the end of previous file
 - Keep Terminated nodes in simulator node list (but not executed)

@@ -64,7 +64,7 @@ impl StateEstimator for PythonStateEstimatorAsyncClient {
             "Start prediction step from async client"
         );
         let node_py = NodeWrapper::from_rust(node, context.clone());
-        let command = command.map(|c| CommandWrapper::from_rust(&c));
+        let command = command.map(|c| CommandWrapper::from(&c));
         self.prediction_step
             .call(PythonStateEstimatorPredictionStepRequest {
                 node: node_py,
@@ -294,7 +294,7 @@ impl PythonStateEstimator {
         );
         let mut observation_py = Vec::new();
         for obs in observations {
-            observation_py.push(ObservationWrapper::from_rust(obs));
+            observation_py.push(ObservationWrapper::from(obs));
         }
         call_py_method_void!(self.model, "correction_step", node, observation_py, time);
     }
@@ -306,7 +306,7 @@ impl PythonStateEstimator {
             "Calling python implementation of state"
         );
         let state = call_py_method!(self.model, "state", WorldStateWrapper,);
-        state.to_rust()
+        state.into()
     }
 
     fn next_time_step(&self, context: &Context) -> f32 {

@@ -9,12 +9,7 @@
 pub mod pid;
 
 use crate::{
-    context::Context,
-    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
-    node::node_factory::FromConfigArguments,
-    physics::{PhysicsConfig, robot_models::Command},
-    recordable::Recordable,
-    utils::SharedRwLock,
+    context::Context, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, interfaces::navigator_controller::{ControllerInputVariable, ControllerInputVariables}, node::node_factory::FromConfigArguments, physics::{PhysicsConfig, robot_models::Command}, recordable::Recordable, utils::SharedRwLock,
 };
 #[cfg(feature = "gui")]
 use crate::{
@@ -31,31 +26,6 @@ use crate::simulator::SimulatorConfig;
 use config_checker::*;
 use serde_derive::{Deserialize, Serialize};
 use simusa_macros::config_derives;
-
-/// Errors used by the controllers: lateral, orientation and velocity.
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct ControllerError {
-    /// Lateral error.
-    pub lateral: f32,
-    /// Longitudinal error.
-    pub longitudinal: f32,
-    /// Orientation error.
-    pub theta: f32,
-    /// Velocity error.
-    pub velocity: f32,
-}
-
-#[cfg(feature = "gui")]
-impl UIComponent for ControllerError {
-    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
-        ui.vertical(|ui| {
-            ui.label(format!("longitudinal: {}", self.longitudinal));
-            ui.label(format!("lateral: {}", self.lateral));
-            ui.label(format!("theta: {}", self.theta));
-            ui.label(format!("velocity: {}", self.velocity));
-        });
-    }
-}
 
 /// Enumerates the strategies configurations.
 #[config_derives]
@@ -151,10 +121,23 @@ impl UIComponent for ControllerRecord {
 
 use crate::node::Node;
 
+pub trait ControllerInput: From<ControllerInputVariables> + Sized {
+    fn required_variables() -> &'static [ControllerInputVariable];
+}
+
 /// Controller strategy that computes [`Command`] values from control errors.
 pub trait Controller:
     std::fmt::Debug + std::marker::Send + std::marker::Sync + Recordable<ControllerRecord>
 {
+    type InputType: ControllerInput;
+    
+    /// Returns the list of variables requested by the controller from the navigator.
+    ///
+    /// Override with caution: the [`InputType`] might not be compatible with the requested variables.
+    fn required_variables(&self) -> &[ControllerInputVariable] {
+        Self::InputType::required_variables()
+    }
+
     /// Performs optional one-time initialization when the node starts, before entering simulation loop.
     #[allow(unused_variables)]
     fn post_init(&mut self, node: &mut Node, context: &Context) -> SimusaResult<()> {
@@ -174,7 +157,7 @@ pub trait Controller:
     fn make_command(
         &mut self,
         robot: &mut Node,
-        error: &ControllerError,
+        input: Self::InputType,
         time: f32,
         context: &Context,
     ) -> Command;
@@ -186,6 +169,57 @@ pub trait Controller:
     #[allow(unused_variables)]
     fn next_time_step(&self, context: &Context) -> Option<f32> {
         None
+    }
+}
+
+pub trait AbstractController:
+    std::fmt::Debug + std::marker::Send + std::marker::Sync + Recordable<ControllerRecord>
+{
+    fn call_make_command(
+        &mut self,
+        robot: &mut Node,
+        variables: ControllerInputVariables,
+        time: f32,
+        context: &Context,
+    ) -> Command;
+
+    fn call_required_variables(&self) -> &[ControllerInputVariable];
+
+    fn call_post_init(&mut self, node: &mut Node, context: &Context) -> SimusaResult<()>;
+
+    fn call_pre_loop_hook(&mut self, node: &mut Node, time: f32, context: &Context);
+
+    fn call_next_time_step(&self, context: &Context) -> Option<f32>;
+}
+
+impl<T> AbstractController for T
+where
+    T: Controller,
+{
+    fn call_make_command(
+        &mut self,
+        robot: &mut Node,
+        variables: ControllerInputVariables,
+        time: f32,
+        context: &Context,
+    ) -> Command {
+        self.make_command(robot, variables.into(), time, context)
+    }
+
+    fn call_required_variables(&self) -> &[ControllerInputVariable] {
+        self.required_variables()
+    }
+
+    fn call_next_time_step(&self, context: &Context) -> Option<f32> {
+        self.next_time_step(context)
+    }
+
+    fn call_post_init(&mut self, node: &mut Node, context: &Context) -> SimusaResult<()> {
+        self.post_init(node, context)
+    }
+
+    fn call_pre_loop_hook(&mut self, node: &mut Node, time: f32, context: &Context) {
+        self.pre_loop_hook(node, time, context)
     }
 }
 
@@ -204,14 +238,14 @@ pub fn make_controller_from_config(
     config: &ControllerConfig,
     from_config_params: &FromConfigArguments,
     physics_config: &PhysicsConfig,
-) -> SimusaResult<SharedRwLock<Box<dyn Controller>>> {
+) -> SimusaResult<SharedRwLock<Box<dyn AbstractController>>> {
     Ok(Arc::new(RwLock::new(match config {
         ControllerConfig::PID(c) => Box::new(pid::PID::from_config(
             c,
             physics_config,
             from_config_params.initial_time,
             from_config_params.context,
-        )) as Box<dyn Controller>,
+        )) as Box<dyn AbstractController>,
         ControllerConfig::Plugin(c) => from_config_params
             .plugin_api
             .as_ref()

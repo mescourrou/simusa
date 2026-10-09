@@ -5,15 +5,8 @@ use ::simusa::{
 use pyo3::prelude::*;
 
 use crate::{
-    controllers::ControllerWrapper,
-    messages::{GoToMessageWrapper, MessageFlagWrapper, SensorTriggerMessageWrapper},
-    navigators::NavigatorWrapper,
-    networking::MessageTypesWrapper,
-    physics::PhysicsWrapper,
-    result_analyser::ResultAnalyser,
-    state_estimators::StateEstimatorWrapper,
-    wrappers::{
-        CommandWrapper, ControllerErrorWrapper, DisplacementObservationWrapper,
+    controllers::{ControllerWrapper, PythonControllerInputWrapper}, messages::{GoToMessageWrapper, MessageFlagWrapper, SensorTriggerMessageWrapper}, navigators::NavigatorWrapper, networking::MessageTypesWrapper, physics::PhysicsWrapper, result_analyser::ResultAnalyser, state_estimators::StateEstimatorWrapper, wrappers::{
+        CommandWrapper, DisplacementObservationWrapper,
         GNSSObservationWrapper, MultiClientWrapper, NodeWrapper, ObservationWrapper,
         OrientedLandmarkObservationWrapper, OrientedRobotObservationWrapper, PluginAPIWrapper,
         Pose, SensorObservationWrapper, SimulatorWrapper, SpeedObservationWrapper, StateWrapper,
@@ -140,7 +133,7 @@ pub fn run_gui(_py: Python, _plugin_api: Option<Py<PyAny>>) {
 pub fn simusa(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SimulatorWrapper>()?;
     m.add_class::<PluginAPIWrapper>()?;
-    m.add_class::<ControllerErrorWrapper>()?;
+    m.add_class::<PythonControllerInputWrapper>()?;
     m.add_class::<PhysicsWrapper>()?;
     m.add_class::<StateWrapper>()?;
     m.add_class::<Pose>()?;

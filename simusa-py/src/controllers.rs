@@ -11,44 +11,73 @@ use std::{str::FromStr, sync::Arc};
 
 use pyo3::{prelude::*, types::PyDict};
 use serde_json::Value;
+use simusa::declare_controller_input;
+use simusa::interfaces::navigator_controller::{ControllerInputVariable, ControllerInputVariables};
+use simusa::navigators::NavigatorOutput;
 use simusa_com::rfc::{self, RemoteFunctionCall, RemoteFunctionCallHost};
 
 use simusa::{
     context::Context, errors::SimusaResult, internal, node::Node, physics::robot_models::Command,
-    recordable::Recordable,
+    recordable::Recordable, state_estimators::WorldState, utils::GeneralValue,
 };
 
 use crate::utils::{call_py_method, call_py_method_void};
 
-use crate::wrappers::{CommandWrapper, ControllerErrorWrapper, NodeWrapper};
-use simusa::controllers::{Controller, ControllerError, ControllerRecord};
+use crate::wrappers::{CommandWrapper, NodeWrapper, WorldStateWrapper};
+use simusa::controllers::{Controller, ControllerRecord};
+
+declare_controller_input!(
+    #[derive(Default)]
+    PythonControllerInput
+);
+
+impl NavigatorOutput for PythonControllerInput {
+    fn available_variables() -> &'static [ControllerInputVariable] {
+        &ControllerInputVariable::all()
+    }
+
+    fn into_controller_input_variables(self, _requested_variables: &[ControllerInputVariable]) -> ControllerInputVariables {
+        ControllerInputVariables::from(self)
+    }
+}
+
+
+_make_controller_input_python_wrapper!();
 
 #[derive(Debug, Clone)]
 /// Simulator-side RPC handles used by the runtime to call Python controller methods.
 pub struct PythonControllerAsyncClient {
-    post_init: RemoteFunctionCall<NodeWrapper, SimusaResult<()>>,
-    make_command: RemoteFunctionCall<(NodeWrapper, ControllerError, f32), Command>,
+    post_init: RemoteFunctionCall<NodeWrapper, SimusaResult<Vec<ControllerInputVariable>>>,
+    make_command: RemoteFunctionCall<(NodeWrapper, PythonControllerInput, f32), Command>,
     record: RemoteFunctionCall<(), ControllerRecord>,
     pre_loop_hook: RemoteFunctionCall<(NodeWrapper, f32), ()>,
     next_time_step: RemoteFunctionCall<(), Option<f32>>,
+    requested_variables: Vec<ControllerInputVariable>,
 }
 
 impl Controller for PythonControllerAsyncClient {
+    type InputType = PythonControllerInput;
     fn post_init(&mut self, node: &mut Node, context: &Context) -> SimusaResult<()> {
         let node_py = NodeWrapper::from_rust(node, context.clone());
-        self.post_init.call(node_py).unwrap()
+        self.requested_variables = self.post_init.call(node_py).unwrap()?;
+        Ok(())
+    }
+
+
+    fn required_variables(&self) -> &[ControllerInputVariable] {
+        &self.requested_variables
     }
 
     fn make_command(
         &mut self,
         node: &mut Node,
-        error: &ControllerError,
+        input: Self::InputType,
         time: f32,
         context: &Context,
     ) -> Command {
         let node_py = NodeWrapper::from_rust(node, context.clone());
         self.make_command
-            .call((node_py, error.clone(), time))
+            .call((node_py, input, time))
             .unwrap()
     }
 
@@ -73,8 +102,8 @@ impl Recordable<ControllerRecord> for PythonControllerAsyncClient {
 pub struct PythonController {
     model: Py<PyAny>,
     client: PythonControllerAsyncClient,
-    post_init: Arc<RemoteFunctionCallHost<NodeWrapper, SimusaResult<()>>>,
-    make_command: Arc<RemoteFunctionCallHost<(NodeWrapper, ControllerError, f32), Command>>,
+    post_init: Arc<RemoteFunctionCallHost<NodeWrapper, SimusaResult<Vec<ControllerInputVariable>>>>,
+    make_command: Arc<RemoteFunctionCallHost<(NodeWrapper, PythonControllerInput, f32), Command>>,
     record: Arc<RemoteFunctionCallHost<(), ControllerRecord>>,
     pre_loop_hook: Arc<RemoteFunctionCallHost<(NodeWrapper, f32), ()>>,
     next_time_step: Arc<RemoteFunctionCallHost<(), Option<f32>>>,
@@ -99,6 +128,7 @@ impl PythonController {
                 record: record_client,
                 pre_loop_hook: pre_loop_hook_client,
                 next_time_step: next_time_step_client,
+                requested_variables: vec![ControllerInputVariable::AllAvailable],
             },
             post_init: Arc::new(post_init_host),
             make_command: Arc::new(make_command_host),
@@ -125,8 +155,8 @@ impl PythonController {
             .try_recv_closure_mut(|node| self.post_init(node, context));
         self.make_command
             .clone()
-            .try_recv_closure_mut(|(node, error, time)| {
-                self.make_command(node, &error, time, context)
+            .try_recv_closure_mut(|(node, input, time)| {
+                self.make_command(node, input, time, context)
             });
         self.record.try_recv_closure(|()| self.record(context));
         self.pre_loop_hook
@@ -137,20 +167,20 @@ impl PythonController {
             .try_recv_closure(|()| self.next_time_step(context));
     }
 
-    fn post_init(&mut self, node: NodeWrapper, context: &Context) -> SimusaResult<()> {
+    fn post_init(&mut self, node: NodeWrapper, context: &Context) -> SimusaResult<Vec<ControllerInputVariable>> {
         internal!(
             context,
             ::simusa::logger::InternalLog::API,
             "Calling python implementation of post_init"
         );
         call_py_method_void!(self.model, "post_init", (node,));
-        Ok(())
+        Ok(vec![ControllerInputVariable::AllAvailable])
     }
 
     fn make_command(
         &mut self,
         node: NodeWrapper,
-        error: &ControllerError,
+        input: PythonControllerInput,
         time: f32,
         context: &Context,
     ) -> Command {
@@ -165,10 +195,10 @@ impl PythonController {
             "make_command",
             CommandWrapper,
             node,
-            ControllerErrorWrapper::from_rust(error),
+            Into::<PythonControllerInputWrapper>::into(&input),
             time
         );
-        result.to_rust()
+        result.into()
     }
 
     fn record(&self, context: &Context) -> ControllerRecord {
@@ -225,7 +255,7 @@ impl ControllerWrapper {
     fn make_command(
         &mut self,
         _node: NodeWrapper,
-        _error: ControllerErrorWrapper,
+        _input: PythonControllerInputWrapper,
         _time: f32,
     ) -> CommandWrapper {
         unimplemented!()

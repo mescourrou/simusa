@@ -693,6 +693,7 @@ pub fn config_derives(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut unknown_fields_derive = quote! {
         #[serde(deny_unknown_fields)]
     };
+    let mut to_vec_derive = quote! { simusa_macros::ToVec, };
     for attribute in attr_str.split(',') {
         let trimmed = attribute.trim();
         match trimmed {
@@ -720,6 +721,9 @@ pub fn config_derives(attr: TokenStream, item: TokenStream) -> TokenStream {
             "skip_jsonschema" => {
                 jsonschema_derive = quote! {};
                 jsonschema_derive_struct = quote! {};
+            }
+            "skip_to_vec" => {
+                to_vec_derive = quote! {};
             }
             "" => {}
             _ => {
@@ -764,7 +768,7 @@ pub fn config_derives(attr: TokenStream, item: TokenStream) -> TokenStream {
             Clone,
             #partial_eq_derive
             #check_derive
-            simusa_macros::ToVec,
+            #to_vec_derive
         )]
         #jsonschema_derive
         #unknown_fields_derive

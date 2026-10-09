@@ -18,12 +18,12 @@ use serde_derive::{Deserialize, Serialize};
 use simusa_macros::config_derives;
 
 use crate::context::Context;
-use crate::controllers::ControllerError;
 use crate::errors::{SimusaError, SimusaErrorTypes, SimusaResult};
 #[cfg(feature = "gui")]
 use crate::gui::utils::{edit_plugin_config, show_plugin_config};
 #[cfg(feature = "gui")]
 use crate::gui::{UIComponent, utils::string_combobox};
+use crate::interfaces::navigator_controller::{ControllerInputVariable, ControllerInputVariables};
 use crate::node::node_factory::FromConfigArguments;
 use crate::simulator::SimulatorConfig;
 use crate::state_estimators::WorldState;
@@ -153,28 +153,43 @@ use crate::utils::SharedRwLock;
 #[cfg(feature = "gui")]
 use crate::utils::enum_tools::ToVec;
 
+
+pub trait NavigatorOutput {
+    fn available_variables() -> &'static [ControllerInputVariable];
+    fn into_controller_input_variables(self, requested_variables: &[ControllerInputVariable]) -> ControllerInputVariables;
+}
+
 /// Trait managing the planning, and providing the error to the planned behavior.
 pub trait Navigator:
     std::fmt::Debug + std::marker::Send + std::marker::Sync + Recordable<NavigatorRecord>
 {
+    type OutputType: NavigatorOutput;
+
+    /// Returns the list of variables that can be provided by the navigator for the controller.
+    ///
+    /// Override with caution: the [`OutputType`] might not be compatible with the returned variables.
+    fn available_variables(&self) -> &[ControllerInputVariable] {
+        Self::OutputType::available_variables()
+    }
+
     /// Performs optional one-time initialization when the node starts.
     #[allow(unused_variables)]
     fn post_init(&mut self, node: &mut Node, context: &Context) -> SimusaResult<()> {
         Ok(())
     }
 
-    /// Compute the error ([`ControllerError`]) between the given `state` and the planned path.
+    /// Compute the output ([`ControllerError`]) between the given `state` and the planned path.
     ///
     /// ## Arguments
     /// * `node` - Reference to the node to access modules.
     /// * `state` - Estimated world state used by the navigator.
     /// * `context` - Shared simulation context used for logging and communication metadata.
-    fn compute_error(
+    fn compute_output(
         &mut self,
         node: &mut Node,
         state: WorldState,
         context: &Context,
-    ) -> ControllerError;
+    ) -> SimusaResult<Self::OutputType>;
 
     /// Executes per-step side effects before controller computation.
     fn pre_loop_hook(&mut self, node: &mut Node, time: f32, context: &Context);
@@ -183,6 +198,65 @@ pub trait Navigator:
     #[allow(unused_variables)]
     fn next_time_step(&self, context: &Context) -> Option<f32> {
         None
+    }
+}
+
+pub trait AbstractNavigator:
+    std::fmt::Debug + std::marker::Send + std::marker::Sync + Recordable<NavigatorRecord>
+{
+    fn call_available_variables(&self) -> &[ControllerInputVariable];
+    
+    fn call_post_init(
+        &mut self,
+        node: &mut Node,
+        context: &Context,
+    ) -> SimusaResult<()>;
+
+    fn call_compute_output(
+        &mut self,
+        node: &mut Node,
+        state: WorldState,
+        context: &Context,
+        requested_variables: &[ControllerInputVariable],
+    ) -> SimusaResult<ControllerInputVariables>;
+
+    fn call_pre_loop_hook(&mut self, node: &mut Node, time: f32, context: &Context);
+
+    fn call_next_time_step(&self, context: &Context) -> Option<f32>;
+}
+
+impl<T> AbstractNavigator for T
+where
+    T: Navigator,
+{
+    fn call_available_variables(&self) -> &[ControllerInputVariable] {
+        self.available_variables()
+    }
+    
+    fn call_post_init(
+        &mut self,
+        node: &mut Node,
+        context: &Context,
+    ) -> SimusaResult<()> {
+        self.post_init(node, context)
+    }
+
+    fn call_compute_output(
+        &mut self,
+        node: &mut Node,
+        state: WorldState,
+        context: &Context,
+        requested_variables: &[ControllerInputVariable],
+    ) -> SimusaResult<ControllerInputVariables> {
+        Ok(self.compute_output(node, state, context)?.into_controller_input_variables(requested_variables))
+    }
+
+    fn call_pre_loop_hook(&mut self, node: &mut Node, time: f32, context: &Context) {
+        self.pre_loop_hook(node, time, context)
+    }
+
+    fn call_next_time_step(&self, context: &Context) -> Option<f32> {
+        self.next_time_step(context)
     }
 }
 
@@ -199,14 +273,14 @@ pub trait Navigator:
 pub fn make_navigator_from_config(
     config: &NavigatorConfig,
     from_config_params: &FromConfigArguments,
-) -> SimusaResult<SharedRwLock<Box<dyn Navigator>>> {
+) -> SimusaResult<SharedRwLock<Box<dyn AbstractNavigator>>> {
     Ok(Arc::new(RwLock::new(match config {
         NavigatorConfig::TrajectoryFollower(c) => {
             Box::new(trajectory_follower::TrajectoryFollower::from_config(
                 c,
                 from_config_params.global_config,
                 from_config_params.initial_time,
-            )) as Box<dyn Navigator>
+            )) as Box<dyn AbstractNavigator>
         }
         NavigatorConfig::Plugin(c) => from_config_params
             .plugin_api
@@ -230,6 +304,6 @@ pub fn make_navigator_from_config(
             from_config_params.network,
             from_config_params.initial_time,
             from_config_params.context,
-        )) as Box<dyn Navigator>,
+        )) as Box<dyn AbstractNavigator>,
     })))
 }

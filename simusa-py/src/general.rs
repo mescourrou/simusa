@@ -4,18 +4,7 @@ use std::sync::{Arc, Mutex};
 use pyo3::prelude::*;
 
 use simusa::{
-    context::Context,
-    controllers::Controller,
-    internal,
-    logger::InternalLog,
-    navigators::{Navigator, go_to::GoToMessage},
-    networking::network::{MessageFlag, Network},
-    physics::Physics,
-    plugin_api::PluginAPI,
-    sensors::sensor_manager::SensorTriggerMessage,
-    simulator::SimulatorConfig,
-    state_estimators::StateEstimator,
-    utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
+    context::Context, controllers::{AbstractController, Controller}, internal, logger::InternalLog, navigators::{AbstractNavigator, Navigator, go_to::GoToMessage}, networking::network::{MessageFlag, Network}, physics::Physics, plugin_api::PluginAPI, sensors::sensor_manager::SensorTriggerMessage, simulator::SimulatorConfig, state_estimators::StateEstimator, utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
 };
 
 use crate::{
@@ -113,7 +102,7 @@ impl PluginAPI for PythonAPI {
         _network: &SharedRwLock<Network>,
         initial_time: f32,
         context: &Context,
-    ) -> Box<dyn Controller> {
+    ) -> Box<dyn AbstractController> {
         internal!(context, InternalLog::API, "Calling Python API");
         self.controllers
             .lock()
@@ -146,7 +135,7 @@ impl PluginAPI for PythonAPI {
         _network: &SharedRwLock<Network>,
         initial_time: f32,
         context: &Context,
-    ) -> Box<dyn Navigator> {
+    ) -> Box<dyn AbstractNavigator> {
         internal!(context, InternalLog::API, "Calling Python API");
         self.navigators
             .lock()
@@ -190,3 +179,15 @@ impl PluginAPI for PythonAPI {
         st
     }
 }
+
+
+macro_rules! impl_from_plain_with_from_ref {
+    ($from_type: ty, $to_type: ty) => {
+        impl From<$from_type> for $to_type {
+            fn from(value: $from_type) -> Self {
+                Self::from(&value)
+            }
+        }
+    };
+}
+pub(crate) use impl_from_plain_with_from_ref;

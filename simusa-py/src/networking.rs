@@ -157,7 +157,7 @@ impl MessageTypesWrapper {
             MessageTypesWrapper::Observations(observations) => MessageType::Observations(
                 observations
                     .iter()
-                    .map(ObservationWrapper::to_rust)
+                    .map(Observation::from)
                     .map(|o| o.record(context))
                     .collect(),
             ),
@@ -185,7 +185,7 @@ impl MessageTypesWrapper {
             MessageType::Observations(observations) => MessageTypesWrapper::Observations(
                 observations
                     .iter()
-                    .map(|o| ObservationWrapper::from_rust(&Observation::from_record(o)))
+                    .map(|o| ObservationWrapper::from(&Observation::from_record(o)))
                     .collect(),
             ),
             MessageType::Event(event) => MessageTypesWrapper::Event(

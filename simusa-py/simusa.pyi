@@ -93,12 +93,26 @@ class OccupancyGrid:
         """
         raise NotImplementedError()
         
-class ControllerError:
+class ControllerInput:
     def __init__(self):
-        self.lateral: float
-        self.theta: float
-        self.velocity: float
-        
+        self.node_position: Tuple[float, float] | None
+        self.node_orientation: float | None
+        self.node_linear_velocity: float | None
+        self.node_longitudinal_lateral_velocities: Tuple[float, float] | None
+        self.node_angular_velocity: float | None
+        self.world_state: WorldState | None
+        self.target_position: Tuple[float, float] | None
+        self.target_orientation: float | None
+        self.target_linear_velocity: float | None
+        self.target_longitudinal_lateral_velocities: Tuple[float, float] | None
+        self.target_angular_velocity: float | None
+        self.error_longitudinal: float | None
+        self.error_lateral: float | None
+        self.error_angular: float | None
+        self.error_linear_velocity: float | None
+        self.error_longitudinal_lateral_velocities: Tuple[float, float] | None
+        self.error_angular_velocity: float | None
+        self.custom: str | None
 
 class OrientedLandmarkObservation:
     def __init__(self):
@@ -365,7 +379,7 @@ class Controller:
     def record(self) -> str:
         raise NotImplementedError()
 
-    def make_command(self, node: Node, error: ControllerError, time: float) -> Command:
+    def make_command(self, node: Node, input: ControllerInput, time: float) -> Command:
         raise NotImplementedError()
     
     def pre_loop_hook(self, node: Node, time: float):
@@ -381,7 +395,7 @@ class Navigator:
     def record(self) -> str:
         raise NotImplementedError()
 
-    def compute_error(self, node: Node, world_state: WorldState) -> ControllerError:
+    def compute_output(self, node: Node, world_state: WorldState) -> ControllerInput:
         raise NotImplementedError()
     
     def pre_loop_hook(self, node: Node, time: float):

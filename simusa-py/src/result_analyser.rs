@@ -86,7 +86,7 @@ impl ResultAnalyser {
                 reader.read_exact(&mut size).map_err(|e| {
                     let _ = stream.write("OK".as_bytes());
                     PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                        "Impossible to read request from result analyser client: {}",
+                        "Impossible to read size request from result analyser client: {}",
                         e
                     ))
                 })?;
@@ -102,8 +102,10 @@ impl ResultAnalyser {
                 debug!(context, "Receiving results");
                 let frame: ResultAnalyserFrame = serde_json::from_slice(&buf).map_err(|e| {
                     let _ = stream.write("OK".as_bytes());
+                    let mut debug_file = std::fs::File::create("buf_received.json").unwrap();
+                    debug_file.write_all(&buf).unwrap();
                     PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                        "Impossible to read request from result analyser client: {}",
+                        "Impossible to deserialize request from result analyser client: {}",
                         e
                     ))
                 })?;
