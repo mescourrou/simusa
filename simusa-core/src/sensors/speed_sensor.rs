@@ -60,7 +60,7 @@ pub enum SpeedSensorFaultModelConfig {
     Additive(AdditiveFaultConfig<SpeedSensorVariablesFaults, SpeedSensorVariables>),
     /// Plugin-provided external fault model.
     #[plugin("SpeedSensorFaultModel", "speed-sensor-fault-model")]
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for SpeedSensorFaultModelConfig {
@@ -126,7 +126,7 @@ pub enum SpeedSensorFilterConfig {
     Range(RangeFilterConfig<SpeedSensorVariablesFilter>),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
     #[plugin("SpeedSensorFilter", "speed-sensor-filter")]
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for SpeedSensorFilterConfig {

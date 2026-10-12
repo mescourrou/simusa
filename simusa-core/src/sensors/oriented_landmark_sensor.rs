@@ -103,7 +103,7 @@ pub enum OrientedLandmarkSensorFaultModelConfig {
         "OrientedLandmarkSensorFaultModel",
         "oriented-landmark-sensor-fault-model"
     )]
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for OrientedLandmarkSensorFaultModelConfig {
@@ -184,7 +184,7 @@ pub enum OrientedLandmarkSensorFilterConfig {
     Label(StringFilterConfig),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
     #[plugin("OrientedLandmarkSensorFilter", "oriented-landmark-sensor-filter")]
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for OrientedLandmarkSensorFilterConfig {

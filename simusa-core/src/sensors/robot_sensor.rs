@@ -93,7 +93,7 @@ pub enum RobotSensorFaultModelConfig {
     Misassociation(MisassociationFaultConfig),
     /// Plugin-provided external fault model.
     #[plugin("RobotSensorFaultModel", "robot-sensor-fault-model")]
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for RobotSensorFaultModelConfig {
@@ -170,7 +170,7 @@ pub enum RobotSensorFilterConfig {
     Label(StringFilterConfig),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
     #[plugin("RobotSensorFilter", "robot-sensor-filter")]
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for RobotSensorFilterConfig {

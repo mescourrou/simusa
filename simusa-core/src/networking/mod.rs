@@ -66,7 +66,7 @@ mod tests {
     };
 
     use serde::{Deserialize, Serialize};
-    use serde_json::Value;
+    use crate::utils::GeneralValue;
     use simusa_com::pub_sub::{MultiClientTrait, PathKey};
 
     use crate::{
@@ -170,10 +170,10 @@ mod tests {
     impl Recordable<StateEstimatorRecord> for StateEstimatorTest {
         fn record(&self, _context: &Context) -> StateEstimatorRecord {
             StateEstimatorRecord::Plugin(
-                serde_json::to_value(StateEstimatorRecordTest {
+                GeneralValue(serde_json::to_value(StateEstimatorRecordTest {
                     last_time: self.last_time,
                 })
-                .unwrap(),
+                .unwrap()),
             )
         }
     }
@@ -187,7 +187,7 @@ mod tests {
     impl PluginAPI for PluginAPITest {
         fn get_state_estimator(
             &self,
-            _config: &serde_json::Value,
+            _config: &crate::utils::GeneralValue,
             _global_config: &SimulatorConfig,
             _va_factory: &Arc<DeterministRandomVariableFactory>,
             network: &SharedRwLock<Network>,
@@ -226,7 +226,7 @@ mod tests {
             node_type: NodeTypeConfig::Robot(Box::new(RobotConfig {
                 state_estimator_bench: vec![BenchStateEstimatorConfig {
                     name: "own".to_string(),
-                    config: StateEstimatorConfig::Plugin(Value::Bool(false)),
+                    config: StateEstimatorConfig::Plugin(GeneralValue::bool(false)),
                 }],
                 ..Default::default()
             })),
@@ -241,7 +241,7 @@ mod tests {
                 },
                 state_estimator_bench: vec![BenchStateEstimatorConfig {
                     name: "own".to_string(),
-                    config: StateEstimatorConfig::Plugin(Value::Bool(true)),
+                    config: StateEstimatorConfig::Plugin(GeneralValue::bool(true)),
                 }],
                 ..Default::default()
             })),

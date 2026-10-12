@@ -37,7 +37,7 @@ pub enum NavigatorConfig {
     #[check]
     TrajectoryFollower(trajectory_follower::TrajectoryFollowerConfig),
     /// Configuration for a plugin [`Navigator`].
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
     /// Configuration for [`go_to::GoTo`].
     #[check]
     GoTo(go_to::GoToConfig),
@@ -71,7 +71,7 @@ impl UIComponent for NavigatorConfig {
                         trajectory_follower::TrajectoryFollowerConfig::default(),
                     )
                 }
-                "Plugin" => *self = NavigatorConfig::Plugin(serde_json::Value::Null),
+                "Plugin" => *self = NavigatorConfig::Plugin(crate::utils::GeneralValue::default()),
                 "GoTo" => *self = NavigatorConfig::GoTo(go_to::GoToConfig::default()),
                 _ => panic!("Where did you find this value?"),
             };
@@ -123,7 +123,7 @@ pub enum NavigatorRecord {
     /// Runtime record for [`TrajectoryFollower`](trajectory_follower::TrajectoryFollower).
     TrajectoryFollower(trajectory_follower::TrajectoryFollowerRecord),
     /// Runtime record for a Plugin [`Navigator`].
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
     /// Runtime record for [`GoTo`](go_to::GoTo).
     GoTo(go_to::GoToRecord),
 }

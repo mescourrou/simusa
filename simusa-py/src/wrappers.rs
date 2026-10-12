@@ -1340,7 +1340,7 @@ impl PluginAPIWrapper {
     ///
     /// # Arguments
     /// * `config` - Config for the external state estimator. The configuration
-    /// is given using [`serde_json::Value`]. It should be converted by the
+    /// is given using [`crate::utils::GeneralValue`]. It should be converted by the
     /// external plugin to the specific configuration.
     /// * `global_config` - Full configuration of the simulator.
     ///
@@ -1361,7 +1361,7 @@ impl PluginAPIWrapper {
     ///
     /// # Arguments
     /// * `config` - Config for the external controller. The configuration
-    /// is given using [`serde_json::Value`]. It should be converted by the
+    /// is given using [`crate::utils::GeneralValue`]. It should be converted by the
     /// external plugin to the specific configuration.
     /// * `global_config` - Full configuration of the simulator.
     ///
@@ -1382,7 +1382,7 @@ impl PluginAPIWrapper {
     ///
     /// # Arguments
     /// * `config` - Config for the external navigator. The configuration
-    /// is given using [`serde_json::Value`]. It should be converted by the
+    /// is given using [`crate::utils::GeneralValue`]. It should be converted by the
     /// external plugin to the specific configuration.
     /// * `global_config` - Full configuration of the simulator.
     ///
@@ -1403,7 +1403,7 @@ impl PluginAPIWrapper {
     ///
     /// # Arguments
     /// * `config` - Config for the external physics. The configuration
-    /// is given using [`serde_json::Value`]. It should be converted by the
+    /// is given using [`crate::utils::GeneralValue`]. It should be converted by the
     /// external plugin to the specific configuration.
     /// * `global_config` - Full configuration of the simulator.
     ///

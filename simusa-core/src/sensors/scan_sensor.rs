@@ -117,7 +117,7 @@ pub enum ScanSensorFaultModelConfig {
     PointMisdetection(MisdetectionFaultConfig),
     /// Plugin-provided external fault model.
     #[plugin("ScanSensorFaultModel", "scan-sensor-fault-model")]
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for ScanSensorFaultModelConfig {
@@ -197,7 +197,7 @@ pub enum ScanSensorFilterConfig {
     Range(RangeFilterConfig<ScanSensorVariablesFilter>),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
     #[plugin("ScanSensorFilter", "scan-sensor-filter")]
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for ScanSensorFilterConfig {

@@ -102,7 +102,7 @@ impl Controller for MyWonderfulController {
 
 impl Recordable<ControllerRecord> for MyWonderfulController {
     fn record(&self, _context: &Context) -> ControllerRecord {
-        ControllerRecord::Plugin(serde_json::to_value(MyWonderfulControllerRecord {}).unwrap())
+        ControllerRecord::Plugin(serde_json::to_value(MyWonderfulControllerRecord {}).unwrap().into())
     }
 }
 
@@ -192,7 +192,7 @@ impl Navigator for MyWonderfulNavigator {
 
 impl Recordable<NavigatorRecord> for MyWonderfulNavigator {
     fn record(&self, _context: &Context) -> NavigatorRecord {
-        NavigatorRecord::Plugin(serde_json::to_value(MyWonderfulNavigatorRecord {}).unwrap())
+        NavigatorRecord::Plugin(serde_json::to_value(MyWonderfulNavigatorRecord {}).unwrap().into())
     }
 }
 
@@ -240,7 +240,7 @@ impl Recordable<PhysicsRecord> for MyWonderfulPhysics {
             serde_json::to_value(MyWonderfulPhysicsRecord {
                 state: self.state.record(context),
             })
-            .unwrap(),
+            .unwrap().into(),
         )
     }
 }
@@ -307,7 +307,7 @@ impl Recordable<StateEstimatorRecord> for MyWonderfulStateEstimator {
             serde_json::to_value(MyWonderfulStateEstimatorRecord {
                 last_prediction: self.last_prediction,
             })
-            .unwrap(),
+            .unwrap().into(),
         )
     }
 }
@@ -369,7 +369,7 @@ impl Sensor for MyWonderfulSensor {
         self.last_time = time;
         // Return a custom observation here, but you can return an existing one as well (e.g. SpeedObservation)
         vec![SensorObservation::Plugin(
-            serde_json::to_value(self.last_observation.as_ref().unwrap()).unwrap(),
+            serde_json::to_value(self.last_observation.as_ref().unwrap()).unwrap().into(),
         )]
     }
 
@@ -380,7 +380,7 @@ impl Sensor for MyWonderfulSensor {
 
 impl Recordable<SensorRecord> for MyWonderfulSensor {
     fn record(&self, _context: &Context) -> SensorRecord {
-        SensorRecord::Plugin(serde_json::to_value(self.last_observation.clone()).unwrap())
+        SensorRecord::Plugin(serde_json::to_value(self.last_observation.clone()).unwrap().into())
     }
 }
 
@@ -590,7 +590,7 @@ struct MyWonderfulPlugin {}
 impl PluginAPI for MyWonderfulPlugin {
     fn get_controller(
         &self,
-        config: &serde_json::Value,
+        config: &::simusa::utils::GeneralValue,
         _global_config: &SimulatorConfig,
         _va_factory: &Arc<DeterministRandomVariableFactory>,
         _network: &SharedRwLock<Network>,
@@ -598,14 +598,14 @@ impl PluginAPI for MyWonderfulPlugin {
         _context: &Context,
     ) -> Box<dyn AbstractController> {
         Box::new(MyWonderfulController::from_config(
-            serde_json::from_value(config.clone()).unwrap(),
+            serde_json::from_value(config.to_value().clone()).unwrap(),
             initial_time,
         ))
     }
 
     fn get_navigator(
         &self,
-        config: &serde_json::Value,
+        config: &::simusa::utils::GeneralValue,
         _global_config: &SimulatorConfig,
         _va_factory: &Arc<DeterministRandomVariableFactory>,
         _network: &SharedRwLock<Network>,
@@ -613,14 +613,14 @@ impl PluginAPI for MyWonderfulPlugin {
         _context: &Context,
     ) -> Box<dyn AbstractNavigator> {
         Box::new(MyWonderfulNavigator::from_config(
-            serde_json::from_value(config.clone()).unwrap(),
+            serde_json::from_value(config.to_value().clone()).unwrap(),
             initial_time,
         ))
     }
 
     fn get_physics(
         &self,
-        config: &serde_json::Value,
+        config: &::simusa::utils::GeneralValue,
         _global_config: &SimulatorConfig,
         _va_factory: &Arc<DeterministRandomVariableFactory>,
         _network: &SharedRwLock<Network>,
@@ -628,14 +628,14 @@ impl PluginAPI for MyWonderfulPlugin {
         _context: &Context,
     ) -> Box<dyn Physics> {
         Box::new(MyWonderfulPhysics::from_config(
-            serde_json::from_value(config.clone()).unwrap(),
+            serde_json::from_value(config.to_value().clone()).unwrap(),
             initial_time,
         ))
     }
 
     fn get_state_estimator(
         &self,
-        config: &serde_json::Value,
+        config: &::simusa::utils::GeneralValue,
         _global_config: &SimulatorConfig,
         _va_factory: &Arc<DeterministRandomVariableFactory>,
         _network: &SharedRwLock<Network>,
@@ -643,14 +643,14 @@ impl PluginAPI for MyWonderfulPlugin {
         _context: &Context,
     ) -> Box<dyn StateEstimator> {
         Box::new(MyWonderfulStateEstimator::from_config(
-            serde_json::from_value(config.clone()).unwrap(),
+            serde_json::from_value(config.to_value().clone()).unwrap(),
             initial_time,
         ))
     }
 
     fn get_sensor(
         &self,
-        config: &serde_json::Value,
+        config: &::simusa::utils::GeneralValue,
         _global_config: &SimulatorConfig,
         _va_factory: &Arc<DeterministRandomVariableFactory>,
         _network: &SharedRwLock<Network>,
@@ -658,49 +658,49 @@ impl PluginAPI for MyWonderfulPlugin {
         _context: &Context,
     ) -> Box<dyn Sensor> {
         Box::new(MyWonderfulSensor::from_config(
-            serde_json::from_value(config.clone()).unwrap(),
+            serde_json::from_value(config.to_value().clone()).unwrap(),
             initial_time,
         ))
     }
 
     fn get_physics_fault(
         &self,
-        config: &serde_json::Value,
+        config: &::simusa::utils::GeneralValue,
         global_config: &SimulatorConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
         initial_time: f32,
         context: &Context,
     ) -> Box<dyn simusa::physics::fault_models::PhysicsFaultModel> {
         Box::new(MyWonderfulPhysicsFault::from_config(
-            serde_json::from_value(config.clone()).unwrap(),
+            serde_json::from_value(config.to_value().clone()).unwrap(),
             initial_time,
         ))
     }
 
     fn get_sensor_fault(
         &self,
-        config: &serde_json::Value,
+        config: &::simusa::utils::GeneralValue,
         global_config: &SimulatorConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
         initial_time: f32,
         context: &Context,
     ) -> Box<dyn simusa::sensors::fault_models::FaultModel> {
         Box::new(MyWonderfulSensorFault::from_config(
-            serde_json::from_value(config.clone()).unwrap(),
+            serde_json::from_value(config.to_value().clone()).unwrap(),
             initial_time,
         ))
     }
 
     fn get_sensor_filter(
         &self,
-        config: &serde_json::Value,
+        config: &::simusa::utils::GeneralValue,
         global_config: &SimulatorConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
         initial_time: f32,
         context: &Context,
     ) -> Box<dyn simusa::sensors::sensor_filters::SensorFilter> {
         Box::new(MyWonderfulSensorFilter::from_config(
-            serde_json::from_value(config.clone()).unwrap(),
+            serde_json::from_value(config.to_value().clone()).unwrap(),
             initial_time,
         ))
     }
@@ -714,12 +714,12 @@ impl PluginAPI for MyWonderfulPlugin {
 
     fn get_result_analyser(
         &self,
-        config: &serde_json::Value,
+        config: &::simusa::utils::GeneralValue,
         global_config: &SimulatorConfig,
         context: &Context,
     ) -> Box<dyn simusa::result_analyser::ResultAnalyserTrait> {
         Box::new(MyWonderfulResultAnalyser::from_config(
-            serde_json::from_value(config.clone()).unwrap(),
+            serde_json::from_value(config.to_value().clone()).unwrap(),
             0.0,
         ))
     }

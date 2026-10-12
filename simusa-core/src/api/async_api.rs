@@ -361,7 +361,7 @@ impl Default for PluginAsyncAPI {
 impl PluginAPI for PluginAsyncAPI {
     fn get_state_estimator(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         global_config: &SimulatorConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
         network: &SharedRwLock<Network>,
@@ -381,7 +381,7 @@ impl PluginAPI for PluginAsyncAPI {
 
     fn get_controller(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         global_config: &SimulatorConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
         network: &SharedRwLock<Network>,
@@ -401,7 +401,7 @@ impl PluginAPI for PluginAsyncAPI {
 
     fn get_navigator(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         global_config: &SimulatorConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
         network: &SharedRwLock<Network>,
@@ -421,7 +421,7 @@ impl PluginAPI for PluginAsyncAPI {
 
     fn get_physics(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         global_config: &SimulatorConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
         network: &SharedRwLock<Network>,
@@ -462,7 +462,7 @@ pub struct PluginAsyncAPIClient {
 /// It contains the configuration for the state estimator to get, the global configuration of the simulator, a factory for random variables, a reference to the network and the initial time of the simulation.
 pub struct PluginAsyncAPIGetStateEstimatorRequest {
     /// User custom configuration as a serialized JSON value. It is up to the plugin to parse it and use it as needed.
-    pub config: serde_json::Value,
+    pub config: crate::utils::GeneralValue,
     /// Global configuration of the simulator, as defined in the configuration file. It can be used by the plugin to get information about the simulation and configure itself accordingly.
     pub global_config: SimulatorConfig,
     /// Factory for random variables, to create random variables with the same seed as the simulator and ensure reproducibility. It can be used by the plugin to create random variables for its internal use.

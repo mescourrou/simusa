@@ -12,17 +12,7 @@ use pyo3::{prelude::*, types::PyDict};
 use simusa_com::rfc::{self, RemoteFunctionCall, RemoteFunctionCallHost};
 
 use simusa::{
-    constants::TIME_ROUND,
-    context::Context,
-    errors::SimusaResult,
-    internal,
-    logger::InternalLog,
-    node::Node,
-    physics::robot_models::Command,
-    recordable::Recordable,
-    sensors::Observation,
-    state_estimators::{StateEstimator, StateEstimatorRecord, WorldState},
-    utils::maths::round_precision,
+    constants::TIME_ROUND, context::Context, errors::SimusaResult, internal, logger::InternalLog, node::Node, physics::robot_models::Command, recordable::Recordable, sensors::Observation, state_estimators::{StateEstimator, StateEstimatorRecord, WorldState}, utils::{GeneralValue, maths::round_precision},
 };
 
 use crate::{
@@ -327,8 +317,8 @@ impl PythonStateEstimator {
             "Calling python implementation of record"
         );
         let record_str: String = call_py_method!(self.model, "record", String,);
-        let record = serde_json::Value::from_str(record_str.as_str()).expect(
-            "Impossible to get serde_json::Value from the input serialized python structure",
+        let record = GeneralValue::from_str(record_str.as_str()).expect(
+            "Impossible to get crate::utils::GeneralValue from the input serialized python structure",
         );
         StateEstimatorRecord::Plugin(record)
     }

@@ -121,7 +121,7 @@ pub fn json_config(
     buffer_key: &String,
     error_key: &String,
     buffer_stack: &mut BTreeMap<String, String>,
-    value: &mut serde_json::Value,
+    value: &mut crate::utils::GeneralValue,
 ) {
     if !buffer_stack.contains_key(buffer_key) {
         buffer_stack.insert(buffer_key.clone(), value.to_string());
@@ -176,7 +176,7 @@ pub fn edit_plugin_config(
     unique_key: &str,
     unique_id: &str,
     buffer_stack: &mut BTreeMap<String, String>,
-    config: &mut serde_json::Value,
+    config: &mut crate::utils::GeneralValue,
 ) {
     egui::CollapsingHeader::new(plugin_name).show(ui, |ui| {
         ui.vertical(|ui| {
@@ -193,7 +193,7 @@ pub fn edit_plugin_config(
 }
 
 /// Show the config of a plugin as a JSON text.
-pub fn show_plugin_config(ui: &mut egui::Ui, plugin_name: &str, config: &serde_json::Value) {
+pub fn show_plugin_config(ui: &mut egui::Ui, plugin_name: &str, config: &crate::utils::GeneralValue) {
     egui::CollapsingHeader::new(plugin_name).show(ui, |ui| {
         ui.vertical(|ui| {
             ui.label("Config (JSON):");

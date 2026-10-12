@@ -6,18 +6,10 @@
 use std::{str::FromStr, sync::Arc};
 
 use pyo3::{prelude::*, types::PyDict};
-use serde_json::Value;
 use simusa_com::rfc::{self, RemoteFunctionCall, RemoteFunctionCallHost};
 
 use simusa::{
-    context::Context,
-    errors::SimusaResult,
-    internal,
-    logger::InternalLog,
-    node::Node,
-    physics::{Physics, PhysicsRecord, robot_models::Command},
-    recordable::Recordable,
-    state_estimators::State,
+    context::Context, errors::SimusaResult, internal, logger::InternalLog, node::Node, physics::{Physics, PhysicsRecord, robot_models::Command}, recordable::Recordable, state_estimators::State, utils::GeneralValue,
 };
 
 use crate::{
@@ -191,8 +183,8 @@ impl PythonPhysics {
             "Calling python implementation of record"
         );
         let record_str: String = call_py_method!(self.model, "record", String,);
-        let record = Value::from_str(&record_str).expect(
-            "Impossible to get serde_json::Value from the input serialized python structure",
+        let record = GeneralValue::from_str(&record_str).expect(
+            "Impossible to get crate::utils::GeneralValue from the input serialized python structure",
         );
         PhysicsRecord::Plugin(record)
     }

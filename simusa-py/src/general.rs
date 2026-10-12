@@ -69,7 +69,7 @@ impl PluginAPI for PythonAPI {
 
     fn get_state_estimator(
         &self,
-        config: &serde_json::Value,
+        config: &::simusa::utils::GeneralValue,
         global_config: &SimulatorConfig,
         _va_factory: &Arc<DeterministRandomVariableFactory>,
         _network: &SharedRwLock<Network>,
@@ -106,7 +106,7 @@ impl PluginAPI for PythonAPI {
 
     fn get_controller(
         &self,
-        config: &serde_json::Value,
+        config: &::simusa::utils::GeneralValue,
         global_config: &SimulatorConfig,
         _va_factory: &Arc<DeterministRandomVariableFactory>,
         _network: &SharedRwLock<Network>,
@@ -139,7 +139,7 @@ impl PluginAPI for PythonAPI {
 
     fn get_navigator(
         &self,
-        config: &serde_json::Value,
+        config: &::simusa::utils::GeneralValue,
         global_config: &SimulatorConfig,
         _va_factory: &Arc<DeterministRandomVariableFactory>,
         _network: &SharedRwLock<Network>,
@@ -165,7 +165,7 @@ impl PluginAPI for PythonAPI {
 
     fn get_physics(
         &self,
-        config: &serde_json::Value,
+        config: &::simusa::utils::GeneralValue,
         global_config: &SimulatorConfig,
         _va_factory: &Arc<DeterministRandomVariableFactory>,
         _network: &SharedRwLock<Network>,

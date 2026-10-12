@@ -10,7 +10,6 @@
 use std::{str::FromStr, sync::Arc};
 
 use pyo3::{prelude::*, types::PyDict};
-use serde_json::Value;
 use simusa::declare_controller_input;
 use simusa::interfaces::navigator_controller::{ControllerInputVariable, ControllerInputVariables};
 use simusa::navigators::NavigatorOutput;
@@ -211,8 +210,8 @@ impl PythonController {
             "Calling python implementation of record"
         );
         let record_str: String = call_py_method!(self.model, "record", String,);
-        let record = Value::from_str(&record_str).expect(
-            "Impossible to get serde_json::Value from the input serialized python structure",
+        let record = GeneralValue::from_str(&record_str).expect(
+            "Impossible to get crate::utils::GeneralValue from the input serialized python structure",
         );
         ControllerRecord::Plugin(record)
     }

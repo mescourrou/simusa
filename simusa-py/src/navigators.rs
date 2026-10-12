@@ -10,20 +10,11 @@
 use std::{str::FromStr, sync::Arc};
 
 use pyo3::{prelude::*, types::PyDict};
-use serde_json::Value;
 
 use simusa_com::rfc::{self, RemoteFunctionCall, RemoteFunctionCallHost};
 
 use simusa::{
-    context::Context,
-    errors::SimusaResult,
-    interfaces::navigator_controller::ControllerInputVariable,
-    internal,
-    logger::InternalLog,
-    navigators::{Navigator, NavigatorRecord},
-    node::Node,
-    recordable::Recordable,
-    state_estimators::WorldState,
+    context::Context, errors::SimusaResult, interfaces::navigator_controller::ControllerInputVariable, internal, logger::InternalLog, navigators::{Navigator, NavigatorRecord}, node::Node, recordable::Recordable, state_estimators::WorldState, utils::GeneralValue,
 };
 
 use crate::{
@@ -193,8 +184,8 @@ impl PythonNavigator {
             "Calling python implementation of record"
         );
         let record_str: String = call_py_method!(self.model, "record", String,);
-        NavigatorRecord::Plugin(Value::from_str(&record_str).expect(
-            "Impossible to get serde_json::Value from the input serialized python structure",
+        NavigatorRecord::Plugin(GeneralValue::from_str(&record_str).expect(
+            "Impossible to get crate::utils::GeneralValue from the input serialized python structure",
         ))
     }
 

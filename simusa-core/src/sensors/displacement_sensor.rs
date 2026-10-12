@@ -82,7 +82,7 @@ pub enum DisplacementSensorFaultModelConfig {
     ),
     /// Plugin-provided external fault model.
     #[plugin("DisplacementSensorFaultModel", "displacement-sensor-fault-model")]
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for DisplacementSensorFaultModelConfig {
@@ -136,7 +136,7 @@ pub enum DisplacementSensorFilterConfig {
     Range(RangeFilterConfig<DisplacementSensorVariablesFilter>),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
     #[plugin("DisplacementSensorFilter", "displacement-sensor-filter")]
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for DisplacementSensorFilterConfig {

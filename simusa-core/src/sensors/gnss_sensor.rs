@@ -86,7 +86,7 @@ pub enum GNSSSensorFaultModelConfig {
     Misdetection(MisdetectionFaultConfig),
     /// Plugin-provided external fault model.
     #[plugin("GNSSSensorFaultModel", "gnss-sensor-fault-model")]
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for GNSSSensorFaultModelConfig {
@@ -138,7 +138,7 @@ pub enum GNSSSensorFilterConfig {
     Range(RangeFilterConfig<GNSSSensorVariablesFilter>),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
     #[plugin("GNSSSensorFilterModel", "gnss-sensor-filter-model")]
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for GNSSSensorFilterConfig {

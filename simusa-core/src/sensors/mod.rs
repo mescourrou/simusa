@@ -182,7 +182,7 @@ pub enum SensorObservation {
     /// Scan sensor observation payload.
     Scan(ScanObservation),
     /// Plugin sensor observation payload.
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl SensorObservation {
@@ -248,7 +248,7 @@ pub enum SensorObservationRecord {
     /// Record payload for scan observations.
     Scan(ScanObservationRecord),
     /// Record payload for plugin observations.
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for SensorObservationRecord {
@@ -298,7 +298,7 @@ pub enum SensorConfig {
     #[check]
     Scan(scan_sensor::ScanSensorConfig),
     /// Plugin sensor configuration.
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 #[cfg(feature = "gui")]
@@ -338,7 +338,7 @@ impl UIComponent for SensorConfig {
                 "GNSS" => *self = SensorConfig::GNSS(gnss_sensor::GNSSSensorConfig::default()),
                 "Robot" => *self = SensorConfig::Robot(robot_sensor::RobotSensorConfig::default()),
                 "Scan" => *self = SensorConfig::Scan(scan_sensor::ScanSensorConfig::default()),
-                "Plugin" => *self = SensorConfig::Plugin(serde_json::Value::Null),
+                "Plugin" => *self = SensorConfig::Plugin(crate::utils::GeneralValue::default()),
                 _ => panic!("Where did you find this value?"),
             };
         }
@@ -434,7 +434,7 @@ pub enum SensorRecord {
     /// Record produced by a scan sensor.
     ScanSensor(scan_sensor::ScanSensorRecord),
     /// Record produced by a plugin sensor.
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 #[cfg(feature = "gui")]

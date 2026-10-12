@@ -61,7 +61,7 @@ pub struct PythonResultAnalyserConfig {
     pub function_name: String,
     /// Arbitrary parameters forwarded to the analysis script (additional_params in the script entry point).
     /// This can be used to forward any custom configuration to the analysis script without having to add it to the simulator configuration.
-    pub additionnal_params: serde_json::Value,
+    pub additionnal_params: crate::utils::GeneralValue,
     /// Port used to communicate with the Python analysis server.
     pub port: u16,
 }
@@ -72,7 +72,7 @@ impl Default for PythonResultAnalyserConfig {
             show_figures: false,
             script_path: "analyse_results.py".to_string(),
             function_name: "analyse_results".to_string(),
-            additionnal_params: serde_json::Value::default(),
+            additionnal_params: crate::utils::GeneralValue::default(),
             port: 54600,
         }
     }

@@ -24,7 +24,7 @@ pub enum PhysicsConfig {
     #[check]
     Internal(internal_physics::InternalPhysicConfig),
     /// Plugin-provided physics implementation.
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 #[cfg(feature = "gui")]
@@ -54,7 +54,7 @@ impl UIComponent for PhysicsConfig {
                     *self =
                         PhysicsConfig::Internal(internal_physics::InternalPhysicConfig::default())
                 }
-                "Plugin" => *self = PhysicsConfig::Plugin(serde_json::Value::Null),
+                "Plugin" => *self = PhysicsConfig::Plugin(crate::utils::GeneralValue::default()),
                 _ => panic!("Where did you find this value?"),
             };
         }
@@ -95,7 +95,7 @@ pub enum PhysicsRecord {
     /// Record emitted by internal physics.
     Internal(internal_physics::InternalPhysicsRecord),
     /// Record emitted by plugin physics.
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl PhysicsRecord {

@@ -87,7 +87,7 @@ package api {
     PluginAsyncAPIClient -- PluginAsyncAPIRequest
 
     class PluginAsyncAPIRequest {
-        {field} config: serde_json::Value
+        {field} config: crate::utils::GeneralValue
         global_config: SimulatorConfig
         va_factory: DeterministRandomVariableFactory
         network: Network
@@ -479,7 +479,7 @@ package sensors {
     PluginSensor *-- Sensor
     class PluginSensor
     class PluginObservation {
-        +{field} observation: serde_json::Value
+        +{field} observation: crate::utils::GeneralValue
     }
 
     class Observation {

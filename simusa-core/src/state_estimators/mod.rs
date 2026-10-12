@@ -502,7 +502,7 @@ pub enum StateEstimatorConfig {
     #[check]
     Perfect(perfect_estimator::PerfectEstimatorConfig),
     /// Plugin state estimator provided through plugin API.
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 #[cfg(feature = "gui")]
@@ -533,7 +533,7 @@ impl UIComponent for StateEstimatorConfig {
                         perfect_estimator::PerfectEstimatorConfig::default(),
                     )
                 }
-                "Plugin" => *self = StateEstimatorConfig::Plugin(serde_json::Value::Null),
+                "Plugin" => *self = StateEstimatorConfig::Plugin(crate::utils::GeneralValue::default()),
                 _ => panic!("Where did you find this value?"),
             };
         }
@@ -574,7 +574,7 @@ pub enum StateEstimatorRecord {
     /// Record for the [`PerfectEstimator`](crate::state_estimators::perfect_estimator::PerfectEstimator).
     Perfect(perfect_estimator::PerfectEstimatorRecord),
     /// Record for the plugin [`StateEstimator`].
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 #[cfg(feature = "gui")]

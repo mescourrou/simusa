@@ -40,7 +40,7 @@ pub enum ControllerConfig {
     /// Configuration for [`PID`](pid::PIDConfig).
     PID(pid::PIDConfig),
     /// Configuration for a plugin [`Controller`].
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 #[cfg(feature = "gui")]
@@ -67,7 +67,7 @@ impl UIComponent for ControllerConfig {
         if current_str != self.to_string() {
             match current_str.as_str() {
                 "PID" => *self = ControllerConfig::PID(pid::PIDConfig::default()),
-                "Plugin" => *self = ControllerConfig::Plugin(serde_json::Value::Null),
+                "Plugin" => *self = ControllerConfig::Plugin(crate::utils::GeneralValue::default()),
                 _ => panic!("Where did you find this value?"),
             };
         }
@@ -108,7 +108,7 @@ pub enum ControllerRecord {
     /// Runtime record for [`pid::PID`].
     PID(pid::PIDRecord),
     /// Runtime record for a plugin [`Controller`].
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 #[cfg(feature = "gui")]

@@ -34,7 +34,7 @@ struct PluginAPITest<SE: StateEstimator + 'static> {
 impl<SE: StateEstimator> PluginAPI for PluginAPITest<SE> {
     fn get_state_estimator(
         &self,
-        _config: &serde_json::Value,
+        _config: &crate::utils::GeneralValue,
         _global_config: &SimulatorConfig,
         _va_factory: &Arc<DeterministRandomVariableFactory>,
         _network: &SharedRwLock<Network>,
@@ -126,7 +126,7 @@ mod kill_node {
 
     impl Recordable<StateEstimatorRecord> for StateEstimatorTest {
         fn record(&self, _context: &Context) -> StateEstimatorRecord {
-            StateEstimatorRecord::Plugin(serde_json::Value::default())
+            StateEstimatorRecord::Plugin(crate::utils::GeneralValue::default())
         }
     }
 }
@@ -148,7 +148,7 @@ fn kill_node() {
             }),
             state_estimator_bench: vec![BenchStateEstimatorConfig {
                 name: "own".to_string(),
-                config: StateEstimatorConfig::Plugin(serde_json::Value::Null),
+                config: StateEstimatorConfig::Plugin(crate::utils::GeneralValue::default()),
             }],
             ..Default::default()
         })),
@@ -300,7 +300,7 @@ mod trigger_sensor {
 
     impl Recordable<StateEstimatorRecord> for StateEstimatorTest {
         fn record(&self, _context: &Context) -> StateEstimatorRecord {
-            StateEstimatorRecord::Plugin(serde_json::Value::default())
+            StateEstimatorRecord::Plugin(crate::utils::GeneralValue::default())
         }
     }
 
@@ -312,14 +312,14 @@ mod trigger_sensor {
     impl PluginAPI for PluginAPITest {
         fn get_state_estimator(
             &self,
-            config: &serde_json::Value,
+            config: &crate::utils::GeneralValue,
             _global_config: &SimulatorConfig,
             _va_factory: &Arc<DeterministRandomVariableFactory>,
             _network: &SharedRwLock<Network>,
             initial_time: f32,
             _context: &Context,
         ) -> Box<dyn StateEstimator> {
-            if config.as_bool().unwrap() {
+            if config.to_value().as_bool().unwrap() {
                 Box::new(StateEstimatorTest {
                     last_time: initial_time,
                     is_the_triggered: false,
@@ -370,7 +370,7 @@ fn trigger_sensor(nb_threads: usize) {
             }),
             state_estimator_bench: vec![BenchStateEstimatorConfig {
                 name: "triggered".to_string(),
-                config: StateEstimatorConfig::Plugin(serde_json::Value::Bool(false)),
+                config: StateEstimatorConfig::Plugin(crate::utils::GeneralValue::bool(false)),
             }],
             sensor_manager: SensorManagerConfig {
                 sensors: vec![ManagedSensorConfig {
@@ -394,7 +394,7 @@ fn trigger_sensor(nb_threads: usize) {
             navigator: NavigatorConfig::GoTo(GoToConfig::default()),
             state_estimator_bench: vec![BenchStateEstimatorConfig {
                 name: "triggering".to_string(),
-                config: StateEstimatorConfig::Plugin(serde_json::Value::Bool(true)),
+                config: StateEstimatorConfig::Plugin(crate::utils::GeneralValue::bool(true)),
             }],
             ..Default::default()
         })),

@@ -41,7 +41,7 @@ pub enum PhysicsFaultModelConfig {
     #[check]
     AdditiveRobotCentered(AdditiveRobotCenteredPhysicsFaultConfig),
     /// Plugin-based custom physics fault model: delegates fault logic to external compiled or scripted plugins.
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 #[cfg(feature = "gui")]
@@ -152,7 +152,7 @@ impl PhysicsFaultModelConfig {
                         ))
                     },
                     "Plugin" => {
-                        faults.push(PhysicsFaultModelConfig::Plugin(serde_json::Value::Null))
+                        faults.push(PhysicsFaultModelConfig::Plugin(crate::utils::GeneralValue::default()))
                     },
                     _ => panic!("Where did you find this fault?"),
                 };

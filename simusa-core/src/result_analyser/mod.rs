@@ -37,7 +37,7 @@ pub enum ResultAnalyserConfig {
     #[check]
     Python(PythonResultAnalyserConfig),
     /// Plugin result analyser that is defined through the PluginAPI.
-    Plugin(serde_json::Value),
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for ResultAnalyserConfig {
@@ -72,7 +72,7 @@ impl UIComponent for ResultAnalyserConfig {
                 "Python" => {
                     *self = ResultAnalyserConfig::Python(PythonResultAnalyserConfig::default())
                 }
-                "Plugin" => *self = ResultAnalyserConfig::Plugin(serde_json::Value::default()),
+                "Plugin" => *self = ResultAnalyserConfig::Plugin(crate::utils::GeneralValue::default()),
                 _ => panic!("Where did you find this value?"),
             };
         }

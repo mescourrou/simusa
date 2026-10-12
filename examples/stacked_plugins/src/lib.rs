@@ -6,7 +6,7 @@ use simusa::plugin_api::PluginAPI;
 use simusa::recordable::Recordable;
 use simusa::simulator::{AsyncSimulator, SimulatorConfig};
 use simusa::state_estimators::{StateEstimator, WorldState};
-use simusa::utils::SharedRwLock;
+use simusa::utils::{GeneralValue, SharedRwLock};
 use simusa::utils::determinist_random_variable::DeterministRandomVariableFactory;
 use simusa::{declare_navigator_output, info};
 use simusa_py::general::PythonAPI;
@@ -98,7 +98,7 @@ impl Navigator for MyWonderfulNavigator {
 
 impl Recordable<NavigatorRecord> for MyWonderfulNavigator {
     fn record(&self, _context: &Context) -> NavigatorRecord {
-        NavigatorRecord::Plugin(serde_json::to_value(MyWonderfulNavigatorRecord {}).unwrap())
+        NavigatorRecord::Plugin(serde_json::to_value(MyWonderfulNavigatorRecord {}).unwrap().into())
     }
 }
 
@@ -110,7 +110,7 @@ impl PluginAPI for MyWonderfulPlugin {
     // Rust Navigator
     fn get_navigator(
         &self,
-        config: &serde_json::Value,
+        config: &GeneralValue,
         _global_config: &SimulatorConfig,
         _va_factory: &Arc<DeterministRandomVariableFactory>,
         _network: &SharedRwLock<Network>,
@@ -118,7 +118,7 @@ impl PluginAPI for MyWonderfulPlugin {
         _context: &Context,
     ) -> Box<dyn AbstractNavigator> {
         Box::new(MyWonderfulNavigator::from_config(
-            serde_json::from_value(config.clone()).unwrap(),
+            serde_json::from_value(config.to_value().clone()).unwrap(),
             initial_time,
         ))
     }
@@ -126,7 +126,7 @@ impl PluginAPI for MyWonderfulPlugin {
     // Python state estimator
     fn get_state_estimator(
         &self,
-        config: &serde_json::Value,
+        config: &GeneralValue,
         global_config: &SimulatorConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
         network: &SharedRwLock<Network>,

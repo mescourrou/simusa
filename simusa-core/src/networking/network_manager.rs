@@ -5,7 +5,7 @@
 //! node [`Network`](crate::networking::network::Network) instances and advances queued messages in
 //! simulation time order.
 
-use serde_json::Value;
+use crate::utils::GeneralValue;
 use simusa_com::pub_sub::{BrokerTrait, BrokerTraitProcessing, PathBroker};
 
 use crate::constants::TIME_ROUND;
@@ -35,7 +35,7 @@ pub enum MessageSendMethod {
 #[derive(Debug, Clone)]
 pub struct NetworkMessage {
     /// Serialized message payload.
-    pub value: Value,
+    pub value: GeneralValue,
     /// Sender node name.
     pub from: String,
     /// Routing strategy for the destination.
