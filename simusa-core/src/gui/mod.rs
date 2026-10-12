@@ -16,10 +16,7 @@ pub use drawables::Drawable;
 mod panels;
 pub mod utils;
 
-use crate::{
-    plugin_api::PluginAPI,
-    simulator::{Simulator, SimulatorConfig},
-};
+use crate::{plugin_api::PluginAPI, simulator::SimulatorConfig};
 
 /// Function to run the GUI of Simusa. Can be called in the main function.
 ///

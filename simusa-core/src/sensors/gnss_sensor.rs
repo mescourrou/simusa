@@ -29,7 +29,7 @@ use crate::sensors::sensor_filters::range_filter::{RangeFilter, RangeFilterConfi
 use crate::simulator::SimulatorConfig;
 use crate::utils::determinist_random_variable::DeterministRandomVariableFactory;
 use crate::utils::enum_tools::EnumVariables;
-use crate::utils::frame::{Frame, FrameConfig, FrameRecord};
+use crate::utils::frame::Frame;
 use crate::utils::periodicity::{Periodicity, PeriodicityConfig};
 use nalgebra::{Rotation2, Vector2, Vector3};
 use serde_derive::{Deserialize, Serialize};
@@ -308,6 +308,7 @@ pub struct GNSSObservation {
 }
 
 impl GNSSObservation {
+    /// Converts a [`GNSSObservationRecord`] into a [`GNSSObservation`].
     pub fn from_record(record: &GNSSObservationRecord) -> Self {
         Self {
             pose: Vector3::new(record.pose[0], record.pose[1], record.pose[2]),
@@ -329,7 +330,7 @@ pub struct GNSSObservationRecord {
 
 #[cfg(feature = "gui")]
 impl UIComponent for GNSSObservationRecord {
-    fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
+    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
         ui.vertical(|ui| {
             ui.label(format!(
                 "Position: ({}, {}, {})",
@@ -344,7 +345,7 @@ impl UIComponent for GNSSObservationRecord {
 }
 
 impl Recordable<GNSSObservationRecord> for GNSSObservation {
-    fn record(&self, context: &Context) -> GNSSObservationRecord {
+    fn record(&self, _context: &Context) -> GNSSObservationRecord {
         GNSSObservationRecord {
             pose: [self.pose.x, self.pose.y, self.pose.z],
             velocity: [self.velocity.x, self.velocity.y],
@@ -723,7 +724,7 @@ impl Sensor for GNSSSensor {
 }
 
 impl Recordable<SensorRecord> for GNSSSensor {
-    fn record(&self, context: &Context) -> SensorRecord {
+    fn record(&self, _context: &Context) -> SensorRecord {
         SensorRecord::GNSSSensor(GNSSSensorRecord {
             last_time: self.last_time,
         })

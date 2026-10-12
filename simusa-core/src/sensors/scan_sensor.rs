@@ -38,7 +38,7 @@ use crate::{
     utils::{
         determinist_random_variable::DeterministRandomVariableFactory,
         enum_tools::EnumVariables,
-        frame::{Frame, FrameConfig, FrameRecord},
+        frame::Frame,
         geometry::{is_angle_inside, segments_intersection},
         periodicity::{Periodicity, PeriodicityConfig},
     },
@@ -476,7 +476,7 @@ pub struct ScanSensorRecord {
 
 #[cfg(feature = "gui")]
 impl UIComponent for ScanSensorRecord {
-    fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
+    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
         ui.label(format!(
             "Last time: {}",
             match self.last_time {
@@ -530,7 +530,7 @@ impl Iterator for ScanObservation {
 }
 
 impl Recordable<ScanObservationRecord> for ScanObservation {
-    fn record(&self, context: &Context) -> ScanObservationRecord {
+    fn record(&self, _context: &Context) -> ScanObservationRecord {
         ScanObservationRecord {
             distances: self.distances.clone(),
             angles: self.angles.clone(),
@@ -556,7 +556,7 @@ pub struct ScanObservationRecord {
 
 #[cfg(feature = "gui")]
 impl UIComponent for ScanObservationRecord {
-    fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
+    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
         ui.vertical(|ui| {
             ui.label(format!("Distances: {:?}", self.distances));
             ui.label(format!("Angles: {:?}", self.angles));

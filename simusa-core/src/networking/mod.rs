@@ -70,17 +70,33 @@ mod tests {
     use simusa_com::pub_sub::{MultiClientTrait, PathKey};
 
     use crate::{
-        config::NumberConfig, constants::TIME_ROUND, context::Context, debug, logger::LogLevel, networking::{
+        config::NumberConfig,
+        constants::TIME_ROUND,
+        context::Context,
+        debug,
+        logger::LogLevel,
+        networking::{
             message_types::MessageType,
             network::{Envelope, Network, NetworkConfig},
-        }, node::{Node, node_factory::{NodeConfig, NodeTypeConfig, RobotConfig}}, physics::robot_models::Command, plugin_api::PluginAPI, recordable::Recordable, sensors::{
+        },
+        node::{
+            Node,
+            node_factory::{NodeConfig, NodeTypeConfig, RobotConfig},
+        },
+        physics::robot_models::Command,
+        plugin_api::PluginAPI,
+        recordable::Recordable,
+        sensors::{
             Observation, SensorConfig,
             robot_sensor::RobotSensorConfig,
             sensor_manager::{ManagedSensorConfig, SensorManagerConfig},
-        }, simulator::{Simulator, SimulatorConfig, SimusaBrokerMultiClient}, state_estimators::{
+        },
+        simulator::{Simulator, SimulatorConfig, SimusaBrokerMultiClient},
+        state_estimators::{
             BenchStateEstimatorConfig, StateEstimator, StateEstimatorConfig, StateEstimatorRecord,
             WorldState,
-        }, utils::{
+        },
+        utils::{
             SharedMutex, SharedRwLock,
             determinist_random_variable::DeterministRandomVariableFactory, maths::round_precision,
         },
@@ -207,18 +223,18 @@ mod tests {
         } * 1.1;
         config.nodes.push(NodeConfig {
             name: "node1".to_string(),
-            node_type: NodeTypeConfig::Robot(RobotConfig {
+            node_type: NodeTypeConfig::Robot(Box::new(RobotConfig {
                 state_estimator_bench: vec![BenchStateEstimatorConfig {
                     name: "own".to_string(),
                     config: StateEstimatorConfig::Plugin(Value::Bool(false)),
                 }],
                 ..Default::default()
-            }),
+            })),
             ..Default::default()
         });
         config.nodes.push(NodeConfig {
             name: "node2".to_string(),
-            node_type: NodeTypeConfig::Robot(RobotConfig {
+            node_type: NodeTypeConfig::Robot(Box::new(RobotConfig {
                 network: NetworkConfig {
                     reception_delay: 0.,
                     ..Default::default()
@@ -228,7 +244,7 @@ mod tests {
                     config: StateEstimatorConfig::Plugin(Value::Bool(true)),
                 }],
                 ..Default::default()
-            }),
+            })),
             ..Default::default()
         });
 
@@ -276,7 +292,7 @@ mod tests {
         } * 1.1;
         config.nodes.push(NodeConfig {
             name: "node1".to_string(),
-            node_type: NodeTypeConfig::Robot(RobotConfig {
+            node_type: NodeTypeConfig::Robot(Box::new(RobotConfig {
                 sensor_manager: SensorManagerConfig {
                     sensors: vec![ManagedSensorConfig {
                         name: "RobotSensor".to_string(),
@@ -286,12 +302,12 @@ mod tests {
                     }],
                 },
                 ..Default::default()
-            }),
+            })),
             ..Default::default()
         });
         config.nodes.push(NodeConfig {
             name: "node2".to_string(),
-            node_type: NodeTypeConfig::Robot(RobotConfig {
+            node_type: NodeTypeConfig::Robot(Box::new(RobotConfig {
                 sensor_manager: SensorManagerConfig {
                     sensors: vec![ManagedSensorConfig {
                         name: "RobotSensor".to_string(),
@@ -301,7 +317,7 @@ mod tests {
                     }],
                 },
                 ..Default::default()
-            }),
+            })),
             ..Default::default()
         });
 

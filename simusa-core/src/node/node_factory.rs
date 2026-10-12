@@ -18,12 +18,33 @@ use simusa_macros::{UIComponent, config_derives};
 use crate::gui::{UIComponent, utils::text_singleline_with_apply};
 
 use crate::{
-    api::internal_api::NodeServer, context::Context, controllers::{self, ControllerConfig, ControllerRecord, pid}, environment::{Environment, map::MapRecord}, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, interfaces::navigator_controller::ControllerInputRecord, internal, navigators::{self, NavigatorConfig, NavigatorRecord, go_to}, networking::{
+    api::internal_api::NodeServer,
+    context::Context,
+    controllers::{self, ControllerConfig, ControllerRecord, pid},
+    environment::{Environment, map::MapRecord},
+    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
+    interfaces::navigator_controller::ControllerInputRecord,
+    internal,
+    navigators::{self, NavigatorConfig, NavigatorRecord, go_to},
+    networking::{
         self,
         network::{Network, NetworkConfig},
-    }, node::{Node, NodeMetaData, NodeState}, physics::{self, PhysicsConfig, PhysicsRecord, internal_physics, robot_models::Command}, plugin_api::PluginAPI, scenario::config::EventRecord, sensors::sensor_manager::{SensorManager, SensorManagerConfig, SensorManagerRecord}, simulator::{SimulatorConfig, SimusaBroker, SimusaBrokerMultiClient}, state_estimators::{
-        self, BenchStateEstimator, BenchStateEstimatorConfig, BenchStateEstimatorRecord, State, StateEstimatorConfig, StateEstimatorRecord, WorldStateRecord, perfect_estimator,
-    }, time_analysis::{TimeAnalysisFactory, TimeAnalysisNode}, utils::{SharedMutex, SharedRoLock, SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
+    },
+    node::{Node, NodeMetaData, NodeState},
+    physics::{self, PhysicsConfig, PhysicsRecord, internal_physics, robot_models::Command},
+    plugin_api::PluginAPI,
+    scenario::config::EventRecord,
+    sensors::sensor_manager::{SensorManager, SensorManagerConfig, SensorManagerRecord},
+    simulator::{SimulatorConfig, SimusaBroker, SimusaBrokerMultiClient},
+    state_estimators::{
+        self, BenchStateEstimator, BenchStateEstimatorConfig, BenchStateEstimatorRecord, State,
+        StateEstimatorConfig, StateEstimatorRecord, WorldStateRecord, perfect_estimator,
+    },
+    time_analysis::{TimeAnalysisFactory, TimeAnalysisNode},
+    utils::{
+        SharedMutex, SharedRoLock, SharedRwLock,
+        determinist_random_variable::DeterministRandomVariableFactory,
+    },
 };
 
 /// Type of node instantiated in the simulator.
@@ -213,15 +234,15 @@ impl RecordType {
 pub enum NodeTypeConfig {
     /// Configuration for [`NodeType::Robot`].
     #[check]
-    Robot(RobotConfig),
+    Robot(Box<RobotConfig>),
     /// Configuration for [`NodeType::Sensor`].
     #[check]
-    ComputationUnit(ComputationUnitConfig),
+    ComputationUnit(Box<ComputationUnitConfig>),
 }
 
 impl Default for NodeTypeConfig {
     fn default() -> Self {
-        NodeTypeConfig::Robot(RobotConfig::default())
+        NodeTypeConfig::Robot(Box::default())
     }
 }
 
@@ -309,7 +330,7 @@ impl UIComponent for NodeConfig {
                 ui.label("Autospawn:");
                 ui.checkbox(&mut self.autospawn, "");
             });
-            
+
             self.node_type.show_mut(
                 ui,
                 ctx,
@@ -318,11 +339,10 @@ impl UIComponent for NodeConfig {
                 current_node_name,
                 unique_id,
             );
-
         });
     }
 
-    fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
+    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
         egui::CollapsingHeader::new(&self.name).show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(format!("Name: {}", self.name));
@@ -638,7 +658,7 @@ impl UIComponent for RobotRecord {
             } else {
                 ui.label("Navigator was not called.");
             }
-            
+
             if let Some(controller) = &self.controller {
                 egui::CollapsingHeader::new("Controller").show(ui, |ui| {
                     controller.show(ui, ctx, unique_id);
@@ -857,13 +877,10 @@ pub struct MakeNodeParams<'a> {
 }
 
 struct NodeBuilder {
-    node_type: NodeType,
     node_name: String,
-    labels: Vec<String>,
     node_server: Option<NodeServer>,
     other_node_names: Vec<String>,
     time_analysis: Option<SharedMutex<TimeAnalysisNode>>,
-    send_records: bool,
     node_meta_data: SharedRwLock<NodeMetaData>,
     meta_data_list: Option<SharedRoLock<BTreeMap<String, SharedRoLock<NodeMetaData>>>>,
     node_message_client: SimusaBrokerMultiClient,
@@ -949,18 +966,15 @@ impl NodeBuilder {
         let node_type = config.node_type.as_node_type();
         let client = Self::make_global_channels(&node_name, params.broker, &params.context)?;
         let proto_node = Self {
-            node_type: node_type.clone(),
-            labels: config.labels.clone(),
             node_server: None,
             other_node_names: Vec::new(),
             time_analysis: params
                 .time_analysis_factory
                 .as_mut()
                 .map(|taf| taf.new_node(node_name.clone())),
-            send_records: false,
             node_meta_data: Arc::new(RwLock::new(NodeMetaData {
                 name: node_name.clone(),
-                node_type: node_type,
+                node_type,
                 model_name: node_name.clone(),
                 labels: config.labels.clone(),
                 state: if config.autospawn {
@@ -984,12 +998,7 @@ impl NodeBuilder {
         }
     }
 
-    fn make_robot(
-        self,
-        config: &RobotConfig,
-        params: &mut MakeNodeParams,
-    ) -> SimusaResult<Node> {
-        
+    fn make_robot(self, config: &RobotConfig, params: &mut MakeNodeParams) -> SimusaResult<Node> {
         // Make global channels
         let network = Arc::new(RwLock::new(Network::from_config(
             self.node_name.clone(),
@@ -1153,6 +1162,7 @@ impl NodeBuilder {
 pub struct NodeFactory {}
 
 impl NodeFactory {
+    /// Builds a node from its configuration.
     pub fn make_node(config: &NodeConfig, params: &mut MakeNodeParams) -> SimusaResult<Node> {
         NodeBuilder::from_config(config, params)
     }

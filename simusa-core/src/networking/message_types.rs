@@ -1,12 +1,12 @@
 //! Definitions of message types and transport envelopes used in the networking layer.
 
-use simusa_macros::{EnumToString, config_derives};
+use simusa_macros::config_derives;
 
 use crate::{
     navigators::go_to::GoToMessage,
     scenario::config::EventRecord,
     sensors::{
-        Observation, ObservationRecord,
+        ObservationRecord,
         sensor_manager::{SensorFrameMessage, SensorTriggerMessage},
     },
 };
@@ -22,7 +22,7 @@ pub enum MessageType {
     GoTo(GoToMessage),
     /// Sensor event payload used by [`SensorTriggerMessage`].
     SensorTrigger(SensorTriggerMessage),
-    /// Observations payload used by [`Observation`].
+    /// Observations payload received by [`SensorManager`](crate::sensors::sensor_manager::SensorManager).
     Observations(Vec<ObservationRecord>),
     /// Setting the frame of a sensor, used by [`SensorManager`](crate::sensors::sensor_manager::SensorManager).
     SensorFrame(SensorFrameMessage),

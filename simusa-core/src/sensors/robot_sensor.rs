@@ -29,7 +29,7 @@ use crate::simulator::SimulatorConfig;
 use crate::state_estimators::State;
 use crate::utils::determinist_random_variable::DeterministRandomVariableFactory;
 use crate::utils::enum_tools::EnumVariables;
-use crate::utils::frame::{self, Frame, FrameConfig, FrameRecord};
+use crate::utils::frame::Frame;
 use crate::utils::periodicity::{Periodicity, PeriodicityConfig};
 use serde_derive::{Deserialize, Serialize};
 
@@ -393,6 +393,7 @@ pub struct OrientedRobotObservation {
 }
 
 impl OrientedRobotObservation {
+    /// Converts a [`OrientedRobotObservationRecord`] into a [`OrientedRobotObservation`].
     pub fn from_record(record: &OrientedRobotObservationRecord) -> Self {
         Self {
             name: record.name.clone(),
@@ -404,7 +405,7 @@ impl OrientedRobotObservation {
 }
 
 impl Recordable<OrientedRobotObservationRecord> for OrientedRobotObservation {
-    fn record(&self, context: &Context) -> OrientedRobotObservationRecord {
+    fn record(&self, _context: &Context) -> OrientedRobotObservationRecord {
         OrientedRobotObservationRecord {
             name: self.name.clone(),
             labels: self.labels.clone(),
@@ -427,7 +428,7 @@ pub struct OrientedRobotObservationRecord {
 
 #[cfg(feature = "gui")]
 impl UIComponent for OrientedRobotObservationRecord {
-    fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
+    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
         ui.vertical(|ui| {
             ui.label(format!("Name: {}", self.name));
             ui.label("Labels:");

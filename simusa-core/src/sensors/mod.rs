@@ -24,7 +24,7 @@ pub mod sensor_filters;
 use std::fmt::Debug;
 
 use serde_derive::{Deserialize, Serialize};
-use simusa_macros::{EnumToString, config_derives};
+use simusa_macros::config_derives;
 
 use {
     gnss_sensor::{GNSSObservation, GNSSObservationRecord},
@@ -81,6 +81,7 @@ impl Observation {
         }
     }
 
+    /// Converts a [`ObservationRecord`] into a [`Observation`].
     pub fn from_record(record: &ObservationRecord) -> Self {
         Self {
             sensor_name: record.sensor_name.clone(),
@@ -185,6 +186,7 @@ pub enum SensorObservation {
 }
 
 impl SensorObservation {
+    /// Converts a [`SensorObservationRecord`] into a [`SensorObservation`].
     pub fn from_record(record: &SensorObservationRecord) -> Self {
         match record {
             SensorObservationRecord::OrientedLandmark(r) => {

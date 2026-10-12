@@ -9,7 +9,13 @@
 pub mod pid;
 
 use crate::{
-    context::Context, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, interfaces::navigator_controller::{ControllerInputVariable, ControllerInputVariables}, node::node_factory::FromConfigArguments, physics::{PhysicsConfig, robot_models::Command}, recordable::Recordable, utils::SharedRwLock,
+    context::Context,
+    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
+    interfaces::navigator_controller::{ControllerInputVariable, ControllerInputVariables},
+    node::node_factory::FromConfigArguments,
+    physics::{PhysicsConfig, robot_models::Command},
+    recordable::Recordable,
+    utils::SharedRwLock,
 };
 #[cfg(feature = "gui")]
 use crate::{
@@ -121,7 +127,12 @@ impl UIComponent for ControllerRecord {
 
 use crate::node::Node;
 
+/// Trait for the input of a [`Controller`], which can be created from [`ControllerInputVariables`].
+///
+/// Should not be implemented directly, but rather through the
+/// [`declare_controller_input!`](crate::interfaces::navigator_controller::declare_controller_input) macro.
 pub trait ControllerInput: From<ControllerInputVariables> + Sized {
+    /// Returns the list of variables requested by the controller from the navigator.
     fn required_variables() -> &'static [ControllerInputVariable];
 }
 
@@ -129,8 +140,9 @@ pub trait ControllerInput: From<ControllerInputVariables> + Sized {
 pub trait Controller:
     std::fmt::Debug + std::marker::Send + std::marker::Sync + Recordable<ControllerRecord>
 {
+    /// Returns the type of input expected by the controller, which can be converted from [`ControllerInputVariables`].
     type InputType: ControllerInput;
-    
+
     /// Returns the list of variables requested by the controller from the navigator.
     ///
     /// Override with caution: the [`InputType`] might not be compatible with the requested variables.
@@ -144,11 +156,11 @@ pub trait Controller:
         Ok(())
     }
 
-    /// Compute the command from the given error.
+    /// Compute the command from the given input.
     ///
     /// ## Arguments
     /// * `robot` - Reference to the robot to access modules.
-    /// * `error` - Error to be corrected.
+    /// * `input` - Input coming from the navigator, converted into [`ControllerInputVariables`].
     /// * `time` - Current time.
     /// * `context` - Shared simulation context used for logging and communication metadata.
     ///
@@ -172,9 +184,26 @@ pub trait Controller:
     }
 }
 
+/// Trait for abstracting the [`Controller`] trait with dynamic conversion from
+/// [`Navigator::OutputType`](crate::navigators::Navigator::OutputType) to
+/// [`Controller::InputType`](crate::controllers::Controller::InputType), to be
+/// used in the [`Node`] struct.
+///
+/// This trait is implemented automatically for any type that implements [`Controller`].
+/// Should not be implemented directly!
 pub trait AbstractController:
     std::fmt::Debug + std::marker::Send + std::marker::Sync + Recordable<ControllerRecord>
 {
+    /// Returns the list of variables requested by the controller from the navigator.
+    fn call_required_variables(&self) -> &[ControllerInputVariable];
+
+    /// Post-creation initialization of the controller, called at the end of the simulator creation.
+    fn call_post_init(&mut self, node: &mut Node, context: &Context) -> SimusaResult<()>;
+
+    /// Call of the hook at the beginning of the simulation loop, just after updating physics.
+    fn call_pre_loop_hook(&mut self, node: &mut Node, time: f32, context: &Context);
+
+    /// Compute the command from the given input.
     fn call_make_command(
         &mut self,
         robot: &mut Node,
@@ -183,12 +212,7 @@ pub trait AbstractController:
         context: &Context,
     ) -> Command;
 
-    fn call_required_variables(&self) -> &[ControllerInputVariable];
-
-    fn call_post_init(&mut self, node: &mut Node, context: &Context) -> SimusaResult<()>;
-
-    fn call_pre_loop_hook(&mut self, node: &mut Node, time: f32, context: &Context);
-
+    /// Optional: return the time of the next time step. Needed if using messages
     fn call_next_time_step(&self, context: &Context) -> Option<f32>;
 }
 

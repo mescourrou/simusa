@@ -6,9 +6,8 @@
 //!   delivery conditions.
 
 use std::{
-    collections::{BTreeMap, BTreeSet, HashSet},
+    collections::{BTreeMap, BTreeSet},
     fmt::Debug,
-    hash::Hash,
     sync::{
         Arc, Mutex,
         mpsc::{self, Receiver, Sender},

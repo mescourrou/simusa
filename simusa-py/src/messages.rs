@@ -6,7 +6,7 @@ use simusa::{
 };
 use simusa_macros::EnumToString;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[pyclass(get_all, set_all)]
 #[pyo3(name = "SensorTriggerMessage")]
 pub struct SensorTriggerMessageWrapper {}
@@ -21,7 +21,7 @@ impl SensorTriggerMessageWrapper {
 }
 
 impl SensorTriggerMessageWrapper {
-    pub fn from_rust(msg: &SensorTriggerMessage) -> Self {
+    pub fn from_rust(_msg: &SensorTriggerMessage) -> Self {
         Self {}
     }
 

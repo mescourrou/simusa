@@ -16,7 +16,7 @@ use crate::{
     constants::TIME_ROUND,
     gui::{
         UIComponent,
-        utils::{json_config, path_finder, string_combobox},
+        utils::{path_finder, string_combobox},
     },
     utils::enum_tools::ToVec,
 };
@@ -82,13 +82,11 @@ impl UIComponent for ResultConfig {
         _current_node_name: Option<&String>,
         unique_id: &str,
     ) {
-        let python_param_key = format!("result-config-python-params-{}", unique_id);
-        let python_param_error_key = format!("result-config-python-params-error-{}", unique_id);
         CollapsingHeader::new("Results").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label("Result Path:");
                 if let Some(path) = &mut self.result_path {
-                    path_finder(ui, path, &global_config.get_base_path());
+                    path_finder(ui, path, global_config.get_base_path());
                     if ui.button("X").clicked() {
                         self.result_path = None;
                     }

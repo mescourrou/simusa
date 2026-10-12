@@ -12,7 +12,15 @@ use std::collections::BTreeMap;
 use std::{fs, path::Path};
 
 use crate::{
-    VERSION, environment::EnvironmentConfig, errors::{SimusaError, SimusaErrorTypes, SimusaResult}, logger::LoggerConfig, node::node_factory::{ComputationUnitConfig, NodeConfig, NodeTypeConfig, RobotConfig}, scenario::config::ScenarioConfig, simulator::ResultConfig, time_analysis::TimeAnalysisConfig, utils::format_option_f32,
+    VERSION,
+    environment::EnvironmentConfig,
+    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
+    logger::LoggerConfig,
+    node::node_factory::{NodeConfig, NodeTypeConfig},
+    scenario::config::ScenarioConfig,
+    simulator::ResultConfig,
+    time_analysis::TimeAnalysisConfig,
+    utils::format_option_f32,
 };
 
 #[cfg(feature = "gui")]
@@ -140,6 +148,7 @@ pub struct SimulatorConfig {
     /// Result-export configuration.
     pub results: Option<ResultConfig>,
     /// Auto-computed base directory used to resolve relative paths in the configuration.
+    /// Should not be exposed to the user.
     #[serde(skip)]
     base_path: Box<Path>,
     /// Maximum simulated time before stopping the run.
@@ -240,19 +249,22 @@ impl SimulatorConfig {
         Ok(config)
     }
 
+    /// Get the base path of the simulator configuration.
     pub fn get_base_path(&self) -> &Path {
         self.base_path.as_ref()
     }
 
+    /// Set the base path of the simulator configuration (only available in the core)
     pub(crate) fn set_base_path(&mut self, path: Box<Path>) {
         self.base_path = path;
     }
 
+    /// Create an example configuration.
     pub fn example() -> SimulatorConfig {
         let mut config = SimulatorConfig::default();
-        config.nodes.push(NodeConfig { 
+        config.nodes.push(NodeConfig {
             name: "robot1".to_string(),
-            node_type: NodeTypeConfig::Robot(RobotConfig::default()),
+            node_type: NodeTypeConfig::Robot(Box::default()),
             ..Default::default()
         });
         config

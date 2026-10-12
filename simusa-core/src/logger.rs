@@ -140,7 +140,7 @@ pub enum InternalLog {
     Environment,
     /// Detailed environment logs.
     EnvironmentDetailed,
-
+    /// External network logs (e.g., communication with other language servers).
     ExternalNetwork,
 }
 
@@ -212,9 +212,7 @@ impl UIComponent for LoggerConfig {
                 });
             });
 
-            let mut node_list = Vec::from_iter(
-                global_config.nodes.iter().map(|x| x.name.clone())
-            );
+            let mut node_list = Vec::from_iter(global_config.nodes.iter().map(|x| x.name.clone()));
             node_list.push("simulator".to_string());
             ui.horizontal_wrapped(|ui| {
                 ui.label("Include only:");

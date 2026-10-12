@@ -15,10 +15,16 @@ use std::{
 #[cfg(feature = "gui")]
 use crate::{gui::UIComponent, simulator::SimulatorConfig};
 
-use crate::{
-    context::Context, errors::SimusaResult, info, navigators::{Navigator, NavigatorRecord}, networking::{message_types::MessageType, network::Network}, simulator::SimusaBrokerMultiClient, utils::{SharedMutex, SharedRwLock, geometry::smallest_theta_diff},
-};
 use crate::interfaces::navigator_controller::declare_navigator_output;
+use crate::{
+    context::Context,
+    errors::SimusaResult,
+    info,
+    navigators::{Navigator, NavigatorRecord},
+    networking::{message_types::MessageType, network::Network},
+    simulator::SimusaBrokerMultiClient,
+    utils::{SharedMutex, SharedRwLock, geometry::smallest_theta_diff},
+};
 
 extern crate nalgebra as na;
 
@@ -200,7 +206,7 @@ pub struct GoToRecord {
 
 #[cfg(feature = "gui")]
 impl UIComponent for GoToRecord {
-    fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
+    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
         ui.vertical(|ui| {
             if let Some(current_point) = &self.current_point {
                 ui.label(format!(
@@ -263,8 +269,8 @@ impl GoTo {
 use crate::node::Node;
 use crate::state_estimators::WorldState;
 
-
 declare_navigator_output! {
+    /// Output of the [`GoTo`] navigator.
     #[derive(Default)]
     GoToOutput;
     node_position,
@@ -322,8 +328,11 @@ impl Navigator for GoTo {
             output.error_angular = 0.;
             output.error_linear_velocity = -output.node_linear_velocity;
             output.error_angular_velocity = -output.node_angular_velocity;
-            output.error_longitudinal_lateral_velocities = (-output.node_longitudinal_lateral_velocities.0, -output.node_longitudinal_lateral_velocities.1);
-            
+            output.error_longitudinal_lateral_velocities = (
+                -output.node_longitudinal_lateral_velocities.0,
+                -output.node_longitudinal_lateral_velocities.1,
+            );
+
             output.target_position = output.node_position;
             output.target_orientation = output.node_orientation;
             output.target_linear_velocity = 0.;
@@ -341,21 +350,22 @@ impl Navigator for GoTo {
             actual_target_speed = 0.;
         }
 
-        let target_direction = (target_point[1] - state.pose.y).atan2(target_point[0] - state.pose.x);
+        let target_direction =
+            (target_point[1] - state.pose.y).atan2(target_point[0] - state.pose.x);
 
         let theta_error = smallest_theta_diff(target_direction, state.pose.z);
-
 
         // Compute longitudinal and lateral errors
         // Need to project the target point in the robot frame
         let rot = na::Rotation2::new(-state.pose.z);
         let relative_target = rot * (target_point - state.pose.fixed_view::<2, 1>(0, 0));
-        
+
         output.error_longitudinal = relative_target[0];
         output.error_lateral = relative_target[1];
         output.error_angular = theta_error;
         // Compute the velocity error
-        output.error_linear_velocity = actual_target_speed - state.velocity.fixed_rows::<2>(0).norm();
+        output.error_linear_velocity =
+            actual_target_speed - state.velocity.fixed_rows::<2>(0).norm();
         output.error_angular_velocity = 0. - state.velocity[2];
         output.error_longitudinal_lateral_velocities = (0., 0.); // Any velocity vector is acceptable, so we set the error to 0.
 
@@ -363,7 +373,10 @@ impl Navigator for GoTo {
         output.target_orientation = target_direction;
         output.target_linear_velocity = actual_target_speed;
         output.target_angular_velocity = 0.;
-        output.target_longitudinal_lateral_velocities = (actual_target_speed * relative_target[0] / distance_to_final, actual_target_speed * relative_target[1] / distance_to_final);
+        output.target_longitudinal_lateral_velocities = (
+            actual_target_speed * relative_target[0] / distance_to_final,
+            actual_target_speed * relative_target[1] / distance_to_final,
+        );
 
         Ok(output)
     }

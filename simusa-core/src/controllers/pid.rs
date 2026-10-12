@@ -587,10 +587,11 @@ impl Default for PID {
 }
 
 use super::{Controller, ControllerRecord};
-use crate::node::Node;
 use crate::interfaces::navigator_controller::declare_controller_input;
+use crate::node::Node;
 
 declare_controller_input!(
+    /// Input variables for the [`PID`] controller.
     PIDInput;
     error_linear_velocity,
     error_angular,

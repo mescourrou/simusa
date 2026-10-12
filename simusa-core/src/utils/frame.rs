@@ -112,6 +112,7 @@ impl Frame {
         Frame::new(config.x, config.y, config.theta)
     }
 
+    /// Create a new [`Frame`] from a given [`FrameRecord`].
     pub fn from_record(record: &FrameRecord) -> Self {
         Self::from_config(record)
     }

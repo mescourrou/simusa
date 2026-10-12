@@ -4,17 +4,27 @@ use std::{
 };
 
 use crate::{
-    constants::TIME_ROUND, context::Context, logger::LogLevel, navigators::{
+    constants::TIME_ROUND,
+    context::Context,
+    logger::LogLevel,
+    navigators::{
         NavigatorConfig, go_to::GoToConfig, trajectory::TrajectoryConfig,
         trajectory_follower::TrajectoryFollowerConfig,
-    }, networking::network::Network, node::node_factory::{NodeConfig, NodeTypeConfig, RecordType, RobotConfig}, plugin_api::PluginAPI, sensors::{
+    },
+    networking::network::Network,
+    node::node_factory::{NodeConfig, NodeTypeConfig, RecordType, RobotConfig},
+    plugin_api::PluginAPI,
+    sensors::{
         SensorConfig,
         robot_sensor::RobotSensorConfig,
         sensor_manager::{ManagedSensorConfig, SensorManagerConfig},
-    }, simulator::{ResultConfig, Simulator, SimulatorConfig}, state_estimators::{
+    },
+    simulator::{ResultConfig, Simulator, SimulatorConfig},
+    state_estimators::{
         BenchStateEstimatorConfig, StateEstimator, StateEstimatorConfig,
         perfect_estimator::PerfectEstimatorConfig,
-    }, utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
+    },
+    utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
 };
 
 struct PluginAPITest<SE: StateEstimator + 'static> {
@@ -131,7 +141,7 @@ fn kill_node() {
     config.results = Some(ResultConfig::default());
     config.nodes.push(NodeConfig {
         name: "node1".to_string(),
-        node_type: NodeTypeConfig::Robot(RobotConfig {
+        node_type: NodeTypeConfig::Robot(Box::new(RobotConfig {
             state_estimator: StateEstimatorConfig::Perfect(PerfectEstimatorConfig {
                 targets: vec!["self".to_string(), "node2".to_string(), "node3".to_string()],
                 ..Default::default()
@@ -141,29 +151,29 @@ fn kill_node() {
                 config: StateEstimatorConfig::Plugin(serde_json::Value::Null),
             }],
             ..Default::default()
-        }),
+        })),
         ..Default::default()
     });
     config.nodes.push(NodeConfig {
         name: "node2".to_string(),
-        node_type: NodeTypeConfig::Robot(RobotConfig {
+        node_type: NodeTypeConfig::Robot(Box::new(RobotConfig {
             state_estimator: StateEstimatorConfig::Perfect(PerfectEstimatorConfig {
                 targets: vec!["self".to_string(), "node1".to_string(), "node3".to_string()],
                 ..Default::default()
             }),
             ..Default::default()
-        }),
+        })),
         ..Default::default()
     });
     config.nodes.push(NodeConfig {
         name: "node3".to_string(),
-        node_type: NodeTypeConfig::Robot(RobotConfig {
+        node_type: NodeTypeConfig::Robot(Box::new(RobotConfig {
             state_estimator: StateEstimatorConfig::Perfect(PerfectEstimatorConfig {
                 targets: vec!["self".to_string(), "node1".to_string(), "node2".to_string()],
                 ..Default::default()
             }),
             ..Default::default()
-        }),
+        })),
         ..Default::default()
     });
 
@@ -350,7 +360,7 @@ fn trigger_sensor(nb_threads: usize) {
     config.results = None;
     config.nodes.push(NodeConfig {
         name: "robot1".to_string(),
-        node_type: NodeTypeConfig::Robot(RobotConfig {
+        node_type: NodeTypeConfig::Robot(Box::new(RobotConfig {
             navigator: NavigatorConfig::TrajectoryFollower(TrajectoryFollowerConfig {
                 trajectory: TrajectoryConfig {
                     point_list: vec![vec![0., 0.], vec![1., 1.]],
@@ -375,19 +385,19 @@ fn trigger_sensor(nb_threads: usize) {
                 }],
             },
             ..Default::default()
-        }),
+        })),
         ..Default::default()
     });
     config.nodes.push(NodeConfig {
         name: "robot2".to_string(),
-        node_type: NodeTypeConfig::Robot(RobotConfig {
+        node_type: NodeTypeConfig::Robot(Box::new(RobotConfig {
             navigator: NavigatorConfig::GoTo(GoToConfig::default()),
             state_estimator_bench: vec![BenchStateEstimatorConfig {
                 name: "triggering".to_string(),
                 config: StateEstimatorConfig::Plugin(serde_json::Value::Bool(true)),
             }],
             ..Default::default()
-        }),
+        })),
         ..Default::default()
     });
 

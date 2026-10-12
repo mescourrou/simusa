@@ -32,10 +32,11 @@ use crate::{
 
 use super::configurator::Configurator;
 
+/// Information about the painter, which is used to convert between world coordinates and screen coordinates.
 pub struct PainterInfo {
-    pub top_left: Pos2,
-    pub bottom_right: Pos2,
-    pub shift: Pos2,
+    top_left: Pos2,
+    bottom_right: Pos2,
+    shift: Pos2,
 }
 
 impl Default for PainterInfo {
@@ -49,6 +50,7 @@ impl Default for PainterInfo {
 }
 
 impl PainterInfo {
+    /// Get the position of the origin of the world coordinates (0,0) in screen coordinates.
     pub fn zero(&self, scale: f32) -> Pos2 {
         Pos2 {
             x: -self.top_left.x * scale + self.shift.x,
@@ -56,6 +58,7 @@ impl PainterInfo {
         }
     }
 
+    /// Include a point in the painter's bounds, expanding the bounds if necessary.
     pub fn include_point(&mut self, pt: Vec2) {
         if pt.x < self.top_left.x {
             // Left of paint area
@@ -74,6 +77,7 @@ impl PainterInfo {
         }
     }
 
+    /// Get the size of the painter, which is the width and height of the painter in world coordinates.
     pub fn size(&self) -> Vec2 {
         Vec2 {
             x: self.bottom_right.x - self.top_left.x,
@@ -81,6 +85,7 @@ impl PainterInfo {
         }
     }
 
+    /// Check if a position is inside the painter's bounds.
     pub fn is_inside(&self, pt: &Vec2) -> bool {
         if pt.x < self.top_left.x || pt.x > self.bottom_right.x {
             return false;
@@ -93,10 +98,14 @@ impl PainterInfo {
         true
     }
 
+    /// Set the shift of the painter, which is the position of the top-left corner of the painter in screen coordinates.
+    ///
+    /// This moves the origin of the painter in screen coordinates.
     pub fn set_shift(&mut self, shift: Pos2) {
         self.shift = shift;
     }
 
+    /// Returns the rectangle of the painter in screen coordinates.
     pub fn rect_painter(&self, scale: f32) -> Rect {
         let size = self.size();
         Rect {
@@ -109,16 +118,25 @@ impl PainterInfo {
         }
     }
 
+    /// Check if a position is clicked while accomodating the scale and the shift of the painter.
+    /// The position is in the painter's coordinates (world coordinates), not in the screen coordinates.
+    ///
+    /// # Arguments
+    /// * `response_click` - The position of the click in the screen coordinates.
+    /// * `scale` - The scale of the painter.
+    /// * `position` - The position to check in the painter's coordinates (world coordinates).
+    /// * `distance_margin` - The distance margin to consider the position as clicked (in screen coordinates). Good value: 10.
     pub fn is_position_clicked(
         &self,
         response_click: Option<Pos2>,
         scale: f32,
         position: Vec2,
+        distance_margin: f32,
     ) -> bool {
         if let Some(click_pos) = response_click {
             let position = self.zero(scale) + position * scale;
             let dist = (click_pos - position).length();
-            if dist < 10. {
+            if dist < distance_margin {
                 return true;
             }
         }

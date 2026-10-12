@@ -1,11 +1,19 @@
+//! Python result analyser that calls a Python script to analyse the results of the simulation.
+//!
+//! The python script is called by a Python server that is started as an external command.
+//! The server is started with the following command:
+//! ```python
+//! import simusa
+//! simusa._internal.ResultAnalyser().run_server('localhost', port, loglevel)
+//! ```
+//! Then, a TCP connection is established to the server and the results are sent to the server as a JSON message.
+
 #[cfg(feature = "gui")]
 use std::collections::BTreeMap;
 use std::{
-    ffi::{CStr, CString},
     fs,
     io::{BufReader, BufWriter, Read, Write},
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream},
-    process::Stdio,
     sync::Arc,
     time::Duration,
 };
@@ -25,7 +33,6 @@ use crate::{
     plugin_api::PluginAPI,
     result_analyser::ResultAnalyserTrait,
     simulator::Results,
-    warning,
 };
 
 #[cfg(feature = "gui")]
@@ -37,6 +44,9 @@ use crate::{
     simulator::SimulatorConfig,
 };
 
+/// Configuration of the Python Result Analyser.
+///
+/// The python script is called by a Python server that is started as an external command.
 #[config_derives]
 pub struct PythonResultAnalyserConfig {
     /// Show the matplotlib figures (call `plt.show()`)
@@ -52,7 +62,7 @@ pub struct PythonResultAnalyserConfig {
     /// Arbitrary parameters forwarded to the analysis script (additional_params in the script entry point).
     /// This can be used to forward any custom configuration to the analysis script without having to add it to the simulator configuration.
     pub additionnal_params: serde_json::Value,
-
+    /// Port used to communicate with the Python analysis server.
     pub port: u16,
 }
 
@@ -85,7 +95,7 @@ impl UIComponent for PythonResultAnalyserConfig {
         CollapsingHeader::new("Python Result Analyser").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label("Script path:");
-                path_finder(ui, &mut self.script_path, &global_config.get_base_path());
+                path_finder(ui, &mut self.script_path, global_config.get_base_path());
             });
             ui.horizontal(|ui| {
                 ui.label("Function name:");
@@ -129,6 +139,16 @@ impl UIComponent for PythonResultAnalyserConfig {
     }
 }
 
+/// Python result analyser that calls a Python script to analyse the results of the simulation.
+///
+/// The python script is called by a Python server that is started as an external command.
+/// The server is started with the following command:
+/// ```python
+/// import simusa
+/// simusa._internal.ResultAnalyser().run_server('localhost', port, loglevel)
+/// ```
+///
+/// Then, a TCP connection is established to the server and the results are sent to the server as a JSON message.
 #[derive(Debug)]
 pub struct PythonResultAnalyser {
     config: PythonResultAnalyserConfig,
@@ -136,6 +156,7 @@ pub struct PythonResultAnalyser {
 }
 
 impl PythonResultAnalyser {
+    /// Create a new PythonResultAnalyser from the given configuration.
     pub fn from_config(
         config: &PythonResultAnalyserConfig,
         global_config: &SimulatorConfig,
@@ -143,7 +164,7 @@ impl PythonResultAnalyser {
         _context: &Context,
     ) -> Self {
         let config = PythonResultAnalyserConfig {
-            script_path: fs::canonicalize(&global_config.get_base_path())
+            script_path: fs::canonicalize(global_config.get_base_path())
                 .unwrap()
                 .join(&config.script_path)
                 .to_str()
@@ -160,7 +181,7 @@ impl PythonResultAnalyser {
     fn send_request(&self, frame: ResultAnalyserFrame, context: &Context) -> SimusaResult<()> {
         let mut connection = None;
         for _ in 0..10 {
-            if let Ok(conn) = TcpStream::connect(&SocketAddr::new(
+            if let Ok(conn) = TcpStream::connect(SocketAddr::new(
                 IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 self.config.port,
             )) {
@@ -193,7 +214,9 @@ impl PythonResultAnalyser {
                 ),
             )
         })?;
-        writer.write(&buf.len().to_be_bytes());
+        let _ = writer
+            .write(&buf.len().to_be_bytes())
+            .expect("Impossible to write size to result analyser server");
         writer.write_all(&buf).map_err(|e| {
             SimusaError::new(
                 SimusaErrorTypes::NetworkError(NetworkError::Other),
@@ -260,7 +283,7 @@ except ImportError as e:
         raise e
 
 simusa._internal.ResultAnalyser().run_server('localhost', {2}, '{3}')
-            ", VERSION, python_distrib, self.config.port, context.get_loglevel().to_string()))
+            ", VERSION, python_distrib, self.config.port, context.get_loglevel()))
             .envs(std::env::vars())
             .spawn()
             .map_err(|e| {
@@ -308,16 +331,19 @@ simusa._internal.ResultAnalyser().run_server('localhost', {2}, '{3}')
 
 impl Drop for PythonResultAnalyser {
     fn drop(&mut self) {
-        if let Some(mut command) = self.command.take() {
-            if let Err(e) = command.kill() {
-                eprintln!("Impossible to stop result analyser server: {}", e);
-            }
+        if let Some(mut command) = self.command.take()
+            && let Err(e) = command.kill()
+        {
+            eprintln!("Impossible to stop result analyser server: {}", e);
         }
     }
 }
 
+/// Message frame sent to Python Result Analyser server on python-side.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResultAnalyserFrame {
+    /// Results of the simulation ([`SimulatorConfig`] and [`Record`](crate::simulator::Record)s).
     pub results: Results,
+    /// Configuration of the Python Result Analyser.
     pub config: PythonResultAnalyserConfig,
 }

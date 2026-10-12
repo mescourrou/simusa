@@ -218,7 +218,7 @@ pub fn make_physics_from_config(
                 )
             })?
             .get_physics(
-                &c,
+                c,
                 from_config_args.global_config,
                 from_config_args.va_factory,
                 from_config_args.network,

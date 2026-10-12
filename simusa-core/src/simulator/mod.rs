@@ -49,9 +49,7 @@ use crate::error;
 use crate::info;
 use crate::internal;
 use crate::node::node_factory::NodeConfig;
-use crate::physics::Physics;
 use crate::result_analyser::ResultAnalyser;
-use crate::utils::SharedRoLock;
 use crate::utils::log_rotation::create_new_file_with_rotation;
 use crate::warning;
 use crate::{
@@ -64,9 +62,7 @@ use crate::{
     networking::{network::Envelope, network_manager::NetworkManager},
     node::{
         Node, NodeState,
-        node_factory::{
-            ComputationUnitConfig, MakeNodeParams, NodeFactory, RecordType, RobotConfig,
-        },
+        node_factory::{MakeNodeParams, NodeFactory, RecordType},
     },
     plugin_api::PluginAPI,
     recordable::Recordable,
@@ -78,21 +74,13 @@ use crate::{
     },
 };
 use core::f32;
-use std::{
-    cmp::Ordering,
-    collections::BTreeMap,
-    fs::OpenOptions,
-    io::SeekFrom,
-    path::{Path, PathBuf},
-};
+use std::{cmp::Ordering, collections::BTreeMap, fs::OpenOptions, io::SeekFrom, path::Path};
 
 use serde_json;
 use std::default::Default;
-use std::fs::{self, File};
+use std::fs::File;
 use std::io::prelude::*;
-use std::sync::{Arc, Condvar, Mutex, RwLock};
-#[cfg(not(feature = "monothreaded"))]
-use std::thread::{self, JoinHandle};
+use std::sync::{Arc, Mutex};
 
 /// One time record.
 ///
@@ -728,7 +716,14 @@ impl Simulator {
                     if node.process_messages() {
                         node.handle_messages(time, &node_contexts[&node.name()]);
                     }
-                    node.nav_and_control_step(time, do_control_loop, &node_contexts[&node.name()]);
+                    if let Err(e) = node.nav_and_control_step(
+                        time,
+                        do_control_loop,
+                        &node_contexts[&node.name()],
+                    ) {
+                        error = Some(e);
+                        break;
+                    }
                     if node.process_messages() {
                         node.handle_messages(time, &node_contexts[&node.name()]);
                     }
@@ -972,6 +967,7 @@ impl Simulator {
                         break;
                     }
 
+                    let nav_control_error = Arc::new(Mutex::new(Ok(())));
                     pool.scoped(|scope| {
                         for (node, do_control_loop) in self
                             .nodes
@@ -980,17 +976,28 @@ impl Simulator {
                             .zip(do_control_loops)
                         {
                             let node_context = node_contexts[&node.name()].clone();
+                            let nav_control_error_clone = nav_control_error.clone();
                             scope.execute(move || {
                                 if node.process_messages() {
                                     node.handle_messages(time, &node_context);
                                 }
-                                node.nav_and_control_step(time, do_control_loop, &node_context);
-                                if node.process_messages() {
-                                    node.handle_messages(time, &node_context);
+                                if let Err(e) =
+                                    node.nav_and_control_step(time, do_control_loop, &node_context)
+                                {
+                                    *nav_control_error_clone.lock().unwrap() = Err(e);
+                                } else {
+                                    if node.process_messages() {
+                                        node.handle_messages(time, &node_context);
+                                    }
                                 }
                             });
                         }
                     });
+
+                    if let Err(e) = nav_control_error.lock().unwrap().as_ref() {
+                        error = Some(e.clone());
+                        break;
+                    }
 
                     internal!(
                         context,
@@ -1419,15 +1426,11 @@ impl Simulator {
                         Some((
                             node_name.clone(),
                             if let Some(physics) = meta_data.physics.as_ref() {
-                                if let Some(state) = physics
+                                physics
                                     .read()
                                     .unwrap()
                                     .state(self.context.get_time().unwrap(), &self.context)
-                                {
-                                    Some([state.pose.x, state.pose.y])
-                                } else {
-                                    None
-                                }
+                                    .map(|state| [state.pose.x, state.pose.y])
                             } else {
                                 None
                             },
@@ -1459,6 +1462,7 @@ impl Simulator {
         }
     }
 
+    /// Add a new record to the simulator's records, which will be saved to the results file if configured.
     pub fn add_record(&mut self, record: Record) {
         self.new_records.push(record);
     }

@@ -27,7 +27,7 @@ use crate::simulator::SimulatorConfig;
 use crate::state_estimators::{State, StateRecord};
 use crate::utils::determinist_random_variable::DeterministRandomVariableFactory;
 use crate::utils::enum_tools::EnumVariables;
-use crate::utils::frame::{Frame, FrameConfig, FrameRecord};
+use crate::utils::frame::Frame;
 use crate::utils::geometry::smallest_theta_diff;
 use crate::utils::periodicity::{Periodicity, PeriodicityConfig};
 use nalgebra::{Matrix3, Vector2};
@@ -324,6 +324,7 @@ pub struct DisplacementObservation {
 }
 
 impl DisplacementObservation {
+    /// Converts a [`DisplacementObservationRecord`] into a [`DisplacementObservation`].
     pub fn from_record(record: &DisplacementObservationRecord) -> Self {
         Self {
             translation: Vector2::new(record.translation[0], record.translation[1]),
@@ -334,7 +335,7 @@ impl DisplacementObservation {
 }
 
 impl Recordable<DisplacementObservationRecord> for DisplacementObservation {
-    fn record(&self, context: &Context) -> DisplacementObservationRecord {
+    fn record(&self, _context: &Context) -> DisplacementObservationRecord {
         DisplacementObservationRecord {
             translation: self.translation.into(),
             rotation: self.rotation,
@@ -366,7 +367,7 @@ impl Default for DisplacementObservationRecord {
 
 #[cfg(feature = "gui")]
 impl UIComponent for DisplacementObservationRecord {
-    fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
+    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
         ui.vertical(|ui| {
             ui.label(format!("Translation: {:?}", self.translation));
             ui.label(format!("Rotation: {}", self.rotation));

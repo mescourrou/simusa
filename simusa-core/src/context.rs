@@ -123,6 +123,7 @@ impl Context {
         self.current_sim_time.as_ref().map(|x| *x.read().unwrap())
     }
 
+    /// Get the current log level from the context.
     pub fn get_loglevel(&self) -> LogLevel {
         self.enabled_loglevel.read().unwrap().clone()
     }

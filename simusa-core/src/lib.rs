@@ -36,6 +36,7 @@ pub mod config;
 pub mod context;
 pub mod controllers;
 pub mod environment;
+pub mod interfaces;
 pub mod logger;
 pub mod navigators;
 pub mod networking;
@@ -47,7 +48,6 @@ pub mod sensors;
 pub mod simulator;
 pub mod state_estimators;
 pub mod utils;
-pub mod interfaces;
 
 pub mod plugin_api;
 

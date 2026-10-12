@@ -15,11 +15,21 @@ use serde_json::Value;
 use simusa_com::rfc::{self, RemoteFunctionCall, RemoteFunctionCallHost};
 
 use simusa::{
-    context::Context, errors::SimusaResult, interfaces::navigator_controller::ControllerInputVariable, internal, logger::InternalLog, navigators::{Navigator, NavigatorRecord}, node::Node, recordable::Recordable, state_estimators::WorldState,
+    context::Context,
+    errors::SimusaResult,
+    interfaces::navigator_controller::ControllerInputVariable,
+    internal,
+    logger::InternalLog,
+    navigators::{Navigator, NavigatorRecord},
+    node::Node,
+    recordable::Recordable,
+    state_estimators::WorldState,
 };
 
 use crate::{
-    controllers::{PythonControllerInput, PythonControllerInputWrapper}, utils::{call_py_method, call_py_method_void}, wrappers::{NodeWrapper, WorldStateWrapper},
+    controllers::{PythonControllerInput, PythonControllerInputWrapper},
+    utils::{call_py_method, call_py_method_void},
+    wrappers::{NodeWrapper, WorldStateWrapper},
 };
 
 /// Simulator-side RPC handles used by Rust nodes to call Python navigator logic asynchronously.
@@ -28,7 +38,8 @@ pub struct PythonNavigatorAsyncClient {
     /// Remote call to `post_init`.
     pub post_init: RemoteFunctionCall<NodeWrapper, SimusaResult<Vec<ControllerInputVariable>>>,
     /// Remote call to `compute_error`.
-    pub compute_output: RemoteFunctionCall<(NodeWrapper, WorldState), SimusaResult<PythonControllerInput>>,
+    pub compute_output:
+        RemoteFunctionCall<(NodeWrapper, WorldState), SimusaResult<PythonControllerInput>>,
     /// Remote call to `record`.
     pub record: RemoteFunctionCall<(), NavigatorRecord>,
     /// Remote call to `pre_loop_hook`.
@@ -78,7 +89,8 @@ pub struct PythonNavigator {
     model: Py<PyAny>,
     client: PythonNavigatorAsyncClient,
     post_init: Arc<RemoteFunctionCallHost<NodeWrapper, SimusaResult<Vec<ControllerInputVariable>>>>,
-    compute_output: Arc<RemoteFunctionCallHost<(NodeWrapper, WorldState), SimusaResult<PythonControllerInput>>>,
+    compute_output:
+        Arc<RemoteFunctionCallHost<(NodeWrapper, WorldState), SimusaResult<PythonControllerInput>>>,
     record: Arc<RemoteFunctionCallHost<(), NavigatorRecord>>,
     pre_loop_hook: Arc<RemoteFunctionCallHost<(NodeWrapper, f32), ()>>,
     next_time_step: Arc<RemoteFunctionCallHost<(), Option<f32>>>,
@@ -140,7 +152,11 @@ impl PythonNavigator {
             .try_recv_closure(|()| self.next_time_step(context));
     }
 
-    fn post_init(&mut self, node: NodeWrapper, context: &Context) -> SimusaResult<Vec<ControllerInputVariable>> {
+    fn post_init(
+        &mut self,
+        node: NodeWrapper,
+        context: &Context,
+    ) -> SimusaResult<Vec<ControllerInputVariable>> {
         internal!(
             context,
             InternalLog::API,

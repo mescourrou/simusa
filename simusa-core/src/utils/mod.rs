@@ -10,14 +10,13 @@ pub mod enum_tools;
 pub mod frame;
 pub mod geometry;
 pub(crate) mod log_rotation;
-pub mod macros;
 pub mod maths;
 pub mod numbers;
 pub mod occupancy_grid;
 pub mod periodicity;
 pub mod read_only_lock;
 
-use std::str::FromStr;
+use std::{fmt::Display, str::FromStr};
 
 use serde::Serializer;
 use simusa_macros::config_derives;
@@ -50,6 +49,9 @@ pub type SharedRwLock<T> = std::sync::Arc<std::sync::RwLock<T>>;
 /// Shared mutex lock (Shorthand for `Arc<Mutex<T>>`).
 pub type SharedMutex<T> = std::sync::Arc<std::sync::Mutex<T>>;
 
+/// Wrapper around [`serde_json::Value`] that can be used in the configuration system for custom user-defined values.
+///
+/// The wrapper exists to implement specific traits.
 #[config_derives(skip_to_vec, skip_check)]
 pub struct GeneralValue(pub serde_json::Value);
 
@@ -68,9 +70,9 @@ impl From<String> for GeneralValue {
     }
 }
 
-impl ToString for GeneralValue {
-    fn to_string(&self) -> String {
-        self.0.to_string()
+impl Display for GeneralValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 

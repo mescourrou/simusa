@@ -11,7 +11,6 @@ use crate::{gui::UIComponent, simulator::SimulatorConfig};
 
 use crate::{
     context::Context,
-    error,
     errors::SimusaResult,
     internal,
     logger::InternalLog,
@@ -26,7 +25,7 @@ use crate::{
     },
     recordable::Recordable,
     state_estimators::{State, StateConfig, StateRecord},
-    utils::{SharedMutex, determinist_random_variable::DeterministRandomVariableFactory},
+    utils::SharedMutex,
 };
 use config_checker::*;
 use serde_derive::{Deserialize, Serialize};
@@ -253,7 +252,7 @@ impl Physics for InternalPhysics {
     }
 
     /// Return the current state. Do not compute the state again.
-    fn state(&self, time: f32, context: &Context) -> Option<State> {
+    fn state(&self, time: f32, _context: &Context) -> Option<State> {
         if time != self.last_time_update {
             None
         } else {

@@ -78,48 +78,45 @@ impl ResultAnalyser {
                 host, port, e
             ))
         })?;
-        for stream in connection.incoming() {
-            if let Ok(mut stream) = stream {
-                let mut buf = Vec::new();
-                let mut reader = BufReader::new(stream.try_clone().unwrap());
-                let mut size: [u8; 8] = Default::default();
-                reader.read_exact(&mut size).map_err(|e| {
-                    let _ = stream.write("OK".as_bytes());
-                    PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                        "Impossible to read size request from result analyser client: {}",
-                        e
-                    ))
-                })?;
-                let size = u64::from_be_bytes(size) as usize;
-                buf.resize(size, 0);
-                reader.read_exact(&mut buf).map_err(|e| {
-                    let _ = stream.write("OK".as_bytes());
-                    PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                        "Impossible to read request from result analyser client: {}",
-                        e
-                    ))
-                })?;
-                debug!(context, "Receiving results");
-                let frame: ResultAnalyserFrame = serde_json::from_slice(&buf).map_err(|e| {
-                    let _ = stream.write("OK".as_bytes());
-                    let mut debug_file = std::fs::File::create("buf_received.json").unwrap();
-                    debug_file.write_all(&buf).unwrap();
-                    PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                        "Impossible to deserialize request from result analyser client: {}",
-                        e
-                    ))
-                })?;
-                self.analyser_results(py, &frame.results, &frame.config, &context)
-                    .map_err(|e| {
-                        let _ = stream.write("OK".as_bytes());
-                        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                            "Impossible to analyse results: {}",
-                            e.detailed_error()
-                        ))
-                    })?;
+        if let Some(mut stream) = connection.incoming().flatten().next() {
+            let mut buf = Vec::new();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut size: [u8; 8] = Default::default();
+            reader.read_exact(&mut size).map_err(|e| {
                 let _ = stream.write("OK".as_bytes());
-                break;
-            }
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                    "Impossible to read size request from result analyser client: {}",
+                    e
+                ))
+            })?;
+            let size = u64::from_be_bytes(size) as usize;
+            buf.resize(size, 0);
+            reader.read_exact(&mut buf).map_err(|e| {
+                let _ = stream.write("OK".as_bytes());
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                    "Impossible to read request from result analyser client: {}",
+                    e
+                ))
+            })?;
+            debug!(context, "Receiving results");
+            let frame: ResultAnalyserFrame = serde_json::from_slice(&buf).map_err(|e| {
+                let _ = stream.write("OK".as_bytes());
+                let mut debug_file = std::fs::File::create("buf_received.json").unwrap();
+                debug_file.write_all(&buf).unwrap();
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                    "Impossible to deserialize request from result analyser client: {}",
+                    e
+                ))
+            })?;
+            self.analyser_results(py, &frame.results, &frame.config, &context)
+                .map_err(|e| {
+                    let _ = stream.write("OK".as_bytes());
+                    PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                        "Impossible to analyse results: {}",
+                        e.detailed_error()
+                    ))
+                })?;
+            let _ = stream.write("OK".as_bytes());
         }
         debug!(context, "Stopping result analyser server");
         Ok(())
@@ -155,19 +152,18 @@ impl ResultAnalyser {
                         format!("Impossible to create default result analyser script: {}", e),
                     )
                 })?;
-                writeln!(file, "#!/usr/bin/python3");
-                writeln!(file, "import numpy as np");
-                writeln!(file, "import matplotlib.pyplot as plt");
-                writeln!(file, "");
-                writeln!(
-                    file,
-                    "def {}(results, config, additional_params):",
-                    config.function_name
-                );
-                writeln!(
-                    file,
-                    "    print('It works! You can now edit this script to analyse the results.')"
-                );
+                writeln!(file, "#!/usr/bin/python3")
+                    .and_then(|_| writeln!(file, "import numpy as np"))
+                    .and_then(|_| writeln!(file, "import matplotlib.pyplot as plt\n"))
+                    .and_then(|_| writeln!(file, "# This script is automatically generated by Simusa."))
+                    .and_then(|_| writeln!(file, "def {}(results, config, additional_params):", config.function_name))
+                    .and_then(|_| writeln!(file,"    print('It works! You can now edit this script to analyse the results.')"))
+                    .map_err(|e| {
+                        SimusaError::new(
+                            SimusaErrorTypes::ConfigError,
+                            format!("Impossible to write default result analyser script: {}", e),
+                        )
+                    })?;
                 fs::read_to_string(script_path.clone()).map_err(|e| {
                     SimusaError::new(
                         SimusaErrorTypes::ConfigError,
@@ -224,7 +220,7 @@ def show():
             None,
         )?;
 
-        let script = PyModule::from_code(py, &python_script, c_str!(""), c_str!(""))?;
+        let script = PyModule::from_code(py, python_script, c_str!(""), c_str!(""))?;
         let analyse_fn: Py<PyAny> = script.getattr(&config.function_name)?.into();
         let res = analyse_fn.call(py, (result_dict, config_dict, param_dict), None);
         if let Err(err) = res {

@@ -4,14 +4,8 @@ use pyo3::prelude::*;
 use simusa_macros::EnumToString;
 
 use simusa::{
-    context::Context,
-    navigators::go_to::GoToMessage,
-    networking::message_types::MessageType,
-    recordable::Recordable,
-    sensors::{
-        Observation,
-        sensor_manager::{SensorFrameMessage, SensorTriggerMessage},
-    },
+    context::Context, networking::message_types::MessageType, recordable::Recordable,
+    sensors::Observation,
 };
 
 use crate::{
@@ -173,14 +167,12 @@ impl MessageTypesWrapper {
     pub fn from_rust(msg: &MessageType) -> Self {
         match msg {
             MessageType::String(s) => MessageTypesWrapper::String(s.clone()),
-            MessageType::GoTo(msg) => {
-                MessageTypesWrapper::GoTo(GoToMessageWrapper::from_rust(&msg))
-            }
+            MessageType::GoTo(msg) => MessageTypesWrapper::GoTo(GoToMessageWrapper::from_rust(msg)),
             MessageType::SensorTrigger(msg) => {
-                MessageTypesWrapper::SensorTrigger(SensorTriggerMessageWrapper::from_rust(&msg))
+                MessageTypesWrapper::SensorTrigger(SensorTriggerMessageWrapper::from_rust(msg))
             }
             MessageType::SensorFrame(msg) => {
-                MessageTypesWrapper::SensorFrame(SensorFrameMessageWrapper::from_rust(&msg))
+                MessageTypesWrapper::SensorFrame(SensorFrameMessageWrapper::from_rust(msg))
             }
             MessageType::Observations(observations) => MessageTypesWrapper::Observations(
                 observations

@@ -9,13 +9,17 @@
 #[cfg(feature = "gui")]
 use crate::gui::UIComponent;
 
+use crate::interfaces::navigator_controller::declare_navigator_output;
 use crate::{
-    context::Context, errors::{SimusaError, SimusaResult}, navigators::{
+    context::Context,
+    errors::SimusaResult,
+    navigators::{
         Navigator, NavigatorRecord,
         trajectory::{Trajectory, TrajectoryConfig, TrajectoryRecord},
-    }, simulator::SimulatorConfig, utils::geometry::{mod2pi, smallest_theta_diff},
+    },
+    simulator::SimulatorConfig,
+    utils::geometry::{mod2pi, smallest_theta_diff},
 };
-use crate::interfaces::navigator_controller::declare_navigator_output;
 
 extern crate nalgebra as na;
 use na::Vector3;
@@ -291,8 +295,8 @@ impl Default for TrajectoryFollower {
 use crate::node::Node;
 use crate::state_estimators::WorldState;
 
-
 declare_navigator_output! {
+    /// Output of the [`TrajectoryFollower`] navigator.
     #[derive(Default)]
     TrajectoryFollowerOutput;
     node_position,
@@ -351,7 +355,8 @@ impl Navigator for TrajectoryFollower {
             if distance_to_final < self.stop_distance {
                 0.
             } else {
-                self.target_speed.min(distance_to_final * self.stop_ramp_coefficient)
+                self.target_speed
+                    .min(distance_to_final * self.stop_ramp_coefficient)
             }
         } else {
             self.target_speed
@@ -374,14 +379,26 @@ impl Navigator for TrajectoryFollower {
         // Compute target lat lon velocities
         let segment_vector = segment.1 - segment.0;
         let segment_orientation = segment_vector.y.atan2(segment_vector.x);
-        let rot = na::Rotation2::new(-segment_orientation - world_state.ego.as_ref().unwrap().pose.z);
-        let vel = world_state.ego.as_ref().unwrap().velocity.fixed_rows::<2>(0);
+        let rot =
+            na::Rotation2::new(-segment_orientation - world_state.ego.as_ref().unwrap().pose.z);
+        let vel = world_state
+            .ego
+            .as_ref()
+            .unwrap()
+            .velocity
+            .fixed_rows::<2>(0);
         let vel = rot * vel;
 
         let rot = na::Rotation2::new(-state.pose.z);
         let local_projection = rot * projection_vector.fixed_view::<2, 1>(0, 0);
 
-        let normalized_vel = world_state.ego.as_ref().unwrap().velocity.fixed_rows::<2>(0).normalize();
+        let normalized_vel = world_state
+            .ego
+            .as_ref()
+            .unwrap()
+            .velocity
+            .fixed_rows::<2>(0)
+            .normalize();
         let linear_vel_error = actual_target_speed - state.velocity.fixed_rows::<2>(0).norm();
         let error_longitudinal_lateral_velocities = if normalized_vel.norm().is_nan() {
             // No velocity => no direction. Considering all linear velocity error on the longitudinal direction

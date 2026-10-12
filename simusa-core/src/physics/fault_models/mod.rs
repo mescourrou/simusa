@@ -5,7 +5,7 @@
 //! Currently, the main implementation is [`AdditiveRobotCenteredPhysicsFault`].
 pub mod additive_robot_centered;
 
-use std::{fmt::Debug, sync::Arc};
+use std::fmt::Debug;
 
 use simusa_macros::config_derives;
 
@@ -19,9 +19,7 @@ use crate::{
         },
         robot_models::RobotModelConfig,
     },
-    plugin_api::PluginAPI,
     state_estimators::State,
-    utils::determinist_random_variable::DeterministRandomVariableFactory,
 };
 #[cfg(feature = "gui")]
 use crate::{

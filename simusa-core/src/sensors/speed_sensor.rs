@@ -26,7 +26,7 @@ use crate::simulator::SimulatorConfig;
 use crate::state_estimators::{State, StateRecord};
 use crate::utils::determinist_random_variable::DeterministRandomVariableFactory;
 use crate::utils::enum_tools::EnumVariables;
-use crate::utils::frame::{self, Frame, FrameConfig, FrameRecord};
+use crate::utils::frame::Frame;
 use crate::utils::periodicity::{Periodicity, PeriodicityConfig};
 use serde_derive::{Deserialize, Serialize};
 use simusa_macros::{EnumToString, UIComponent, config_derives, enum_variables};
@@ -303,6 +303,7 @@ pub struct SpeedObservation {
 }
 
 impl SpeedObservation {
+    /// Converts a [`SpeedObservationRecord`] into a [`SpeedObservation`].
     pub fn from_record(record: &SpeedObservationRecord) -> Self {
         Self {
             linear_velocity: record.linear_velocity,
@@ -314,7 +315,7 @@ impl SpeedObservation {
 }
 
 impl Recordable<SpeedObservationRecord> for SpeedObservation {
-    fn record(&self, context: &Context) -> SpeedObservationRecord {
+    fn record(&self, _context: &Context) -> SpeedObservationRecord {
         SpeedObservationRecord {
             linear_velocity: self.linear_velocity,
             lateral_velocity: self.lateral_velocity,
@@ -340,7 +341,7 @@ pub struct SpeedObservationRecord {
 
 #[cfg(feature = "gui")]
 impl UIComponent for SpeedObservationRecord {
-    fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
+    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
         ui.vertical(|ui| {
             ui.label(format!("Linear velocity: {}", self.linear_velocity));
             ui.label(format!("Lateral velocity: {}", self.lateral_velocity));

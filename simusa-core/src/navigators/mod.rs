@@ -153,16 +153,26 @@ use crate::utils::SharedRwLock;
 #[cfg(feature = "gui")]
 use crate::utils::enum_tools::ToVec;
 
-
+/// Trait for the output of a [`Navigator`], which can be converted into [`ControllerInputVariables`].
+///
+/// Should not be implemented directly, but rather through the
+/// [`declare_navigator_output!`](crate::interfaces::navigator_controller::declare_navigator_output) macro.
 pub trait NavigatorOutput {
+    /// Returns the list of variables that can be provided by the navigator for the controller.
     fn available_variables() -> &'static [ControllerInputVariable];
-    fn into_controller_input_variables(self, requested_variables: &[ControllerInputVariable]) -> ControllerInputVariables;
+
+    /// Converts the output of the navigator into [`ControllerInputVariables`] for the controller.
+    fn into_controller_input_variables(
+        self,
+        requested_variables: &[ControllerInputVariable],
+    ) -> ControllerInputVariables;
 }
 
 /// Trait managing the planning, and providing the error to the planned behavior.
 pub trait Navigator:
     std::fmt::Debug + std::marker::Send + std::marker::Sync + Recordable<NavigatorRecord>
 {
+    /// Specifies the variables computed by the navigator. Must implement [`NavigatorOutput`].
     type OutputType: NavigatorOutput;
 
     /// Returns the list of variables that can be provided by the navigator for the controller.
@@ -201,17 +211,20 @@ pub trait Navigator:
     }
 }
 
+/// Trait for abstracting the [`Navigator`] trait with dynamic conversion of [`Navigator::OutputType`], to be used in the [`Node`] struct.
+///
+/// This trait is implemented automatically for any type that implements [`Navigator`].
+/// Should not be implemented directly!
 pub trait AbstractNavigator:
     std::fmt::Debug + std::marker::Send + std::marker::Sync + Recordable<NavigatorRecord>
 {
+    /// Returns the list of variables ( [`ControllerInputVariable`] ) that can be provided by the navigator for the controller.
     fn call_available_variables(&self) -> &[ControllerInputVariable];
-    
-    fn call_post_init(
-        &mut self,
-        node: &mut Node,
-        context: &Context,
-    ) -> SimusaResult<()>;
 
+    /// Performs optional one-time initialization when the node starts.
+    fn call_post_init(&mut self, node: &mut Node, context: &Context) -> SimusaResult<()>;
+
+    /// Compute the output ([`ControllerInputVariables`]) between the given `state` and goal.
     fn call_compute_output(
         &mut self,
         node: &mut Node,
@@ -220,8 +233,10 @@ pub trait AbstractNavigator:
         requested_variables: &[ControllerInputVariable],
     ) -> SimusaResult<ControllerInputVariables>;
 
+    /// Executes the loop hook at the beginning of each simulator time step.
     fn call_pre_loop_hook(&mut self, node: &mut Node, time: f32, context: &Context);
 
+    /// Optional: return the time of the next time step.
     fn call_next_time_step(&self, context: &Context) -> Option<f32>;
 }
 
@@ -232,12 +247,8 @@ where
     fn call_available_variables(&self) -> &[ControllerInputVariable] {
         self.available_variables()
     }
-    
-    fn call_post_init(
-        &mut self,
-        node: &mut Node,
-        context: &Context,
-    ) -> SimusaResult<()> {
+
+    fn call_post_init(&mut self, node: &mut Node, context: &Context) -> SimusaResult<()> {
         self.post_init(node, context)
     }
 
@@ -248,7 +259,9 @@ where
         context: &Context,
         requested_variables: &[ControllerInputVariable],
     ) -> SimusaResult<ControllerInputVariables> {
-        Ok(self.compute_output(node, state, context)?.into_controller_input_variables(requested_variables))
+        Ok(self
+            .compute_output(node, state, context)?
+            .into_controller_input_variables(requested_variables))
     }
 
     fn call_pre_loop_hook(&mut self, node: &mut Node, time: f32, context: &Context) {

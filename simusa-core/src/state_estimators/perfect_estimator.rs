@@ -18,11 +18,14 @@ use crate::{
     warning,
 };
 
-#[cfg(feature = "gui")]
-use crate::{gui::{UIComponent, utils::string_checkbox}, node::node_factory::NodeTypeConfig};
 use crate::recordable::Recordable;
 use crate::sensors::Observation;
 use crate::simulator::SimulatorConfig;
+#[cfg(feature = "gui")]
+use crate::{
+    gui::{UIComponent, utils::string_checkbox},
+    node::node_factory::NodeTypeConfig,
+};
 use serde_derive::{Deserialize, Serialize};
 use simusa_macros::config_derives;
 
@@ -102,11 +105,12 @@ impl UIComponent for PerfectEstimatorConfig {
                     }
                 });
 
-                let mut possible_targets =
-                    Vec::from_iter(global_config.nodes.iter().filter_map(|x| match x.node_type {
+                let mut possible_targets = Vec::from_iter(global_config.nodes.iter().filter_map(
+                    |x| match x.node_type {
                         NodeTypeConfig::Robot(_) => Some(x.name.clone()),
                         NodeTypeConfig::ComputationUnit(_) => None,
-                    }));
+                    },
+                ));
                 possible_targets.insert(0, "self".to_string());
                 if let Some(idx) = possible_targets
                     .iter()

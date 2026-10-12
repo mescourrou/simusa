@@ -133,8 +133,6 @@ impl Drawable for Robot {
                     match &obs.sensor_observation {
                         SensorObservationRecord::OrientedLandmark(o) => {
                             shapes.extend(self.landmark_obs.as_ref().unwrap().draw(
-                                ui,
-                                viewport,
                                 painter_info,
                                 scale,
                                 o,
@@ -144,8 +142,6 @@ impl Drawable for Robot {
                         }
                         SensorObservationRecord::OrientedRobot(o) => {
                             shapes.extend(self.robot_obs.as_ref().unwrap().draw(
-                                ui,
-                                viewport,
                                 painter_info,
                                 scale,
                                 o,
@@ -165,8 +161,6 @@ impl Drawable for Robot {
                         }
                         SensorObservationRecord::Scan(o) => {
                             shapes.extend(self.scan_obs.as_ref().unwrap().draw(
-                                ui,
-                                viewport,
                                 painter_info,
                                 scale,
                                 o,
@@ -195,7 +189,12 @@ impl Drawable for Robot {
             let pose = record.physics.pose();
             let position = Vec2::new(pose[0], pose[1]);
 
-            if painter_info.is_position_clicked(response.interact_pointer_pos(), scale, position) {
+            if painter_info.is_position_clicked(
+                response.interact_pointer_pos(),
+                scale,
+                position,
+                10.0,
+            ) {
                 self.context_info_enabled = true;
             }
             if self.context_info_enabled {

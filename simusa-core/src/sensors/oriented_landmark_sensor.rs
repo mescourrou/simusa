@@ -29,7 +29,7 @@ use crate::simulator::SimulatorConfig;
 use crate::state_estimators::State;
 use crate::utils::determinist_random_variable::DeterministRandomVariableFactory;
 use crate::utils::enum_tools::EnumVariables;
-use crate::utils::frame::{Frame, FrameConfig, FrameRecord};
+use crate::utils::frame::Frame;
 use crate::utils::periodicity::{Periodicity, PeriodicityConfig};
 use serde_derive::{Deserialize, Serialize};
 
@@ -423,6 +423,7 @@ impl Default for OrientedLandmarkObservation {
 }
 
 impl OrientedLandmarkObservation {
+    /// Converts a [`OrientedLandmarkObservationRecord`] into a [`OrientedLandmarkObservation`].
     pub fn from_record(record: &OrientedLandmarkObservationRecord) -> Self {
         Self {
             id: record.id,
@@ -468,7 +469,7 @@ pub struct OrientedLandmarkObservationRecord {
 
 #[cfg(feature = "gui")]
 impl UIComponent for OrientedLandmarkObservationRecord {
-    fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
+    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
         ui.vertical(|ui| {
             ui.label(format!("Id: {}", self.id));
             ui.label("Labels:");

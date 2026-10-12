@@ -1,16 +1,21 @@
-use ::simusa::{
-    navigators::go_to::GoToMessage, networking::network::MessageFlag, plugin_api::PluginAPI,
-    sensors::sensor_manager::SensorTriggerMessage,
-};
+#[cfg(feature = "gui")]
+use ::simusa::plugin_api::PluginAPI;
 use pyo3::prelude::*;
 
 use crate::{
-    controllers::{ControllerWrapper, PythonControllerInputWrapper}, messages::{GoToMessageWrapper, MessageFlagWrapper, SensorTriggerMessageWrapper}, navigators::NavigatorWrapper, networking::MessageTypesWrapper, physics::PhysicsWrapper, result_analyser::ResultAnalyser, state_estimators::StateEstimatorWrapper, wrappers::{
-        CommandWrapper, DisplacementObservationWrapper,
-        GNSSObservationWrapper, MultiClientWrapper, NodeWrapper, ObservationWrapper,
-        OrientedLandmarkObservationWrapper, OrientedRobotObservationWrapper, PluginAPIWrapper,
-        Pose, SensorObservationWrapper, SimulatorWrapper, SpeedObservationWrapper, StateWrapper,
-        UnicycleCommandWrapper, Vec2, Vec3, WorldStateWrapper,
+    controllers::{ControllerWrapper, PythonControllerInputWrapper},
+    messages::{GoToMessageWrapper, MessageFlagWrapper, SensorTriggerMessageWrapper},
+    navigators::NavigatorWrapper,
+    networking::MessageTypesWrapper,
+    physics::PhysicsWrapper,
+    result_analyser::ResultAnalyser,
+    state_estimators::StateEstimatorWrapper,
+    wrappers::{
+        CommandWrapper, DisplacementObservationWrapper, GNSSObservationWrapper, MultiClientWrapper,
+        NodeWrapper, ObservationWrapper, OrientedLandmarkObservationWrapper,
+        OrientedRobotObservationWrapper, PluginAPIWrapper, Pose, SensorObservationWrapper,
+        SimulatorWrapper, SpeedObservationWrapper, StateWrapper, UnicycleCommandWrapper, Vec2,
+        Vec3, WorldStateWrapper,
     },
 };
 

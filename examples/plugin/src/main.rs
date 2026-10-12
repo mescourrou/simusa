@@ -6,7 +6,6 @@ use simusa::context::Context;
 use simusa::controllers::{AbstractController, Controller, ControllerRecord};
 use simusa::errors::SimusaResult;
 use simusa::gui::Drawable;
-use simusa::{declare_controller_input, declare_navigator_output, info};
 use simusa::navigators::{AbstractNavigator, Navigator, NavigatorRecord};
 use simusa::networking::network::Network;
 use simusa::node::Node;
@@ -27,6 +26,7 @@ use simusa::state_estimators::{
 use simusa::utils::SharedRwLock;
 use simusa::utils::determinist_random_variable::DeterministRandomVariableFactory;
 use simusa::utils::frame::Frame;
+use simusa::{declare_controller_input, declare_navigator_output, info};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -73,8 +73,12 @@ declare_controller_input!(
 
 impl Controller for MyWonderfulController {
     type InputType = MyWornderfulControllerInput;
-    
-    fn post_init(&mut self, _node: &mut Node, _context: &Context) -> simusa::errors::SimusaResult<()> {
+
+    fn post_init(
+        &mut self,
+        _node: &mut Node,
+        _context: &Context,
+    ) -> simusa::errors::SimusaResult<()> {
         // Optional implementation of post_init, which is called after the controller is initialized,
         // before the begining of the simulation.
         Ok(())

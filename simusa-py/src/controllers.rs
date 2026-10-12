@@ -33,16 +33,18 @@ declare_controller_input!(
 
 impl NavigatorOutput for PythonControllerInput {
     fn available_variables() -> &'static [ControllerInputVariable] {
-        &ControllerInputVariable::all()
+        ControllerInputVariable::all()
     }
 
-    fn into_controller_input_variables(self, _requested_variables: &[ControllerInputVariable]) -> ControllerInputVariables {
+    fn into_controller_input_variables(
+        self,
+        _requested_variables: &[ControllerInputVariable],
+    ) -> ControllerInputVariables {
         ControllerInputVariables::from(self)
     }
 }
 
-
-_make_controller_input_python_wrapper!();
+_make_controller_input_python_wrapper!(crate);
 
 #[derive(Debug, Clone)]
 /// Simulator-side RPC handles used by the runtime to call Python controller methods.
@@ -63,7 +65,6 @@ impl Controller for PythonControllerAsyncClient {
         Ok(())
     }
 
-
     fn required_variables(&self) -> &[ControllerInputVariable] {
         &self.requested_variables
     }
@@ -76,9 +77,7 @@ impl Controller for PythonControllerAsyncClient {
         context: &Context,
     ) -> Command {
         let node_py = NodeWrapper::from_rust(node, context.clone());
-        self.make_command
-            .call((node_py, input, time))
-            .unwrap()
+        self.make_command.call((node_py, input, time)).unwrap()
     }
 
     fn pre_loop_hook(&mut self, node: &mut Node, time: f32, context: &Context) {
@@ -167,7 +166,11 @@ impl PythonController {
             .try_recv_closure(|()| self.next_time_step(context));
     }
 
-    fn post_init(&mut self, node: NodeWrapper, context: &Context) -> SimusaResult<Vec<ControllerInputVariable>> {
+    fn post_init(
+        &mut self,
+        node: NodeWrapper,
+        context: &Context,
+    ) -> SimusaResult<Vec<ControllerInputVariable>> {
         internal!(
             context,
             ::simusa::logger::InternalLog::API,

@@ -1,3 +1,13 @@
+//! Result analyser module
+//!
+//! This module contains the result analyser, which is used to analyse the results of the simulation.
+//! The result analyser can be a Python script or a plugin, and is configured through the
+//! [`ResultAnalyserConfig`] enum.
+//!
+//! The result analyser is called at the end of the simulation, when `compute_results`
+//! is called, and is passed the results of the simulation (simulation config and records) to
+//! be analysed.
+
 use std::sync::Arc;
 
 use simusa_macros::config_derives;
@@ -7,23 +17,26 @@ use crate::{
     errors::{SimusaError, SimusaErrorTypes, SimusaResult},
     plugin_api::PluginAPI,
     result_analyser::python_analyser::{PythonResultAnalyser, PythonResultAnalyserConfig},
-    simulator::{Record, Results, SimulatorConfig},
+    simulator::{Results, SimulatorConfig},
 };
 #[cfg(feature = "gui")]
 use crate::{
     gui::{
         UIComponent,
-        utils::{edit_plugin_config, json_config, show_plugin_config, string_combobox},
+        utils::{edit_plugin_config, show_plugin_config, string_combobox},
     },
     utils::enum_tools::ToVec,
 };
 
 pub mod python_analyser;
 
+/// Result analyser choices
 #[config_derives]
 pub enum ResultAnalyserConfig {
+    /// Python result analyser that starts a Python server to call a custom Python script.
     #[check]
     Python(PythonResultAnalyserConfig),
+    /// Plugin result analyser that is defined through the PluginAPI.
     Plugin(serde_json::Value),
 }
 
@@ -93,12 +106,18 @@ impl UIComponent for ResultAnalyserConfig {
     }
 }
 
+/// Result analyser choices
 pub enum ResultAnalyser {
+    /// Python result analyser that starts a Python server to call a custom Python script.
     Python(PythonResultAnalyser),
+    /// Plugin result analyser that is defined through the PluginAPI.
     Plugin(Box<dyn ResultAnalyserTrait>),
 }
 
 impl ResultAnalyser {
+    /// Create a new ResultAnalyser from the given configuration.
+    ///
+    /// Calls the PluginAPI if the configuration is a `Plugin`.
     pub fn from_config(
         config: &ResultAnalyserConfig,
         global_config: &SimulatorConfig,
@@ -131,6 +150,11 @@ impl ResultAnalyser {
         })
     }
 
+    /// Analyse the results of the simulation.
+    ///
+    /// # Arguments
+    /// * `results` - The results of the simulation (simulation config and records).
+    /// * `context` - The context of the simulation (used for logging).
     pub fn analyse_results(&mut self, results: &Results, context: &Context) -> SimusaResult<()> {
         match self {
             ResultAnalyser::Python(analyser) => analyser.analyse_results(results, context),
@@ -139,6 +163,13 @@ impl ResultAnalyser {
     }
 }
 
+/// Trait for result analysers: at the end of the simulation, when `compute_results` is called, the results are forwarded to the result analyser to be analysed.
+/// The result analyser can be a Python script or a plugin.
 pub trait ResultAnalyserTrait: std::fmt::Debug + std::marker::Send + std::marker::Sync {
+    /// Analyse the results of the simulation.
+    ///
+    /// # Arguments
+    /// * `results` - The results of the simulation (simulation config and records).
+    /// * `context` - The context of the simulation (used for logging).
     fn analyse_results(&mut self, results: &Results, context: &Context) -> SimusaResult<()>;
 }

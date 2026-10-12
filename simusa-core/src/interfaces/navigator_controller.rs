@@ -1,28 +1,23 @@
+//! This module defines the interface between navigators and controllers in the Simusa framework.
+//!
+//! This interface is around the [`ControllerInputVariable`] enum, which defines the variables that
+//! can be requested by the controller from the navigator.
+//!
+//! It provides the necessary structures, enums, and macros to facilitate communication and data
+//! exchange between these two components.
+#[cfg(feature = "gui")]
+use crate::gui::UIComponent;
 use crate::{
     context::Context,
-    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
-    internal,
-    node::node_factory::FromConfigArguments,
-    physics::{PhysicsConfig, robot_models::Command},
     recordable::Recordable,
     state_estimators::{WorldState, WorldStateRecord},
-    utils::{GeneralValue, SharedRwLock},
-};
-#[cfg(feature = "gui")]
-use crate::{
-    gui::{
-        UIComponent,
-        utils::{json_config, string_combobox},
-    },
-    utils::enum_tools::ToVec,
+    utils::GeneralValue,
 };
 
-use config_checker::*;
 use serde_derive::{Deserialize, Serialize};
-use simusa_macros::config_derives;
 
 /// Generate the controller input variables and macros to be used by specific navigators and controllers.
-/// 
+///
 /// Syntax:
 /// ```text
 /// (
@@ -30,10 +25,11 @@ use simusa_macros::config_derives;
 ///     $snake_case_name: ident, // Name of the variable in snake_case
 ///     $t: ty, // Type of the variable
 ///     $t_record: ty, // Type of the variable for the record (need to be serializable)
-///     $t_python: ty // Type of the variable for the python wrapper
+///     $t_python: ty, // Type of the variable for the python wrapper
+///     $docstring: expr // Documentation string for the variable
 /// );+
 /// ```
-/// 
+///
 /// This generates the following:
 /// - An enum [`ControllerInputVariable`] with variants for each variable.
 /// - A struct [`ControllerInputVariables`] with optional fields for each variable.
@@ -46,14 +42,15 @@ use simusa_macros::config_derives;
 /// - A macro [`declare_optimized_navigator_output!`] to declare a navigator output struct with the specified variables, implementing the
 ///   [`NavigatorOutput`](crate::navigators::NavigatorOutput) trait and conversion to [`ControllerInputVariables`]. Only the variables
 ///   requested by the controller will be computed by the navigator.
-/// 
+///
 macro_rules! generate_controller_input {
     ($(
         $camel_case_name: ident,
         $snake_case_name: ident,
         $t: ty, // Type
         $t_record: ty, // Type for the record (need to be serializable)
-        $t_python: ty // Type for the python wrapper
+        $t_python: ty, // Type for the python wrapper
+        $docstring: expr // Documentation string for the variable
     );+ $(;)?) => {
 /****************************************************************************************************
  * ControllerInputVariable affiliated enums and structs
@@ -66,6 +63,7 @@ macro_rules! generate_controller_input {
 pub enum ControllerInputVariable {
     $(
         /// Variable corresponding to the `$snake_case_name` field in [`ControllerInput`].
+        #[doc = $docstring]
         $camel_case_name,
     )+
     /// Special variable that requests all available variables from the navigator.
@@ -99,6 +97,7 @@ impl ControllerInputVariable {
 pub struct ControllerInputVariables {
     $(
         /// Variable corresponding to the `$camel_case_name` field in [`ControllerInputVariable`].
+        #[doc = $docstring]
         pub $snake_case_name: Option<$t>,
     )+
 }
@@ -118,6 +117,7 @@ impl Recordable<ControllerInputRecord> for ControllerInputVariables {
 pub struct ControllerInputRecord {
     $(
         /// Variable corresponding to the `$camel_case_name` field in [`ControllerInputVariable`].
+        #[doc = $docstring]
         pub $snake_case_name: Option<$t_record>,
     )+
 }
@@ -146,10 +146,10 @@ impl UIComponent for ControllerInputRecord {
 macro_rules! _generate_declare_controller_input {
     ($d:tt) => {
 /// Helper macro to declare a controller input struct using a subset of the variables defined in [`ControllerInputVariable`].
-/// 
+///
 /// This macros also generates the code to convert from [`ControllerInputVariables`] to the declared struct, and implements
 /// the [`ControllerInput`](crate::controllers::ControllerInput) trait for the struct.
-/// 
+///
 /// A panic will occur if a variable is requested that is not provided by the navigator (if it is None in the [`ControllerInputVariables`] instance).
 #[macro_export]
 macro_rules! declare_controller_input {
@@ -165,10 +165,16 @@ macro_rules! _controller_input_get_type {
     ($snake_case_name) => {$t};
     )+
 }
+macro_rules! _controller_input_docstring {
+    $(
+    ($snake_case_name) => {$docstring};
+    )+
+}
 $d (#[$d meta])*
 #[derive(Debug, Clone)]
 pub struct $d name {
     $d (
+    #[doc = _controller_input_docstring!($d var_name)]
     pub $d var_name: _controller_input_get_type!($d var_name),
     )+
 }
@@ -208,6 +214,7 @@ impl From<$crate::interfaces::navigator_controller::ControllerInputVariables> fo
 $d (#[$d meta])*
 pub struct $d name {
     $(
+    #[doc = $docstring]
     pub $snake_case_name: Option<$t>,
     )+
 }
@@ -241,13 +248,14 @@ impl From<$d name> for $crate::interfaces::navigator_controller::ControllerInput
 }
 
 macro_rules! _make_controller_input_python_wrapper {
-    () => {
+    ($c: expr) => {
         paste::paste!{
 #[pyclass(get_all, set_all)]
 #[pyo3(name = "ControllerInput")]
 #[derive(Debug, Clone, Default)]
 pub struct [<$d name Wrapper>] {
     $(
+    #[doc = $docstring]
     pub $snake_case_name: Option<$t_python>,
     )+
 }
@@ -270,7 +278,8 @@ impl From<&$d name> for [<$d name Wrapper>] {
         }
     }
 }
-crate::general::impl_from_plain_with_from_ref!([<$d name Wrapper>], $d name);
+// crate => called by simusa-py
+$c::general::impl_from_plain_with_from_ref!([<$d name Wrapper>], $d name);
 
 impl From<&[<$d name Wrapper>]> for $d name {
     fn from(s: &[<$d name Wrapper>]) -> Self {
@@ -281,7 +290,8 @@ impl From<&[<$d name Wrapper>]> for $d name {
         }
     }
 }
-crate::general::impl_from_plain_with_from_ref!($d name, [<$d name Wrapper>]);
+// crate => called by simusa-py
+$c::general::impl_from_plain_with_from_ref!($d name, [<$d name Wrapper>]);
         }
     };
 }
@@ -301,6 +311,11 @@ pub use declare_controller_input;
 macro_rules! _generate_declare_navigator_output {
     ($d:tt) => {
 #[macro_export]
+/// Declares a new navigator output struct with the specified variables,
+/// implementing the [`NavigatorOutput`](crate::navigators::NavigatorOutput) trait and
+/// conversion to [`ControllerInputVariables`].
+///
+/// Using this macro enforce that the given variables exists.
 macro_rules! declare_navigator_output {
     ($d (#[$d meta:meta])*  // Capture attributes including doc comments
     $d name: ident;
@@ -314,10 +329,16 @@ macro_rules! _navigator_output_get_type {
     ($snake_case_name) => {$t};
     )+
 }
+macro_rules! _navigator_output_docstring {
+    $(
+    ($snake_case_name) => {$docstring};
+    )+
+}
 $d (#[$d meta])*
 #[derive(Debug, Clone)]
 pub struct $d name {
     $d (
+    #[doc = _navigator_output_docstring!($d var_name)]
     pub $d var_name: _navigator_output_get_type!($d var_name),
     )+
 }
@@ -337,8 +358,8 @@ impl $crate::navigators::NavigatorOutput for $d name {
         )+
         ]
     }
-    
-    fn into_controller_input_variables(self, requested_variables: &[$crate::interfaces::navigator_controller::ControllerInputVariable]) -> $crate::interfaces::navigator_controller::ControllerInputVariables {
+
+    fn into_controller_input_variables(self, _requested_variables: &[$crate::interfaces::navigator_controller::ControllerInputVariable]) -> $crate::interfaces::navigator_controller::ControllerInputVariables {
         $crate::interfaces::navigator_controller::ControllerInputVariables {
         $d(
             $d var_name: Some(self.$d var_name),
@@ -358,24 +379,23 @@ _generate_declare_navigator_output!($);
     }
 }
 
-
 generate_controller_input! {
-    NodePosition, node_position, (f32, f32), (f32, f32), (f32, f32);
-    NodeOrientation, node_orientation, f32, f32, f32;
-    NodeLinearVelocity, node_linear_velocity, f32, f32, f32;
-    NodeLongitudinalLateralVelocities, node_longitudinal_lateral_velocities, (f32, f32), (f32, f32), (f32, f32);
-    NodeAngularVelocity, node_angular_velocity, f32, f32, f32;
-    WorldState, world_state, WorldState, WorldStateRecord, WorldStateWrapper;
-    TargetPosition, target_position, (f32, f32), (f32, f32), (f32, f32);
-    TargetOrientation, target_orientation, f32, f32, f32;
-    TargetLinearVelocity, target_linear_velocity, f32, f32, f32;
-    TargetLongitudinalLateralVelocities, target_longitudinal_lateral_velocities, (f32, f32), (f32, f32), (f32, f32);
-    TargetAngularVelocity, target_angular_velocity, f32, f32, f32;
-    ErrorLongitudinal, error_longitudinal, f32, f32, f32;
-    ErrorLateral, error_lateral, f32, f32, f32;
-    ErrorAngular, error_angular, f32, f32, f32;
-    ErrorLinearVelocity, error_linear_velocity, f32, f32, f32;
-    ErrorLongitudinalLateralVelocities, error_longitudinal_lateral_velocities, (f32, f32), (f32, f32), (f32, f32);
-    ErrorAngularVelocity, error_angular_velocity, f32, f32, f32;
-    Custom, custom, GeneralValue, GeneralValue, String;
+    NodePosition, node_position, (f32, f32), (f32, f32), (f32, f32), "Estinated position of the node in the world frame (x, y).";
+    NodeOrientation, node_orientation, f32, f32, f32, "Estimated orientation of the node in the world frame (yaw).";
+    NodeLinearVelocity, node_linear_velocity, f32, f32, f32, "Estimated linear velocity of the node in the world frame (m/s).";
+    NodeLongitudinalLateralVelocities, node_longitudinal_lateral_velocities, (f32, f32), (f32, f32), (f32, f32), "Estimated longitudinal and lateral velocities of the node in the world frame (m/s).";
+    NodeAngularVelocity, node_angular_velocity, f32, f32, f32, "Estimated angular velocity of the node in the world frame (rad/s).";
+    WorldState, world_state, WorldState, WorldStateRecord, WorldStateWrapper, "Full estimated state of the world, including all nodes and map.";
+    TargetPosition, target_position, (f32, f32), (f32, f32), (f32, f32), "Target position of the node in the world frame (x, y).";
+    TargetOrientation, target_orientation, f32, f32, f32, "Target orientation of the node in the world frame (yaw).";
+    TargetLinearVelocity, target_linear_velocity, f32, f32, f32, "Target linear velocity of the node in the world frame (m/s).";
+    TargetLongitudinalLateralVelocities, target_longitudinal_lateral_velocities, (f32, f32), (f32, f32), (f32, f32), "Target longitudinal and lateral velocities of the node in the world frame (m/s).";
+    TargetAngularVelocity, target_angular_velocity, f32, f32, f32, "Target angular velocity of the node in the world frame (rad/s).";
+    ErrorLongitudinal, error_longitudinal, f32, f32, f32, "Error in the longitudinal direction (m).";
+    ErrorLateral, error_lateral, f32, f32, f32, "Error in the lateral direction (m).";
+    ErrorAngular, error_angular, f32, f32, f32, "Error in the angular direction (rad).";
+    ErrorLinearVelocity, error_linear_velocity, f32, f32, f32, "Error in the linear velocity (m/s).";
+    ErrorLongitudinalLateralVelocities, error_longitudinal_lateral_velocities, (f32, f32), (f32, f32), (f32, f32), "Error in the longitudinal and lateral velocities (m/s).";
+    ErrorAngularVelocity, error_angular_velocity, f32, f32, f32, "Error in the angular velocity (rad/s).";
+    Custom, custom, GeneralValue, GeneralValue, String, "Custom variable that can be used to send any type of data from the navigator to the controller (when both are user-defined).";
 }

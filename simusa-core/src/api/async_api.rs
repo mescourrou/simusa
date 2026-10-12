@@ -10,7 +10,17 @@ use std::{
 use simusa_com::rfc::{self, RemoteFunctionCall, RemoteFunctionCallHost};
 
 use crate::{
-    context::Context, controllers::{AbstractController, Controller}, errors::SimusaResult, info, navigators::{AbstractNavigator, Navigator}, networking::network::Network, physics::Physics, plugin_api::PluginAPI, simulator::{Record, Simulator, SimulatorAsyncApi, SimulatorConfig}, state_estimators::StateEstimator, utils::{
+    context::Context,
+    controllers::AbstractController,
+    errors::SimusaResult,
+    info,
+    navigators::AbstractNavigator,
+    networking::network::Network,
+    physics::Physics,
+    plugin_api::PluginAPI,
+    simulator::{Record, Simulator, SimulatorAsyncApi, SimulatorConfig},
+    state_estimators::StateEstimator,
+    utils::{
         SharedMutex, SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory,
     },
 };
@@ -309,7 +319,8 @@ pub struct PluginAsyncAPI {
         Arc<RemoteFunctionCall<PluginAsyncAPIGetStateEstimatorRequest, Box<dyn StateEstimator>>>,
     get_controller:
         Arc<RemoteFunctionCall<PluginAsyncAPIGetControllerRequest, Box<dyn AbstractController>>>,
-    get_navigator: Arc<RemoteFunctionCall<PluginAsyncAPIGetNavigatorRequest, Box<dyn AbstractNavigator>>>,
+    get_navigator:
+        Arc<RemoteFunctionCall<PluginAsyncAPIGetNavigatorRequest, Box<dyn AbstractNavigator>>>,
     get_physics: Arc<RemoteFunctionCall<PluginAsyncAPIGetPhysicsRequest, Box<dyn Physics>>>,
 }
 
@@ -437,8 +448,9 @@ pub struct PluginAsyncAPIClient {
         RemoteFunctionCallHost<PluginAsyncAPIGetStateEstimatorRequest, Box<dyn StateEstimator>>,
     >,
     /// Get a controller from the plugin API, with the given configuration, global configuration, random variable factory, network and initial time. It returns a controller to use in the simulator.
-    pub get_controller:
-        Arc<RemoteFunctionCallHost<PluginAsyncAPIGetControllerRequest, Box<dyn AbstractController>>>,
+    pub get_controller: Arc<
+        RemoteFunctionCallHost<PluginAsyncAPIGetControllerRequest, Box<dyn AbstractController>>,
+    >,
     /// Get a navigator from the plugin API, with the given configuration, global configuration, random variable factory, network and initial time. It returns a navigator to use in the simulator.
     pub get_navigator:
         Arc<RemoteFunctionCallHost<PluginAsyncAPIGetNavigatorRequest, Box<dyn AbstractNavigator>>>,

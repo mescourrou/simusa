@@ -31,8 +31,6 @@ impl OrientedRobotObservation {
 
     pub fn draw(
         &self,
-        _ui: &mut egui::Ui,
-        _viewport: &Rect,
         painter_info: &PainterInfo,
         scale: f32,
         obs: &OrientedRobotObservationRecord,
@@ -116,8 +114,6 @@ impl OrientedLandmarkObservation {
 
     pub fn draw(
         &self,
-        _ui: &mut egui::Ui,
-        _viewport: &Rect,
         painter_info: &PainterInfo,
         scale: f32,
         obs: &OrientedLandmarkObservationRecord,
@@ -305,8 +301,6 @@ impl ScanObservation {
 
     pub fn draw(
         &self,
-        _ui: &mut egui::Ui,
-        _viewport: &Rect,
         painter_info: &PainterInfo,
         scale: f32,
         obs: &ScanObservationRecord,

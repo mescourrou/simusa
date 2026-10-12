@@ -169,6 +169,7 @@ pub fn text_singleline_with_apply(
     }
 }
 
+/// Edit the config of a plugin as a JSON editor (very basic for now).
 pub fn edit_plugin_config(
     ui: &mut egui::Ui,
     plugin_name: &str,
@@ -191,6 +192,7 @@ pub fn edit_plugin_config(
     });
 }
 
+/// Show the config of a plugin as a JSON text.
 pub fn show_plugin_config(ui: &mut egui::Ui, plugin_name: &str, config: &serde_json::Value) {
     egui::CollapsingHeader::new(plugin_name).show(ui, |ui| {
         ui.vertical(|ui| {

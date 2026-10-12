@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use simusa::context::Context;
-use simusa::{declare_navigator_output, info};
 use simusa::navigators::{AbstractNavigator, Navigator, NavigatorRecord};
 use simusa::networking::network::Network;
 use simusa::plugin_api::PluginAPI;
@@ -9,6 +8,7 @@ use simusa::simulator::{AsyncSimulator, SimulatorConfig};
 use simusa::state_estimators::{StateEstimator, WorldState};
 use simusa::utils::SharedRwLock;
 use simusa::utils::determinist_random_variable::DeterministRandomVariableFactory;
+use simusa::{declare_navigator_output, info};
 use simusa_py::general::PythonAPI;
 use std::sync::Arc;
 
@@ -32,7 +32,6 @@ impl MyWonderfulNavigator {
         Self {}
     }
 }
-
 
 // Variables that your navigator can compute.
 // Make a maximum to maximize compatibility.
@@ -89,7 +88,6 @@ impl Navigator for MyWonderfulNavigator {
     }
 
     fn pre_loop_hook(&mut self, _node: &mut simusa::node::Node, _time: f32, _context: &Context) {}
-
 
     fn next_time_step(&self, _context: &Context) -> Option<f32> {
         // Optional implementation of next_time_step, which detemines the next time step of the navigator.

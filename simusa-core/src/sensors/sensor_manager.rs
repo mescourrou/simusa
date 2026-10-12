@@ -21,14 +21,14 @@ use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
 use crate::constants::TIME_ROUND;
-use crate::context::{self, Context};
+use crate::context::Context;
 use crate::errors::{SimusaError, SimusaErrorTypes, SimusaResult};
 #[cfg(feature = "gui")]
 use crate::gui::{
     UIComponent,
     utils::{string_checkbox, text_singleline_with_apply},
 };
-use crate::logger::{InternalLog, LogLevel};
+use crate::logger::InternalLog;
 use crate::networking::message_types::MessageType;
 use crate::networking::network::Envelope;
 use crate::node::Node;
@@ -39,7 +39,7 @@ use crate::simulator::SimusaBrokerMultiClient;
 use crate::state_estimators::State;
 use crate::utils::SharedRwLock;
 use crate::utils::frame::{Frame, FrameConfig};
-use crate::{debug, error, internal, networking, warning};
+use crate::{error, internal, networking, warning};
 use crate::{recordable::Recordable, simulator::SimulatorConfig};
 
 use super::gnss_sensor::GNSSSensor;
@@ -116,7 +116,8 @@ impl UIComponent for ManagedSensorConfig {
                     ui.checkbox(&mut self.triggered, "");
                 });
 
-                let mut node_list = Vec::from_iter(global_config.nodes.iter().map(|x| x.name.clone()));
+                let mut node_list =
+                    Vec::from_iter(global_config.nodes.iter().map(|x| x.name.clone()));
                 if let Some(idx) = node_list
                     .iter()
                     .position(|x| x == current_node_name.unwrap())
@@ -285,7 +286,7 @@ pub struct ManagedSensorRecord {
 
 /// Runtime manager of one sensor allowing its triggering, observation retrieval, and observation forwarding.
 #[derive(Debug)]
-struct ManagedSensor {
+pub struct ManagedSensor {
     name: String,
     send_to: Vec<String>,
     triggered: bool,
@@ -552,10 +553,9 @@ impl SensorManager {
                     MessageType::Observations(obs) => obs,
                     _ => panic!("Received message on observation channel with invalid type"),
                 };
-                self.last_observations
-                    .extend(obs_list.iter().map(|o| o.clone()));
+                self.last_observations.extend(obs_list.iter().cloned());
                 self.distant_observations
-                    .extend(obs_list.iter().map(|o| Observation::from_record(o)));
+                    .extend(obs_list.iter().map(Observation::from_record));
                 // Assure that the observations are always in the same order, for determinism:
                 self.distant_observations
                     .sort_by(|a, b| a.observer.cmp(&b.observer));

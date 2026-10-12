@@ -35,9 +35,7 @@ use crate::utils::{SharedMutex, SharedRoLock, SharedRwLock};
 use crate::{
     api::internal_api::{self, NodeClient, NodeServer},
     constants::TIME_ROUND,
-    controllers::Controller,
     errors::SimusaResult,
-    navigators::Navigator,
     networking::network::Network,
     physics::Physics,
     recordable::Recordable,
@@ -452,7 +450,13 @@ impl Node {
                     .unwrap()
                     .finished_time_analysis(ta.unwrap());
             }
-            self.last_estimation = Some(state_estimator.read().unwrap().world_state(&context).record(&context));
+            self.last_estimation = Some(
+                state_estimator
+                    .read()
+                    .unwrap()
+                    .world_state(&context)
+                    .record(&context),
+            );
             true
         } else {
             false
@@ -509,7 +513,13 @@ impl Node {
                             .unwrap()
                             .finished_time_analysis(ta.unwrap());
                     }
-                    self.last_estimation = Some(state_estimator.read().unwrap().world_state(&context).record(&context));
+                    self.last_estimation = Some(
+                        state_estimator
+                            .read()
+                            .unwrap()
+                            .world_state(&context)
+                            .record(&context),
+                    );
                 }
 
                 if let Some(state_estimator_bench) = &self.state_estimator_bench() {
@@ -569,7 +579,14 @@ impl Node {
             let state_estimator = &self.state_estimator().unwrap();
             let world_state = state_estimator.read().unwrap().world_state(&context);
 
-            let requested_variables = self.controller().as_ref().unwrap().read().unwrap().call_required_variables().to_vec();
+            let requested_variables = self
+                .controller()
+                .as_ref()
+                .unwrap()
+                .read()
+                .unwrap()
+                .call_required_variables()
+                .to_vec();
             // Compute the error to the planned path
             let ta = self.time_analysis.as_ref().map(|time_analysis| {
                 time_analysis
@@ -767,27 +784,29 @@ impl Node {
             model_name: meta_data.model_name.clone(),
             labels: meta_data.labels.clone(),
             navigator: if self.last_controller_input.is_some() {
-                Some(self
-                    .navigator
-                    .as_ref()
-                    .unwrap()
-                    .read()
-                    .unwrap()
-                    .record(&context))
-                } else {
-                    None
-                },
+                Some(
+                    self.navigator
+                        .as_ref()
+                        .unwrap()
+                        .read()
+                        .unwrap()
+                        .record(&context),
+                )
+            } else {
+                None
+            },
             controller: if self.last_command.is_some() {
-                Some(self
-                    .controller
-                    .as_ref()
-                    .unwrap()
-                    .read()
-                    .unwrap()
-                    .record(&context))
-                } else {
-                    None
-                },
+                Some(
+                    self.controller
+                        .as_ref()
+                        .unwrap()
+                        .read()
+                        .unwrap()
+                        .record(&context),
+                )
+            } else {
+                None
+            },
             physics: self
                 .physics
                 .as_ref()
@@ -796,16 +815,17 @@ impl Node {
                 .unwrap()
                 .record(&context),
             state_estimator: if self.last_estimation.is_some() {
-                Some(self
-                    .state_estimator
-                    .as_ref()
-                    .unwrap()
-                    .read()
-                    .unwrap()
-                    .record(&context))
-                } else {
-                    None
-                },
+                Some(
+                    self.state_estimator
+                        .as_ref()
+                        .unwrap()
+                        .read()
+                        .unwrap()
+                        .record(&context),
+                )
+            } else {
+                None
+            },
             state_estimator_bench: Vec::new(),
             sensors: self
                 .sensor_manager
@@ -816,7 +836,10 @@ impl Node {
                 .record(&context),
             state: meta_data.state.clone(),
             command: self.last_command.clone(),
-            controller_input: self.last_controller_input.as_ref().map(|c| c.record(&context)),
+            controller_input: self
+                .last_controller_input
+                .as_ref()
+                .map(|c| c.record(&context)),
             estimated_world_state: self.last_estimation.clone(),
         };
         let other_state_estimators = self.state_estimator_bench.clone();

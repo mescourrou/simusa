@@ -8,7 +8,16 @@ use egui::{Rect, Response, RichText, Shape, Vec2};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    api::async_api::AsyncApiRunner, context::Context, environment::map::MapRecord, error, gui::app::PainterInfo, node::node_factory::{ComputationUnitRecord, NodeTypeConfig, RecordType, RobotRecord}, plugin_api::PluginAPI, recordable::Recordable, scenario::config::EventRecord, simulator::SimulatorConfig,
+    api::async_api::AsyncApiRunner,
+    context::Context,
+    environment::map::MapRecord,
+    error,
+    gui::app::PainterInfo,
+    node::node_factory::{ComputationUnitRecord, NodeTypeConfig, RecordType, RobotRecord},
+    plugin_api::PluginAPI,
+    recordable::Recordable,
+    scenario::config::EventRecord,
+    simulator::SimulatorConfig,
 };
 
 pub mod map;
@@ -192,7 +201,9 @@ impl DrawableManager {
 
         // Insert robots
         for node in &config.nodes {
-            if node.autospawn && let NodeTypeConfig::Robot(robot) = &node.node_type {
+            if node.autospawn
+                && let NodeTypeConfig::Robot(robot) = &node.node_type
+            {
                 self.add_drawable(
                     Box::new(robot::Robot::init(robot, config, node.name.clone())),
                     context,
