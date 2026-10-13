@@ -1,13 +1,15 @@
 [package]
 name = "my_rust_plugin"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+resolver = "2"
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
 simusa = { path = "../../simusa-core", features = ["gui"], version = "*"}
+simusa-py = { path = "../../simusa-py", features = ["gui"], version = "*"}
 pyo3 ={ version = "^0.27", features = ["extension-module"]}
 serde_json = "1.0.145"
 serde = "1.0.228"

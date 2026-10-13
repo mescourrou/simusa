@@ -60,7 +60,8 @@ impl Configurator {
                     self.current_config = SimulatorConfig::default();
                 }
             });
-            self.current_config.base_path = Box::from(Path::new(&self.save_path));
+            self.current_config
+                .set_base_path(Box::from(Path::new(&self.save_path)));
 
             egui::ScrollArea::vertical().show(ui, |ui| {
                 let unique_id = String::new();

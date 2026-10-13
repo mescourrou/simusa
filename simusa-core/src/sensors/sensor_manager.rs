@@ -12,8 +12,6 @@
 //!
 
 extern crate confy;
-use core::f32;
-use pyo3::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 use simusa_com::pub_sub::{MultiClientTrait, PathKey};
 use simusa_macros::config_derives;
@@ -23,25 +21,28 @@ use std::sync::{Arc, RwLock};
 
 use crate::constants::TIME_ROUND;
 use crate::context::Context;
-use crate::errors::SimusaResult;
-#[cfg(feature = "gui")]
-use crate::gui::{
-    UIComponent,
-    utils::{string_checkbox, text_singleline_with_apply},
-};
+use crate::errors::{SimusaError, SimusaErrorTypes, SimusaResult};
 use crate::logger::InternalLog;
-use crate::networking::message_types::MessageTypes;
+use crate::networking::message_types::MessageType;
 use crate::networking::network::Envelope;
 use crate::node::Node;
 use crate::node::node_factory::FromConfigArguments;
+use crate::recordable::Recordable;
 use crate::sensors::displacement_sensor::DisplacementSensor;
-use crate::sensors::external_sensor::ExternalSensor;
 use crate::sensors::scan_sensor::ScanSensor;
 use crate::simulator::SimusaBrokerMultiClient;
 use crate::state_estimators::State;
 use crate::utils::SharedRwLock;
-use crate::{internal, networking, warning};
-use crate::{recordable::Recordable, simulator::SimulatorConfig};
+use crate::utils::frame::{Frame, FrameConfig};
+use crate::{error, internal, networking, warning};
+#[cfg(feature = "gui")]
+use crate::{
+    gui::{
+        UIComponent,
+        utils::{string_checkbox, text_singleline_with_apply},
+    },
+    simulator::SimulatorConfig,
+};
 
 use super::gnss_sensor::GNSSSensor;
 use super::oriented_landmark_sensor::OrientedLandmarkSensor;
@@ -71,6 +72,9 @@ pub struct ManagedSensorConfig {
     #[check]
     /// Concrete sensor configuration.
     pub config: SensorConfig,
+    /// Frame configuration for the sensor's pose observations, relative to the node's reference point.
+    #[check]
+    pub frame: FrameConfig,
 }
 
 impl Default for ManagedSensorConfig {
@@ -80,6 +84,7 @@ impl Default for ManagedSensorConfig {
             send_to: Vec::new(),
             triggered: false,
             config: SensorConfig::Speed(SpeedSensorConfig::default()),
+            frame: FrameConfig::default(),
         }
     }
 }
@@ -113,14 +118,8 @@ impl UIComponent for ManagedSensorConfig {
                     ui.checkbox(&mut self.triggered, "");
                 });
 
-                let mut node_list = Vec::from_iter(
-                    global_config.robots.iter().map(|x| x.name.clone()).chain(
-                        global_config
-                            .computation_units
-                            .iter()
-                            .map(|x| x.name.clone()),
-                    ),
-                );
+                let mut node_list =
+                    Vec::from_iter(global_config.nodes.iter().map(|x| x.name.clone()));
                 if let Some(idx) = node_list
                     .iter()
                     .position(|x| x == current_node_name.unwrap())
@@ -131,6 +130,15 @@ impl UIComponent for ManagedSensorConfig {
                     ui.label("Send to:");
                     string_checkbox(ui, &node_list, &mut self.send_to);
                 });
+
+                self.frame.show_mut(
+                    ui,
+                    ctx,
+                    buffer_stack,
+                    global_config,
+                    current_node_name,
+                    unique_id,
+                );
 
                 self.config.show_mut(
                     ui,
@@ -161,6 +169,8 @@ impl UIComponent for ManagedSensorConfig {
                         ui.label(format!("{}, ", to));
                     }
                 });
+
+                self.frame.show(ui, ctx, unique_id);
 
                 self.config.show(ui, ctx, unique_id);
             });
@@ -278,28 +288,46 @@ pub struct ManagedSensorRecord {
 
 /// Runtime manager of one sensor allowing its triggering, observation retrieval, and observation forwarding.
 #[derive(Debug)]
-struct ManagedSensor {
+pub struct ManagedSensor {
     name: String,
     send_to: Vec<String>,
     triggered: bool,
     last_triggered: Option<f32>,
     sensor: SharedRwLock<Box<dyn Sensor>>,
+    frame: Frame,
+}
+
+impl ManagedSensor {
+    /// Sets the frame of the sensor.
+    ///
+    /// There is no move dynamics, the change is instaneous.
+    pub fn set_frame(&mut self, frame: Frame, context: &Context) {
+        internal!(
+            context,
+            InternalLog::SensorManager,
+            "Setting frame of sensor {} to {:?}",
+            self.name,
+            frame
+        );
+        self.frame = frame;
+    }
 }
 
 /// Message used to trigger a sensor through the internal network.
 ///
 /// The message is empty for now, but it could be extended in the future to include additional information about the trigger (e.g. time to trigger, dynamic sensor parameters, etc.).
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-#[pyclass(get_all, set_all)]
+#[derive(Default)]
+#[config_derives]
 pub struct SensorTriggerMessage {}
 
-#[pymethods]
-impl SensorTriggerMessage {
-    /// Creates an empty trigger message.
-    #[new]
-    pub fn new() -> Self {
-        Self {}
-    }
+/// Message used to set the frame of a sensor through the internal network.
+#[derive(Default)]
+#[config_derives]
+pub struct SensorFrameMessage {
+    /// New frame
+    pub frame: [f32; 3],
+    /// Name of the sensor (should already be created in the node)
+    pub sensor_name: String,
 }
 
 /// Sensor manager which manages all the node's [`Sensor`]s.
@@ -319,6 +347,8 @@ impl SensorManager {
     pub const CHANNEL_NAME: &'static str = "sensors";
     /// Channel segment used for observation payload messages.
     pub const OBSERVATION_CHANNEL: &'static str = "observations";
+    /// Channel segment used for setting the frame of a sensor.
+    pub const SET_FRAME_CHANNEL: &'static str = "set_frame";
 
     /// Makes a new [`SensorManager`] without any [`Sensor`].
     pub fn new() -> Self {
@@ -355,6 +385,10 @@ impl SensorManager {
             sensor_manager_key
                 .clone()
                 .join_str(Self::OBSERVATION_CHANNEL),
+            context,
+        );
+        from_config_args.network.write().unwrap().make_channel(
+            sensor_manager_key.clone().join_str(Self::SET_FRAME_CHANNEL),
             context,
         );
         for sensor_config in &config.sensors {
@@ -420,18 +454,27 @@ impl SensorManager {
                         from_config_args.initial_time,
                         context,
                     )?) as Box<dyn Sensor>,
-                    SensorConfig::External(c) => Box::new(ExternalSensor::from_config(
-                        c,
-                        from_config_args.plugin_api,
-                        from_config_args.global_config,
-                        from_config_args.va_factory,
-                        from_config_args.network,
-                        from_config_args.initial_time,
-                        context,
-                    )?) as Box<dyn Sensor>,
+                    SensorConfig::Plugin(c) => from_config_args
+                        .plugin_api
+                        .as_ref()
+                        .ok_or_else(|| {
+                            SimusaError::new(
+                                SimusaErrorTypes::PluginAPIError,
+                                "Plugin API not set!".to_string(),
+                            )
+                        })?
+                        .get_sensor(
+                            c,
+                            from_config_args.global_config,
+                            from_config_args.va_factory,
+                            from_config_args.network,
+                            from_config_args.initial_time,
+                            context,
+                        ),
                 })),
                 triggered: sensor_config.triggered,
                 last_triggered: None,
+                frame: Frame::from_config(&sensor_config.frame),
             });
         }
 
@@ -509,12 +552,12 @@ impl SensorManager {
                     .join_str(Self::OBSERVATION_CHANNEL)
             {
                 let obs_list = match envelope.message {
-                    MessageTypes::Observations(obs) => obs,
+                    MessageType::Observations(obs) => obs,
                     _ => panic!("Received message on observation channel with invalid type"),
                 };
-                self.last_observations
-                    .extend(obs_list.iter().map(|o| o.record(context)));
-                self.distant_observations.extend(obs_list);
+                self.last_observations.extend(obs_list.iter().cloned());
+                self.distant_observations
+                    .extend(obs_list.iter().map(Observation::from_record));
                 // Assure that the observations are always in the same order, for determinism:
                 self.distant_observations
                     .sort_by(|a, b| a.observer.cmp(&b.observer));
@@ -528,7 +571,45 @@ impl SensorManager {
                     envelope.from,
                     envelope.timestamp
                 );
-            } else if let MessageTypes::SensorTrigger(_) = &envelope.message {
+            } else if path
+                == self
+                    .channel_root
+                    .as_ref()
+                    .unwrap()
+                    .join_str(Self::SET_FRAME_CHANNEL)
+            {
+                let set_frame_message = match envelope.message {
+                    MessageType::SensorFrame(msg) => msg,
+                    _ => panic!(
+                        "Received message on {} channel with invalid type ({})",
+                        Self::SET_FRAME_CHANNEL,
+                        envelope.message
+                    ),
+                };
+                if let Some(managed_sensor) =
+                    self.get_managed_sensor_mut(&set_frame_message.sensor_name)
+                {
+                    managed_sensor.set_frame(
+                        Frame::new(
+                            set_frame_message.frame[0],
+                            set_frame_message.frame[1],
+                            set_frame_message.frame[2],
+                        ),
+                        context,
+                    );
+                } else {
+                    error!(
+                        context,
+                        "Sensor Manager received a set_frame message for unknown sensor {}. Available sensors: {}",
+                        set_frame_message.sensor_name,
+                        self.sensors
+                            .iter()
+                            .map(|s| s.name.clone())
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    );
+                }
+            } else if let MessageType::SensorTrigger(_) = &envelope.message {
                 let sensor_name = path.to_vec().last().unwrap().clone();
                 for sensor in &mut self.sensors {
                     if sensor.name == sensor_name {
@@ -611,13 +692,14 @@ impl SensorManager {
                     .sensor
                     .write()
                     .unwrap()
-                    .get_observations(node, time, context)
+                    .get_observations(node, time, &sensor.frame, context)
                     .into_iter()
                     .map(|obs| Observation {
                         sensor_name: sensor.name.clone(),
                         observer: node.name(),
                         time,
                         sensor_observation: obs,
+                        frame: sensor.frame.clone(),
                     })
                     .collect()
             } else {
@@ -646,7 +728,11 @@ impl SensorManager {
             let key_base = PathKey::from_str(networking::channels::internal::NODE).unwrap();
             for (to, observations) in obs_to_send {
                 if !observations.is_empty() {
-                    let obs_msg = observations.into();
+                    let obs_msg = observations
+                        .iter()
+                        .map(|o| o.record(context))
+                        .collect::<Vec<_>>()
+                        .into();
                     node.network()
                         .expect(
                             "This Node has no network, it cannot send observation to other nodes",
@@ -678,6 +764,20 @@ impl SensorManager {
     /// Get the time of the next observation.
     pub fn next_time_step(&self) -> Option<f32> {
         self.next_time
+    }
+
+    /// Get a reference to a managed sensor by name.
+    ///
+    /// Returns `None` if no sensor with the given name is found.
+    pub fn get_managed_sensor(&self, name: &str) -> Option<&ManagedSensor> {
+        self.sensors.iter().find(|s| s.name == name)
+    }
+
+    /// Get a mutable reference to a managed sensor by name.
+    ///
+    /// Returns `None` if no sensor with the given name is found.
+    pub fn get_managed_sensor_mut(&mut self, name: &str) -> Option<&mut ManagedSensor> {
+        self.sensors.iter_mut().find(|s| s.name == name)
     }
 }
 

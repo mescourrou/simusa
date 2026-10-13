@@ -39,7 +39,7 @@ type SharedMutex<T> = std::sync::Arc<std::sync::Mutex<T>>;
 #[cfg(test)]
 mod tests {
     use std::{
-        collections::HashMap,
+        collections::BTreeMap,
         str::FromStr,
         sync::{Arc, Barrier, Mutex},
         thread,
@@ -309,7 +309,7 @@ mod tests {
             assert_eq!(message, Some(5));
         });
 
-        let mut node_states = HashMap::new();
+        let mut node_states = BTreeMap::new();
 
         // Start with different states
         node_states.insert("thread1".to_string(), 3);

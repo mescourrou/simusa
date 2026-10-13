@@ -23,14 +23,15 @@ Here's the simplest configuration that will run a simulation with one robot:
 
 ```yaml
 max_time: 10.0
-robots:
-  - name: robot1
+nodes:
+- name: robot1
+  type: Robot
 ```
 
 After default application, it will result in:
 
 ```yaml
-version: 1.9.0
+version: 1.10.0
 max_time: 10.0
 log:
   log_level: 
@@ -46,8 +47,9 @@ environment:
   map_path: null
 optimization:
   threads: 0 # 0 = automatic, 1 = no parallelism, >1 = number of threads
-robots:
+nodes:
   - name: robot1
+    type: Robot
     navigator:
       type: GoTo
       target_point: null
@@ -81,7 +83,6 @@ robots:
     network:
       range: 0.0 # unlimited range
       reception_delay: 0.0
-computation_units: []
 scenario:
   events: []
 ```
@@ -98,7 +99,7 @@ scenario:
 | `random_seed` | Random seed is not set, so different each run |
 | `environment` | No map is loaded (empty environment) |
 | `optimization` | Setup for optimization (for threads: 0 = automatic, 1 = no parallelism, >1 = number of cores) |
-| `robots` | List of robots in the simulation |
+| `nodes` | List of nodes in the simulation |
 | `navigator` | How the robot chooses where to go (GoTo: simple point-to-point) |
 | `controller` | How the robot converts navigation commands to motor commands (PID controller) |
 | `physics` | Physics simulation (Internal: built-in model, Unicycle: 2D ground robot) |
@@ -109,13 +110,15 @@ scenario:
 
 ## Adding More Robots
 
-To add a second robot, simply add another entry to the `robots` list:
+To add a second robot, simply add another entry to the `nodes` list:
 
 ```yaml
-robots:
+nodes:
   - name: robot1
+    type: Robot
     # ... robot1 configuration ...
   - name: robot2
+    type: Robot
     # ... robot2 configuration ...
 ```
 
@@ -149,7 +152,7 @@ Many configuration fields use a `type` field to select from options. For example
 
 ```yaml
 navigator:
-  type: GoTo  # Choose between: GoTo, TrajectoryFollower, External, Python
+  type: GoTo  # Choose between: GoTo, TrajectoryFollower, Plugin
 ```
 
 When you select a type, additional fields specific to that type become available:

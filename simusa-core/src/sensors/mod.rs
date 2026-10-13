@@ -12,7 +12,6 @@
 //! 3. Add a corresponding variant to [`SensorRecord`]
 
 pub mod displacement_sensor;
-pub mod external_sensor;
 pub mod gnss_sensor;
 pub mod oriented_landmark_sensor;
 pub mod robot_sensor;
@@ -22,13 +21,10 @@ pub mod speed_sensor;
 
 pub mod fault_models;
 pub mod sensor_filters;
-
-extern crate confy;
-
 use std::fmt::Debug;
 
 use serde_derive::{Deserialize, Serialize};
-use simusa_macros::{EnumToString, config_derives};
+use simusa_macros::config_derives;
 
 use {
     gnss_sensor::{GNSSObservation, GNSSObservationRecord},
@@ -44,13 +40,16 @@ use crate::{
     recordable::Recordable,
     sensors::{
         displacement_sensor::{DisplacementObservation, DisplacementObservationRecord},
-        external_sensor::{ExternalObservation, ExternalObservationRecord},
         scan_sensor::{ScanObservation, ScanObservationRecord},
     },
+    utils::frame::{Frame, FrameRecord},
 };
 #[cfg(feature = "gui")]
 use crate::{
-    gui::{UIComponent, utils::string_combobox},
+    gui::{
+        UIComponent,
+        utils::{edit_plugin_config, show_plugin_config, string_combobox},
+    },
     simulator::SimulatorConfig,
     utils::enum_tools::ToVec,
 };
@@ -66,6 +65,8 @@ pub struct Observation {
     pub time: f32,
     /// Sensor-specific observation payload.
     pub sensor_observation: SensorObservation,
+    /// Frame of the sensor's pose observations, relative to the node's reference point.
+    pub frame: Frame,
 }
 
 impl Observation {
@@ -76,6 +77,18 @@ impl Observation {
             observer: "someone".to_string(),
             time: 0.,
             sensor_observation: SensorObservation::Speed(SpeedObservation::default()),
+            frame: Frame::default(),
+        }
+    }
+
+    /// Converts a [`ObservationRecord`] into a [`Observation`].
+    pub fn from_record(record: &ObservationRecord) -> Self {
+        Self {
+            sensor_name: record.sensor_name.clone(),
+            observer: record.observer.clone(),
+            time: record.time,
+            sensor_observation: SensorObservation::from_record(&record.sensor_observation),
+            frame: Frame::from_record(&record.frame),
         }
     }
 }
@@ -93,12 +106,14 @@ impl Recordable<ObservationRecord> for Observation {
             observer: self.observer.clone(),
             time: self.time,
             sensor_observation: self.sensor_observation.record(context),
+            frame: self.frame.record(context),
         }
     }
 }
 
 /// Serializable record representation of [`Observation`].
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[config_derives(skip_partial_eq)]
+#[derive(Default)]
 pub struct ObservationRecord {
     /// Sensor name that produced the observation.
     pub sensor_name: String,
@@ -108,6 +123,8 @@ pub struct ObservationRecord {
     pub time: f32,
     /// Sensor-specific recorded payload.
     pub sensor_observation: SensorObservationRecord,
+    /// Frame of the sensor's pose observations, relative to the node's reference point.
+    pub frame: FrameRecord,
 }
 
 // Implementation of traits needed for sorting observations, first by time, then by sensor name, then by observer.
@@ -144,12 +161,13 @@ impl UIComponent for ObservationRecord {
         ui.label(format!("Sensor name: {}", self.sensor_name));
         ui.label(format!("Observer: {}", self.observer));
         ui.label(format!("Time: {}", self.time));
+        self.frame.show(ui, ctx, unique_id);
         self.sensor_observation.show(ui, ctx, unique_id);
     }
 }
 
 /// Sum type for all concrete sensor observation payloads.
-#[derive(Debug, Clone, Serialize, Deserialize, EnumToString)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SensorObservation {
     /// Oriented-landmark sensor observation payload.
     OrientedLandmark(OrientedLandmarkObservation),
@@ -163,8 +181,35 @@ pub enum SensorObservation {
     OrientedRobot(OrientedRobotObservation),
     /// Scan sensor observation payload.
     Scan(ScanObservation),
-    /// External sensor observation payload.
-    External(ExternalObservation),
+    /// Plugin sensor observation payload.
+    Plugin(crate::utils::GeneralValue),
+}
+
+impl SensorObservation {
+    /// Converts a [`SensorObservationRecord`] into a [`SensorObservation`].
+    pub fn from_record(record: &SensorObservationRecord) -> Self {
+        match record {
+            SensorObservationRecord::OrientedLandmark(r) => {
+                SensorObservation::OrientedLandmark(OrientedLandmarkObservation::from_record(r))
+            }
+            SensorObservationRecord::Speed(r) => {
+                SensorObservation::Speed(SpeedObservation::from_record(r))
+            }
+            SensorObservationRecord::Displacement(r) => {
+                SensorObservation::Displacement(DisplacementObservation::from_record(r))
+            }
+            SensorObservationRecord::GNSS(r) => {
+                SensorObservation::GNSS(GNSSObservation::from_record(r))
+            }
+            SensorObservationRecord::OrientedRobot(r) => {
+                SensorObservation::OrientedRobot(OrientedRobotObservation::from_record(r))
+            }
+            SensorObservationRecord::Scan(r) => {
+                SensorObservation::Scan(ScanObservation::from_record(r))
+            }
+            SensorObservationRecord::Plugin(r) => SensorObservation::Plugin(r.clone()),
+        }
+    }
 }
 
 impl Recordable<SensorObservationRecord> for SensorObservation {
@@ -182,13 +227,13 @@ impl Recordable<SensorObservationRecord> for SensorObservation {
                 SensorObservationRecord::OrientedRobot(o.record(context))
             }
             SensorObservation::Scan(o) => SensorObservationRecord::Scan(o.record(context)),
-            SensorObservation::External(o) => SensorObservationRecord::External(o.record(context)),
+            SensorObservation::Plugin(o) => SensorObservationRecord::Plugin(o.clone()),
         }
     }
 }
 
 /// Serializable record sum type for all sensor observations.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[config_derives]
 pub enum SensorObservationRecord {
     /// Record payload for oriented-landmark observations.
     OrientedLandmark(OrientedLandmarkObservationRecord),
@@ -202,8 +247,14 @@ pub enum SensorObservationRecord {
     OrientedRobot(OrientedRobotObservationRecord),
     /// Record payload for scan observations.
     Scan(ScanObservationRecord),
-    /// Record payload for external observations.
-    External(ExternalObservationRecord),
+    /// Record payload for plugin observations.
+    Plugin(crate::utils::GeneralValue),
+}
+
+impl Default for SensorObservationRecord {
+    fn default() -> Self {
+        SensorObservationRecord::Speed(SpeedObservationRecord::default())
+    }
 }
 
 #[cfg(feature = "gui")]
@@ -216,7 +267,7 @@ impl UIComponent for SensorObservationRecord {
             Self::GNSS(r) => r.show(ui, ctx, unique_id),
             Self::OrientedRobot(r) => r.show(ui, ctx, unique_id),
             Self::Scan(r) => r.show(ui, ctx, unique_id),
-            Self::External(r) => r.show(ui, ctx, unique_id),
+            Self::Plugin(r) => show_plugin_config(ui, "Plugin Observation", r),
         });
     }
 }
@@ -246,9 +297,8 @@ pub enum SensorConfig {
     /// Scan sensor configuration.
     #[check]
     Scan(scan_sensor::ScanSensorConfig),
-    /// External sensor configuration.
-    #[check]
-    External(external_sensor::ExternalSensorConfig),
+    /// Plugin sensor configuration.
+    Plugin(crate::utils::GeneralValue),
 }
 
 #[cfg(feature = "gui")]
@@ -288,9 +338,7 @@ impl UIComponent for SensorConfig {
                 "GNSS" => *self = SensorConfig::GNSS(gnss_sensor::GNSSSensorConfig::default()),
                 "Robot" => *self = SensorConfig::Robot(robot_sensor::RobotSensorConfig::default()),
                 "Scan" => *self = SensorConfig::Scan(scan_sensor::ScanSensorConfig::default()),
-                "External" => {
-                    *self = SensorConfig::External(external_sensor::ExternalSensorConfig::default())
-                }
+                "Plugin" => *self = SensorConfig::Plugin(crate::utils::GeneralValue::default()),
                 _ => panic!("Where did you find this value?"),
             };
         }
@@ -343,13 +391,13 @@ impl UIComponent for SensorConfig {
                 current_node_name,
                 unique_id,
             ),
-            SensorConfig::External(c) => c.show_mut(
+            SensorConfig::Plugin(c) => edit_plugin_config(
                 ui,
-                ctx,
-                buffer_stack,
-                global_config,
-                current_node_name,
+                "Plugin Sensor",
+                "plugin-sensor",
                 unique_id,
+                buffer_stack,
+                c,
             ),
         }
     }
@@ -365,7 +413,7 @@ impl UIComponent for SensorConfig {
             SensorConfig::GNSS(c) => c.show(ui, ctx, unique_id),
             SensorConfig::Robot(c) => c.show(ui, ctx, unique_id),
             SensorConfig::Scan(c) => c.show(ui, ctx, unique_id),
-            SensorConfig::External(c) => c.show(ui, ctx, unique_id),
+            SensorConfig::Plugin(c) => show_plugin_config(ui, "Plugin Sensor", c),
         }
     }
 }
@@ -385,8 +433,8 @@ pub enum SensorRecord {
     RobotSensor(robot_sensor::RobotSensorRecord),
     /// Record produced by a scan sensor.
     ScanSensor(scan_sensor::ScanSensorRecord),
-    /// Record produced by an external sensor.
-    External(external_sensor::ExternalSensorRecord),
+    /// Record produced by a plugin sensor.
+    Plugin(crate::utils::GeneralValue),
 }
 
 #[cfg(feature = "gui")]
@@ -423,11 +471,7 @@ impl UIComponent for SensorRecord {
                     r.show(ui, ctx, unique_id);
                 });
             }
-            Self::External(r) => {
-                egui::CollapsingHeader::new("External").show(ui, |ui| {
-                    r.show(ui, ctx, unique_id);
-                });
-            }
+            Self::Plugin(r) => show_plugin_config(ui, "Plugin Sensor", r),
         });
     }
 }
@@ -453,6 +497,7 @@ pub trait Sensor:
     /// ## Arguments
     /// * `node` - Reference to the node to access the modules.
     /// * `time` - Time at which the observations are taken.
+    /// * `frame` - Position of the sensor relative to the node's reference point.
     /// * `context` - Shared simulation context used for logging and communication metadata.
     ///
     /// ## Return
@@ -462,6 +507,7 @@ pub trait Sensor:
         &mut self,
         node: &mut Node,
         time: f32,
+        frame: &Frame,
         context: &Context,
     ) -> Vec<SensorObservation>;
 

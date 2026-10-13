@@ -63,7 +63,7 @@ impl UIComponent for TimeAnalysisConfig {
 
             ui.horizontal(|ui| {
                 ui.label("Output path: ");
-                path_finder(ui, &mut self.output_path, &global_config.base_path);
+                path_finder(ui, &mut self.output_path, global_config.get_base_path());
             });
 
             ui.horizontal(|ui| {

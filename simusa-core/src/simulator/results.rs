@@ -16,12 +16,15 @@ use crate::{
     constants::TIME_ROUND,
     gui::{
         UIComponent,
-        utils::{json_config, path_finder, string_combobox},
+        utils::{path_finder, string_combobox},
     },
     utils::enum_tools::ToVec,
 };
 
-use crate::simulator::{Record, SimulatorConfig};
+use crate::{
+    result_analyser::ResultAnalyserConfig,
+    simulator::{Record, SimulatorConfig},
+};
 
 #[config_derives(tag_content)]
 #[derive(Default)]
@@ -48,19 +51,13 @@ pub struct ResultConfig {
     ///
     /// If `None`, results are not saved on disk but can still be forwarded to the analysis script.
     pub result_path: Option<String>,
-    /// Show the matplotlib figures (call `plt.show()`)
-    pub show_figures: bool,
-    /// Path to the Python analysis script (path from config location).
-    /// This script should have the following entry point:
-    /// ```def analyse(records: list, config: dict, figure_path: str, figure_type: str, additional_param: dict|None)```
-    /// If this option is `None`, the script is not executed.
-    pub analyse_script: Option<String>,
-    /// Optional output directory for generated figures (path from config location).
-    pub figures_path: Option<String>,
-    /// Arbitrary parameters forwarded to the analysis script (additional_param in the script entry point). This can be used to forward any custom configuration to the analysis script without having to add it to the simulator configuration.
-    pub python_params: serde_json::Value,
+
     /// Result save mode.
     pub save_mode: ResultSaveMode,
+
+    /// Select an analyser for the results. If `None`, no analysis is performed.
+    #[check]
+    pub analyser: Option<ResultAnalyserConfig>,
 }
 
 impl Default for ResultConfig {
@@ -68,11 +65,8 @@ impl Default for ResultConfig {
     fn default() -> Self {
         Self {
             result_path: None,
-            show_figures: false,
-            analyse_script: None,
-            figures_path: None,
-            python_params: serde_json::Value::default(),
             save_mode: ResultSaveMode::default(),
+            analyser: None,
         }
     }
 }
@@ -88,13 +82,11 @@ impl UIComponent for ResultConfig {
         _current_node_name: Option<&String>,
         unique_id: &str,
     ) {
-        let python_param_key = format!("result-config-python-params-{}", unique_id);
-        let python_param_error_key = format!("result-config-python-params-error-{}", unique_id);
         CollapsingHeader::new("Results").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label("Result Path:");
                 if let Some(path) = &mut self.result_path {
-                    path_finder(ui, path, &global_config.base_path);
+                    path_finder(ui, path, global_config.get_base_path());
                     if ui.button("X").clicked() {
                         self.result_path = None;
                     }
@@ -134,43 +126,21 @@ impl UIComponent for ResultConfig {
                 };
             }
 
-            ui.horizontal(|ui| {
-                ui.label("Show figures:");
-                ui.checkbox(&mut self.show_figures, "");
-            });
-
-            ui.horizontal(|ui| {
-                ui.label("Analyse script path:");
-                if let Some(script) = &mut self.analyse_script {
-                    path_finder(ui, script, &global_config.base_path);
-                    if ui.button("X").clicked() {
-                        self.analyse_script = None;
-                    }
-                } else if ui.button("+").clicked() {
-                    self.analyse_script = Some(String::from(""));
-                }
-            });
-            ui.horizontal(|ui| {
-                ui.label("Figure Path:");
-                if let Some(fig) = &mut self.figures_path {
-                    path_finder(ui, fig, &global_config.base_path);
-                    if ui.button("X").clicked() {
-                        self.figures_path = None;
-                    }
-                } else if ui.button("+").clicked() {
-                    self.figures_path = Some(String::from(""));
-                }
-            });
-            ui.vertical(|ui| {
-                ui.label("Python params (JSON format, null for nothing):");
-                json_config(
+            if let Some(analyser) = &mut self.analyser {
+                analyser.show_mut(
                     ui,
-                    &python_param_key,
-                    &python_param_error_key,
+                    _ctx,
                     buffer_stack,
-                    &mut self.python_params,
+                    global_config,
+                    _current_node_name,
+                    unique_id,
                 );
-            });
+                if ui.button("- Remove analyser").clicked() {
+                    self.analyser = None;
+                }
+            } else if ui.button("+ Add analyser").clicked() {
+                self.analyser = Some(ResultAnalyserConfig::default());
+            }
         });
     }
 
@@ -178,7 +148,7 @@ impl UIComponent for ResultConfig {
         CollapsingHeader::new("Results").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label("Result Path: ");
-                if let Some(path) = &self.figures_path {
+                if let Some(path) = &self.result_path {
                     ui.label(path);
                 } else {
                     ui.label("None");
@@ -195,40 +165,16 @@ impl UIComponent for ResultConfig {
                 ui.label(format!("Save mode: {}", as_str));
             });
 
-            ui.horizontal(|ui| {
-                ui.label("Show figures: ");
-                if self.show_figures {
-                    ui.label("Yes");
-                } else {
-                    ui.label("No");
-                }
-            });
-
-            ui.horizontal(|ui| {
-                ui.label("Result Path: ");
-                if let Some(script) = &self.analyse_script {
-                    ui.label(script);
-                } else {
-                    ui.label("None");
-                }
-            });
-            ui.horizontal(|ui| {
-                ui.label("Figure Path: ");
-                if let Some(path) = &self.figures_path {
-                    ui.label(path);
-                } else {
-                    ui.label("None");
-                }
-            });
-            ui.vertical(|ui| {
-                ui.label("Python params: ");
-                ui.label(self.python_params.to_string());
-            });
+            if let Some(analyser) = &self.analyser {
+                analyser.show(ui, _ctx, _unique_id);
+            } else {
+                ui.label("No analyser configured.");
+            }
         });
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 /// Persisted simulation output containing config and produced records.
 pub struct Results {
     /// Simulator configuration used to produce these results.

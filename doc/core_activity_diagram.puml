@@ -1,0 +1,293 @@
+@startuml
+hide empty description
+
+legend top left
+This diagram is a simplified view of the global flow of the simulator,
+from the loading of the configuration to the end of the simulation and the analyse of the results.
+endlegend
+
+[*] -> load_config
+
+state load_config as "SimulatorConfig::load_from_path" {
+    [*] --> YamlLoader
+    YamlLoader --> apply_merge 
+    note left of apply_merge : merge tags (&ref then <<: *ref)
+    apply_merge --> set_base_path
+    set_base_path --> set_time_analysis_path
+    set_time_analysis_path: prefix the time_analysis_path
+    set_time_analysis_path: with the base_path if it is relative
+
+    set_time_analysis_path --> [*]
+
+}
+
+load_config -> load_config_simu
+
+state load_config_simu as "Simulator::load_config" {
+    [*] --> init_logs
+    init_logs --> check_config
+    state check_config {
+        [*] --> config_tree_navigation
+        config_tree_navigation --> do_check: if do_check exists
+        do_check --> config_tree_navigation
+        config_tree_navigation --> config_tree_navigation: while all structs are not checked
+        config_tree_navigation --> [*]: if all structs are checked
+    }
+    state error_end <<end>>
+    check_config --> error_end: if config is not valid
+    check_config --> set_seed: if config is valid
+    set_seed --> reset
+
+    state reset as "Simulator::reset" {
+        [*] --> set_time_to_0
+        set_time_to_0 --> reset_internal_variables
+        reset_internal_variables --> clear_all_nodes
+        clear_all_nodes --> load_environment
+        load_environment --> load_robot
+        load_robot --> load_robot : while all robots are not loaded
+        load_robot --> load_computation_units
+        load_computation_units --> load_computation_units : while all computation units are not loaded
+        load_computation_units --> load_scenario
+        load_scenario --> call_post_init_step
+        state call_post_init_step as "Node::post_creation_step" {
+            update_other_nodes_names_list <- [*]
+            physics_post_init_step <- update_other_nodes_names_list
+            physics_post_init_step: if node has a physics component
+            physics_post_init_step --> state_estimator_post_init_step
+            state_estimator_post_init_step: if node has a state estimator component
+            state_estimator_post_init_step --> state_estimator_bench_post_init_step
+            state_estimator_bench_post_init_step: if node has a state estimator bench component
+            state_estimator_bench_post_init_step --> state_estimator_bench_post_init_step : while all bench state estimator are not treated
+            state_estimator_bench_post_init_step --> sensor_manager_post_init_step
+            sensor_manager_post_init_step: if node has a sensor manager component
+            sensor_manager_post_init_step --> navigator_post_init_step
+            navigator_post_init_step: if node has a navigator component
+            navigator_post_init_step --> controller_post_init_step
+            controller_post_init_step: if node has a controller component
+            controller_post_init_step --> make_node_api
+            make_node_api: Client (returned to the Simulator) and Server
+            make_node_api --> update_nodes_meta_data
+            update_nodes_meta_data -> [*]
+
+        }
+        call_post_init_step --> call_post_init_step : while all nodes are not treated
+        call_post_init_step --> [*]
+    }
+    reset --> [*]
+}
+
+load_config_simu -> run
+
+state run as "Simulator::run" {
+    note as N1
+        Depending on thread configuration, the execution can be:
+        - Parallel (max_threads = 0)
+        - Sequential (max_threads = 1 or monothreaded cargo feature)
+        - Pooled (max_threads > 1)
+        Here, the Pooled execution is shown, but the other two are similar
+        in the core, except that the Parallel execution uses has synchronization
+        points between the threads instead of leaving the pool, and the
+        Sequential execution does not use any threads.
+    end note
+
+    [*] --> next_time
+    state next_time {
+        [*] --> get_min_next_time_among_nodes
+        state get_min_next_time_among_nodes {
+            state loop <<choice>>
+            [*] --> loop
+            loop -> node_next_time_step
+            state node_next_time_step {
+                state node_min <<join>>
+                note left of node_min: Min
+                state_estimator_next_time_step --> node_min
+                bench_state_estimator_next_time_step --> node_min
+                sensor_manager_next_time_step --> node_min
+                navigator_next_time_step --> node_min
+                controller_next_time_step --> node_min
+                node_min --> round_to_closest_simulator_time_resolution
+                round_to_closest_simulator_time_resolution --> [*]
+            }
+            node_next_time_step --> loop : while all nodes are not treated
+            loop -> min
+            min -> [*]
+        }
+        get_min_next_time_among_nodes -> update_context_time
+        update_context_time -> update_api_time
+        update_api_time -> [*]
+    }
+
+    state time_finished <<choice>>
+    next_time --> time_finished
+    time_finished -> [*] : if last time step reached
+
+    ' PHYSICS UPDATE
+
+    state fork_physics <<fork>>
+    time_finished --> fork_physics : if last time step not reached
+    state process_messages_physics as "node_process_messages"
+    
+    fork_physics --> process_messages_physics : thread 1
+    fork_physics --> process_messages_physics : thread 2
+    fork_physics --> process_messages_physics : ...
+    fork_physics --> process_messages_physics : thread max_threads
+
+    process_messages_physics --> physics_update
+    ' state physics_update {
+    '     state call_physics_update_step <<choice>>
+    '     note left of call_physics_update_step: Depend on physics component used
+    '     [*] --> call_physics_update_step
+    '     state internal_physics_update_step as "InternalPhysics::update_state"
+    '     call_physics_update_step --> internal_physics_update_step
+    '     state python_physics_update_step as "PythonPhysics::update_state"
+    '     call_physics_update_step --> python_physics_update_step
+    '     state plugin_physics_update_step as "PluginPhysics::update_state"
+    '     call_physics_update_step --> plugin_physics_update_step
+
+    '     internal_physics_update_step --> update_node_meta_data
+    '     python_physics_update_step --> update_node_meta_data
+    '     plugin_physics_update_step --> update_node_meta_data
+
+    ' }
+
+    state join_physics <<join>>
+    physics_update --> join_physics: thread 1
+    physics_update --> join_physics: thread 2
+    physics_update --> join_physics: ...
+    physics_update --> join_physics: thread max_threads
+
+    join_physics --> process_messages_pre_loop
+
+    ' PRE LOOP HOOK
+
+    state process_messages_pre_loop as "simulator_process_messages"
+    state fork_pre_loop <<fork>>
+    process_messages_pre_loop --> fork_pre_loop
+
+    state node_process_messages_pre_loop as "node_process_messages"
+    
+    fork_pre_loop --> node_process_messages_pre_loop : thread 1
+    fork_pre_loop --> node_process_messages_pre_loop : thread 2
+    fork_pre_loop --> node_process_messages_pre_loop : ...
+    fork_pre_loop --> node_process_messages_pre_loop : thread max_threads
+
+    node_process_messages_pre_loop --> pre_loop_hook
+    state join_pre_loop <<join>>
+    pre_loop_hook --> join_pre_loop: thread 1
+    pre_loop_hook --> join_pre_loop: thread 2
+    pre_loop_hook --> join_pre_loop: ...
+    pre_loop_hook --> join_pre_loop: thread max_threads
+
+    ' PREDICTION STEP
+
+    state process_messages_pred_step as "simulator_process_messages"
+    join_pre_loop --> process_messages_pred_step
+    state fork_pred_step <<fork>>
+    process_messages_pred_step --> fork_pred_step
+    state node_process_messages_pred_step as "node_process_messages"
+    fork_pred_step --> node_process_messages_pred_step : thread 1
+    fork_pred_step --> node_process_messages_pred_step : thread 2
+    fork_pred_step --> node_process_messages_pred_step : ...
+    fork_pred_step --> node_process_messages_pred_step : thread max_threads
+
+    node_process_messages_pred_step --> prediction_step
+    state join_pred_step <<join>>
+    prediction_step --> join_pred_step: thread 1
+    prediction_step --> join_pred_step: thread 2
+    prediction_step --> join_pred_step: ...
+    prediction_step --> join_pred_step: thread max_threads
+
+    ' MAKE OBSERVATIONS
+
+    state process_messages_make_obs as "simulator_process_messages"
+    join_pred_step --> process_messages_make_obs
+    state fork_make_obs <<fork>>
+    process_messages_make_obs --> fork_make_obs
+    state node_process_messages_make_obs as "node_process_messages"
+    fork_make_obs --> node_process_messages_make_obs : thread 1
+    fork_make_obs --> node_process_messages_make_obs : thread 2
+    fork_make_obs --> node_process_messages_make_obs : ...
+    fork_make_obs --> node_process_messages_make_obs : thread max_threads
+    node_process_messages_make_obs --> make_observations
+    state join_make_obs <<join>>
+    make_observations --> join_make_obs: thread 1
+    make_observations --> join_make_obs: thread 2
+    make_observations --> join_make_obs: ...
+    make_observations --> join_make_obs: thread max_threads
+
+    ' CORRECTION STEP
+    state process_messages_correction_step as "simulator_process_messages"
+    join_make_obs --> process_messages_correction_step
+    state fork_correction_step <<fork>>
+    process_messages_correction_step --> fork_correction_step
+    state node_process_messages_correction_step as "node_process_messages"
+    fork_correction_step --> node_process_messages_correction_step : thread 1
+    fork_correction_step --> node_process_messages_correction_step : thread 2
+    fork_correction_step --> node_process_messages_correction_step : ...
+    fork_correction_step --> node_process_messages_correction_step : thread max_threads
+    node_process_messages_correction_step --> correction_step
+    state join_correction_step <<join>>
+    correction_step --> join_correction_step: thread 1
+    correction_step --> join_correction_step: thread 2
+    correction_step --> join_correction_step: ...
+    correction_step --> join_correction_step: thread max_threads
+
+    ' NAVIGATION STEP
+    state process_messages_navigation_step as "simulator_process_messages"
+    join_correction_step --> process_messages_navigation_step
+    state fork_navigation_step <<fork>>
+    process_messages_navigation_step --> fork_navigation_step
+    state node_process_messages_navigation_step as "node_process_messages"
+    fork_navigation_step --> node_process_messages_navigation_step : thread 1
+    fork_navigation_step --> node_process_messages_navigation_step : thread 2
+    fork_navigation_step --> node_process_messages_navigation_step : ...
+    fork_navigation_step --> node_process_messages_navigation_step : thread max_threads
+
+    state do_control_loop <<choice>>
+    state node_process_messages_post_control as "node_process_messages"
+    do_control_loop --> node_process_messages_post_control : if no control loop
+
+    node_process_messages_navigation_step --> do_control_loop
+    do_control_loop -> navigator_compute_error
+    navigator_compute_error -> controller_make_command
+    controller_make_command -> physics_apply_command
+    physics_apply_command -> node_process_messages_post_control
+
+    state join_control_step <<join>>
+    node_process_messages_post_control --> join_control_step: thread 1
+    node_process_messages_post_control --> join_control_step: thread 2
+    node_process_messages_post_control --> join_control_step: ...
+    node_process_messages_post_control --> join_control_step: thread max_threads
+
+    ' SCENARIO
+    join_control_step --> execute_scenario
+    state process_messages_scenario_step as "simulator_process_messages"
+    execute_scenario --> process_messages_scenario_step
+
+    process_messages_scenario_step --> send_records_to_async_api
+
+    state process_messages_pre_kill as "simulator_process_messages"
+    send_records_to_async_api --> process_messages_pre_kill
+    state is_zombie <<choice>>
+    process_messages_pre_kill --> is_zombie
+    is_zombie -> kill_node: if node is a zombie
+
+    is_zombie --> process_records
+    kill_node --> process_records
+    process_records --> next_time
+}
+
+run -> compute_results
+
+state compute_results as "Simulator::compute_results" {
+    [*] --> transform_records_to_python_structs
+    transform_records_to_python_structs --> call_python_analyse_function
+    
+    state do_i_show_figures <<choice>>
+    call_python_analyse_function --> do_i_show_figures
+    do_i_show_figures -> show_figures : if show_figures is true
+    do_i_show_figures --> [*]
+    show_figures --> [*]
+}
+
+@enduml

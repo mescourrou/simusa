@@ -11,10 +11,10 @@ use simusa_com::rfc::{self, RemoteFunctionCall, RemoteFunctionCallHost};
 
 use crate::{
     context::Context,
-    controllers::Controller,
+    controllers::AbstractController,
     errors::SimusaResult,
     info,
-    navigators::Navigator,
+    navigators::AbstractNavigator,
     networking::network::Network,
     physics::Physics,
     plugin_api::PluginAPI,
@@ -190,7 +190,7 @@ impl AsyncApiRunner {
     /// It will also spawn threads for each API call to execute them in parallel and not block the main thread. The threads will be stopped when the runner is stopped.
     ///
     /// # Arguments
-    /// * `plugin_api` - Optional plugin API to use when loading the configuration. It can be None if the plugin API is not needed but required if the configuration use Externals.
+    /// * `plugin_api` - Optional plugin API to use when loading the configuration. It can be None if the plugin API is not needed but required if the configuration use Plugins.
     pub fn run(&mut self, plugin_api: Option<Arc<dyn PluginAPI>>) {
         let private_api = self.private_api.clone();
         let keep_alive_rx = self.keep_alive_rx.clone();
@@ -213,7 +213,7 @@ impl AsyncApiRunner {
                         let mut simulator = simulator_arc.lock().unwrap();
                         println!(
                             "Loading config: {}",
-                            request.config.base_path.to_str().unwrap()
+                            request.config.get_base_path().to_str().unwrap()
                         );
                         simulator.load_config_full(
                             &request.config,
@@ -265,7 +265,7 @@ impl AsyncApiRunner {
             thread::spawn(move || {
                 while !*stopping.read().unwrap() {
                     compute_results.recv_closure_mut(|_| {
-                        let simulator = simulator_arc.lock().unwrap();
+                        let mut simulator = simulator_arc.lock().unwrap();
                         need_reset = true;
                         simulator.compute_results()
                     });
@@ -318,8 +318,9 @@ pub struct PluginAsyncAPI {
     get_state_estimator:
         Arc<RemoteFunctionCall<PluginAsyncAPIGetStateEstimatorRequest, Box<dyn StateEstimator>>>,
     get_controller:
-        Arc<RemoteFunctionCall<PluginAsyncAPIGetControllerRequest, Box<dyn Controller>>>,
-    get_navigator: Arc<RemoteFunctionCall<PluginAsyncAPIGetNavigatorRequest, Box<dyn Navigator>>>,
+        Arc<RemoteFunctionCall<PluginAsyncAPIGetControllerRequest, Box<dyn AbstractController>>>,
+    get_navigator:
+        Arc<RemoteFunctionCall<PluginAsyncAPIGetNavigatorRequest, Box<dyn AbstractNavigator>>>,
     get_physics: Arc<RemoteFunctionCall<PluginAsyncAPIGetPhysicsRequest, Box<dyn Physics>>>,
 }
 
@@ -360,7 +361,7 @@ impl Default for PluginAsyncAPI {
 impl PluginAPI for PluginAsyncAPI {
     fn get_state_estimator(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         global_config: &SimulatorConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
         network: &SharedRwLock<Network>,
@@ -380,13 +381,13 @@ impl PluginAPI for PluginAsyncAPI {
 
     fn get_controller(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         global_config: &SimulatorConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
         network: &SharedRwLock<Network>,
         initial_time: f32,
         _context: &Context,
-    ) -> Box<dyn Controller> {
+    ) -> Box<dyn AbstractController> {
         self.get_controller
             .call(PluginAsyncAPIGetControllerRequest {
                 config: config.clone(),
@@ -400,13 +401,13 @@ impl PluginAPI for PluginAsyncAPI {
 
     fn get_navigator(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         global_config: &SimulatorConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
         network: &SharedRwLock<Network>,
         initial_time: f32,
         _context: &Context,
-    ) -> Box<dyn Navigator> {
+    ) -> Box<dyn AbstractNavigator> {
         self.get_navigator
             .call(PluginAsyncAPIGetNavigatorRequest {
                 config: config.clone(),
@@ -420,7 +421,7 @@ impl PluginAPI for PluginAsyncAPI {
 
     fn get_physics(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         global_config: &SimulatorConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
         network: &SharedRwLock<Network>,
@@ -447,11 +448,12 @@ pub struct PluginAsyncAPIClient {
         RemoteFunctionCallHost<PluginAsyncAPIGetStateEstimatorRequest, Box<dyn StateEstimator>>,
     >,
     /// Get a controller from the plugin API, with the given configuration, global configuration, random variable factory, network and initial time. It returns a controller to use in the simulator.
-    pub get_controller:
-        Arc<RemoteFunctionCallHost<PluginAsyncAPIGetControllerRequest, Box<dyn Controller>>>,
+    pub get_controller: Arc<
+        RemoteFunctionCallHost<PluginAsyncAPIGetControllerRequest, Box<dyn AbstractController>>,
+    >,
     /// Get a navigator from the plugin API, with the given configuration, global configuration, random variable factory, network and initial time. It returns a navigator to use in the simulator.
     pub get_navigator:
-        Arc<RemoteFunctionCallHost<PluginAsyncAPIGetNavigatorRequest, Box<dyn Navigator>>>,
+        Arc<RemoteFunctionCallHost<PluginAsyncAPIGetNavigatorRequest, Box<dyn AbstractNavigator>>>,
     /// Get a physics engine from the plugin API, with the given configuration, global configuration, random variable factory, network and initial time. It returns a physics engine to use in the simulator.
     pub get_physics: Arc<RemoteFunctionCallHost<PluginAsyncAPIGetPhysicsRequest, Box<dyn Physics>>>,
 }
@@ -460,7 +462,7 @@ pub struct PluginAsyncAPIClient {
 /// It contains the configuration for the state estimator to get, the global configuration of the simulator, a factory for random variables, a reference to the network and the initial time of the simulation.
 pub struct PluginAsyncAPIGetStateEstimatorRequest {
     /// User custom configuration as a serialized JSON value. It is up to the plugin to parse it and use it as needed.
-    pub config: serde_json::Value,
+    pub config: crate::utils::GeneralValue,
     /// Global configuration of the simulator, as defined in the configuration file. It can be used by the plugin to get information about the simulation and configure itself accordingly.
     pub global_config: SimulatorConfig,
     /// Factory for random variables, to create random variables with the same seed as the simulator and ensure reproducibility. It can be used by the plugin to create random variables for its internal use.

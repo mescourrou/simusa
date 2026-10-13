@@ -1,5 +1,5 @@
 use clap::Parser;
-use std::path::Path;
+use std::{path::Path, process::ExitCode};
 
 use simusa::{errors::SimusaResult, gui, simulator::Simulator};
 
@@ -22,8 +22,6 @@ fn doit(args: Cli) -> SimusaResult<()> {
             println!("If no gui is used, provide a config path!");
             return Ok(());
         }
-        // Initialize the environment
-        Simulator::init_environment();
         println!("Load configuration...");
         let mut simulator = Simulator::from_config_path(
             Path::new(&args.config_path.unwrap()),
@@ -50,11 +48,14 @@ fn doit(args: Cli) -> SimusaResult<()> {
     Ok(())
 }
 
-fn main() {
+fn main() -> ExitCode {
     let args = Cli::parse();
 
     let res = doit(args);
     if let Err(e) = res {
         println!("{}", e.detailed_error());
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
     }
 }

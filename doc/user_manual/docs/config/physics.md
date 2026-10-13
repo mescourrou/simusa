@@ -121,43 +121,22 @@ faults:
 
 More physics faults will be added in future releases.
 
-## Physics Type: `Python`
-
-Implement custom physics simulation in Python. Use this for custom dynamics, constraints, or physics not covered by built-in models.
-
-```yaml
-physics:
-  type: Python
-  file: my_physics.py
-  class_name: MyPhysics
-  # Additional parameters
-  custom_param: value
-```
-
-**How it works**:
-1. SiMuSA loads `my_physics.py` and instantiates `MyPhysics`
-2. Your class receives initial state and config
-3. When motor commands are sent, your `apply_command(command, time)` method is called
-4. Each time step, `update_state(time)` is called
-5. `state(time)` returns current robot state
-
-For Python integration details, see the [Python Integration Guide](../python/using_python.md).
-
-**Typical use cases**:
-- More complex dynamics (e.g., aerial robots, underwater vehicles)
-- Hardware-in-the-loop simulations
-
-## Physics Type: `External`
+## Physics Type: `Plugin`
 
 Implement physics via external plugin (Rust ou Python). Use for specific physics engines or hardware in the loop.
 
 ```yaml
 physics:
-  type: External
+  type: Plugin
   config: {}  # Configuration for your plugin
 ```
 
 The `config` dict is passed to your plugin. Consult your plugin documentation for required fields.
+
+
+**Typical use cases**:
+- More complex dynamics (e.g., aerial robots, underwater vehicles)
+- Hardware-in-the-loop simulations
 
 ## Common Patterns
 

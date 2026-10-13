@@ -5,7 +5,7 @@
 //! node [`Network`](crate::networking::network::Network) instances and advances queued messages in
 //! simulation time order.
 
-use serde_json::Value;
+use crate::utils::GeneralValue;
 use simusa_com::pub_sub::{BrokerTrait, BrokerTraitProcessing, PathBroker};
 
 use crate::constants::TIME_ROUND;
@@ -16,7 +16,7 @@ use crate::simulator::SimusaBroker;
 use crate::utils::SharedRwLock;
 
 use super::network::MessageFlag;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use std::sync::{Arc, RwLock};
 
@@ -35,7 +35,7 @@ pub enum MessageSendMethod {
 #[derive(Debug, Clone)]
 pub struct NetworkMessage {
     /// Serialized message payload.
-    pub value: Value,
+    pub value: GeneralValue,
     /// Sender node name.
     pub from: String,
     /// Routing strategy for the destination.
@@ -73,7 +73,7 @@ impl NetworkManager {
     /// Nodes with `None` position are not range-filtered and receive all messages.
     pub fn process_messages(
         &mut self,
-        position_map: &HashMap<String, Option<[f32; 2]>>,
+        position_map: &BTreeMap<String, Option<[f32; 2]>>,
         context: &Context,
     ) -> SimusaResult<()> {
         let context = context.new_callstack_level("process_messages");

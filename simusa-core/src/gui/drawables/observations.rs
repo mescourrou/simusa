@@ -13,7 +13,7 @@ use crate::{
     },
     simulator::SimulatorConfig,
     state_estimators::State,
-    utils::frame::Frame,
+    utils::frame::{Frame, FrameRecord},
 };
 
 pub struct OrientedRobotObservation {
@@ -31,17 +31,15 @@ impl OrientedRobotObservation {
 
     pub fn draw(
         &self,
-        _ui: &mut egui::Ui,
-        _viewport: &Rect,
         painter_info: &PainterInfo,
         scale: f32,
         obs: &OrientedRobotObservationRecord,
+        frame: &FrameRecord,
         robot_pose: &Vector3<f32>,
     ) -> Result<Vec<Shape>, Vec2> {
         let mut shapes = Vec::new();
         let center = painter_info.zero(scale);
 
-        let frame = obs.frame;
         let frame = Frame::new(frame.x, frame.y, frame.theta);
         let robot_state = State {
             pose: *robot_pose,
@@ -116,17 +114,15 @@ impl OrientedLandmarkObservation {
 
     pub fn draw(
         &self,
-        _ui: &mut egui::Ui,
-        _viewport: &Rect,
         painter_info: &PainterInfo,
         scale: f32,
         obs: &OrientedLandmarkObservationRecord,
+        frame: &FrameRecord,
         robot_pose: &Vector3<f32>,
     ) -> Result<Vec<Shape>, Vec2> {
         let mut shapes = Vec::new();
         let center = painter_info.zero(scale);
 
-        let frame = obs.frame;
         let frame = Frame::new(frame.x, frame.y, frame.theta);
         let robot_state = State {
             pose: *robot_pose,
@@ -225,6 +221,7 @@ impl GNSSObservation {
         painter_info: &PainterInfo,
         scale: f32,
         obs: &GNSSObservationRecord,
+        _frame: &FrameRecord, // Frame is not used for GNSS observations as there is no need to transform the coordinates
     ) -> Result<Vec<Shape>, Vec2> {
         let mut shapes = Vec::new();
         let center = painter_info.zero(scale);
@@ -304,17 +301,15 @@ impl ScanObservation {
 
     pub fn draw(
         &self,
-        _ui: &mut egui::Ui,
-        _viewport: &Rect,
         painter_info: &PainterInfo,
         scale: f32,
         obs: &ScanObservationRecord,
+        frame: &FrameRecord,
         robot_pose: &Vector3<f32>,
     ) -> Result<Vec<Shape>, Vec2> {
         let mut shapes = Vec::new();
         let center = painter_info.zero(scale);
 
-        let frame = obs.frame;
         let frame = Frame::new(frame.x, frame.y, frame.theta);
         let robot_state = State {
             pose: *robot_pose,

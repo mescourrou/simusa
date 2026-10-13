@@ -3,7 +3,7 @@ use std::path::Path;
 use serde::Serialize;
 use simusa_macros::config_derives;
 
-use crate::time_analysis::TimeAnalysisFactory;
+use crate::{time_analysis::TimeAnalysisFactory, utils::GeneralValue};
 
 /// Configuraition for the profiler exporter. It allows to select the type of exporter to use, and to configure it if needed.
 #[config_derives]
@@ -28,7 +28,7 @@ struct TraceEvent {
     dur: i64,
     tid: i64,
     pid: i64,
-    args: Option<serde_json::Value>,
+    args: Option<crate::utils::GeneralValue>,
     sf: i64,
 }
 
@@ -39,7 +39,7 @@ struct TraceEventRoot {
     #[serde(rename = "displayTimeUnit")]
     display_time_unit: String,
     #[serde(rename = "otherData")]
-    other_data: serde_json::Value,
+    other_data: crate::utils::GeneralValue,
 }
 
 impl ProfilerExporter for TraceEventExporter {
@@ -57,9 +57,9 @@ impl ProfilerExporter for TraceEventExporter {
                 sf: 0,
                 ts: 0,
                 tid: node_names.len() as i64 - 1,
-                args: Some(serde_json::json!({
+                args: Some(GeneralValue::new(serde_json::json!({
                     "name" : node_name.to_string()
-                })),
+                }))),
             });
             for profile in profiles {
                 trace_events.push(TraceEvent {
@@ -78,7 +78,7 @@ impl ProfilerExporter for TraceEventExporter {
         let json = serde_json::to_string(&TraceEventRoot {
             trace_events,
             display_time_unit: "us".to_string(),
-            other_data: serde_json::Value::Null,
+            other_data: crate::utils::GeneralValue::default(),
         })
         .unwrap();
         let json_path = path.with_extension("json");

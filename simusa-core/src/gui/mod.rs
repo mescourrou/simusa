@@ -8,6 +8,7 @@ mod app;
 
 use std::{collections::BTreeMap, sync::Arc};
 
+pub use app::PainterInfo;
 pub use app::SimusaApp;
 mod configurator;
 mod drawables;
@@ -15,10 +16,7 @@ pub use drawables::Drawable;
 mod panels;
 pub mod utils;
 
-use crate::{
-    plugin_api::PluginAPI,
-    simulator::{Simulator, SimulatorConfig},
-};
+use crate::{plugin_api::PluginAPI, simulator::SimulatorConfig};
 
 /// Function to run the GUI of Simusa. Can be called in the main function.
 ///
@@ -31,9 +29,6 @@ pub fn run_gui(
     plugin_api: Option<Arc<dyn PluginAPI>>,
     load_results: bool,
 ) {
-    // Initialize the environment, essentially the logging part
-    Simulator::init_environment();
-
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([400.0, 300.0])

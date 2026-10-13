@@ -3,17 +3,22 @@ log:
   log_level: #!Internal ["All"]
     type: Debug
 results:
-  result_path: "../result.json"
-  show_figures: true # Disabled for automatic testing
-  analyse_script: "../../../python_scripts/analyse_results.py"
-  figures_path: "../figures"
+  result_path: "result.json"
+  analyser:
+    type: Python
+    show_figures: false # Disabled for automatic testing
+    script_path: "../../../config_example/analyse_results.py"
+    function_name: "analyse_results"
+    additionnal_params:
+      figures_path: "figures"
 time_analysis:
   exporter:
     type: TraceEventExporter
   output_path: "time_performance"
 max_time: 60.
-robots:
+nodes:
   - name: "robot1"
+    type: Robot
     navigator: 
       type: GoTo
       target_speed: 0.5
@@ -21,10 +26,10 @@ robots:
       type: Perfect
       prediction_activation:
         period: {type: Num, value: 0.1}
-computation_units:
   - name: "master"
+    type: ComputationUnit
     state_estimators:
       - name: "master"
         config:
-          type: External
+          type: Plugin
 

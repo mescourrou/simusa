@@ -10,12 +10,12 @@
 use core::unreachable;
 use std::sync::Arc;
 
-use super::fault_models::fault_model::FaultModel;
+use super::fault_models::FaultModel;
 use super::{Sensor, SensorObservation, SensorRecord};
 
 use crate::constants::TIME_ROUND;
 use crate::context::Context;
-use crate::errors::SimusaResult;
+use crate::errors::{SimusaError, SimusaErrorTypes, SimusaResult};
 #[cfg(feature = "gui")]
 use crate::gui::UIComponent;
 use crate::internal;
@@ -23,23 +23,17 @@ use crate::plugin_api::PluginAPI;
 use crate::recordable::Recordable;
 use crate::sensors::fault_models::additive::{AdditiveFault, AdditiveFaultConfig};
 use crate::sensors::fault_models::clutter::{ClutterFault, ClutterFaultConfig};
-use crate::sensors::fault_models::external_fault::{ExternalFault, ExternalFaultConfig};
 use crate::sensors::fault_models::misdetection::{MisdetectionFault, MisdetectionFaultConfig};
-use crate::sensors::fault_models::python_fault_model::{PythonFaultModel, PythonFaultModelConfig};
 use crate::sensors::sensor_filters::SensorFilter;
-use crate::sensors::sensor_filters::external_filter::{ExternalFilter, ExternalFilterConfig};
-use crate::sensors::sensor_filters::python_filter::{PythonFilter, PythonFilterConfig};
 use crate::sensors::sensor_filters::range_filter::{RangeFilter, RangeFilterConfig};
 use crate::simulator::SimulatorConfig;
 use crate::utils::determinist_random_variable::DeterministRandomVariableFactory;
 use crate::utils::enum_tools::EnumVariables;
-use crate::utils::frame::{Frame, FrameConfig, FrameRecord};
+use crate::utils::frame::Frame;
 use crate::utils::periodicity::{Periodicity, PeriodicityConfig};
 use nalgebra::{Rotation2, Vector2, Vector3};
 use serde_derive::{Deserialize, Serialize};
 use simusa_macros::{EnumToString, UIComponent, config_derives, enum_variables};
-
-extern crate nalgebra as na;
 
 enum_variables!(
     "Variables used by GNSS observations, filters, and fault models."
@@ -82,15 +76,17 @@ enum_variables!(
 #[show_all = "Faults"]
 pub enum GNSSSensorFaultModelConfig {
     /// Additive fault model in robot-centered coordinates.
+    #[check]
     Additive(AdditiveFaultConfig<GNSSSensorVariablesFaults, GNSSSensorVariables>),
     /// Clutter fault model.
+    #[check]
     Clutter(ClutterFaultConfig<GNSSSensorVariablesFaults>),
     /// Misdetection fault model.
+    #[check]
     Misdetection(MisdetectionFaultConfig),
     /// Plugin-provided external fault model.
-    External(ExternalFaultConfig),
-    /// Python-implemented fault model.
-    Python(PythonFaultModelConfig),
+    #[plugin("GNSSSensorFaultModel", "gnss-sensor-fault-model")]
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for GNSSSensorFaultModelConfig {
@@ -108,10 +104,8 @@ pub enum GNSSSensorFaultModelType {
     Clutter(ClutterFault<GNSSSensorVariablesFaults>),
     /// Instantiated misdetection fault model.
     Misdetection(MisdetectionFault),
-    /// Instantiated external fault model.
-    External(ExternalFault),
-    /// Instantiated Python fault model.
-    Python(PythonFaultModel),
+    /// Instantiated plugin fault model.
+    Plugin(Box<dyn FaultModel>),
 }
 
 impl GNSSSensorFaultModelType {
@@ -123,8 +117,7 @@ impl GNSSSensorFaultModelType {
         context: &Context,
     ) -> crate::errors::SimusaResult<()> {
         match self {
-            Self::Python(f) => f.post_init(node, initial_time, context),
-            Self::External(f) => f.post_init(node, initial_time, context),
+            Self::Plugin(f) => f.post_init(node, initial_time, context),
             Self::Additive(_) | Self::Clutter(_) | Self::Misdetection(_) => Ok(()),
         }
     }
@@ -138,17 +131,14 @@ impl GNSSSensorFaultModelType {
 /// Default value: [`GNSSSensorFilterConfig::Range`] with [`RangeFilterConfig::default`].
 #[config_derives]
 #[derive(UIComponent)]
-#[show_all = "Faults"]
+#[show_all = "Filters"]
 pub enum GNSSSensorFilterConfig {
     /// Range-based filtering on enumerated variables: excludes observations where numeric values fall outside specified bounds.
     #[check]
     Range(RangeFilterConfig<GNSSSensorVariablesFilter>),
-    /// Python-based custom filtering: delegates exclusion logic to user-defined Python methods.
-    #[check]
-    Python(PythonFilterConfig),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
-    #[check]
-    External(ExternalFilterConfig),
+    #[plugin("GNSSSensorFilterModel", "gnss-sensor-filter-model")]
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for GNSSSensorFilterConfig {
@@ -162,10 +152,8 @@ impl Default for GNSSSensorFilterConfig {
 pub enum GNSSSensorFilterType {
     /// Instantiated range filter for GNSS sensor variables.
     Range(RangeFilter<GNSSSensorVariablesFilter>),
-    /// Instantiated Python filter for GNSS sensor observations.
-    Python(PythonFilter),
-    /// Instantiated external filter for GNSS sensor observations.
-    External(ExternalFilter),
+    /// Instantiated plugin filter for GNSS sensor observations.
+    Plugin(Box<dyn SensorFilter>),
 }
 
 impl GNSSSensorFilterType {
@@ -177,8 +165,7 @@ impl GNSSSensorFilterType {
         context: &Context,
     ) -> crate::errors::SimusaResult<()> {
         match self {
-            Self::Python(f) => f.post_init(node, initial_time, context),
-            Self::External(f) => f.post_init(node, initial_time, context),
+            Self::Plugin(f) => f.post_init(node, initial_time, context),
             Self::Range(_) => Ok(()),
         }
     }
@@ -201,9 +188,6 @@ pub struct GNSSSensorConfig {
     /// Filter configurations applied before fault injection.
     #[check]
     pub filters: Vec<GNSSSensorFilterConfig>,
-    /// Frame configuration for the sensor's pose observations, relative to the node's reference point.
-    #[check]
-    pub frame: FrameConfig,
 }
 
 impl Default for GNSSSensorConfig {
@@ -216,7 +200,6 @@ impl Default for GNSSSensorConfig {
             }),
             faults: Vec::new(),
             filters: Vec::new(),
-            frame: FrameConfig::default(),
         }
     }
 }
@@ -253,15 +236,6 @@ impl UIComponent for GNSSSensorConfig {
                     }
                 });
 
-                self.frame.show_mut(
-                    ui,
-                    ctx,
-                    buffer_stack,
-                    global_config,
-                    current_node_name,
-                    unique_id,
-                );
-
                 GNSSSensorFilterConfig::show_all_mut(
                     &mut self.filters,
                     ui,
@@ -296,8 +270,6 @@ impl UIComponent for GNSSSensorConfig {
                     }
                 });
 
-                self.frame.show(ui, ctx, unique_id);
-
                 GNSSSensorFilterConfig::show_all(&self.filters, ui, ctx, unique_id);
 
                 GNSSSensorFaultModelConfig::show_all(&self.faults, ui, ctx, unique_id);
@@ -309,7 +281,6 @@ impl UIComponent for GNSSSensorConfig {
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct GNSSSensorRecord {
     last_time: Option<f32>,
-    frame: FrameRecord,
 }
 
 #[cfg(feature = "gui")]
@@ -334,24 +305,32 @@ pub struct GNSSObservation {
     pub velocity: Vector2<f32>,
     /// Fault models applied to this observation.
     pub applied_faults: Vec<GNSSSensorFaultModelConfig>,
-    /// Frame of the observation relative to the node's reference point.
-    pub frame: Frame,
+}
+
+impl GNSSObservation {
+    /// Converts a [`GNSSObservationRecord`] into a [`GNSSObservation`].
+    pub fn from_record(record: &GNSSObservationRecord) -> Self {
+        Self {
+            pose: Vector3::new(record.pose[0], record.pose[1], record.pose[2]),
+            velocity: Vector2::new(record.velocity[0], record.velocity[1]),
+            applied_faults: Vec::new(),
+        }
+    }
 }
 
 /// Serializable record representation of [`GNSSObservation`].
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[config_derives]
+#[derive(Default)]
 pub struct GNSSObservationRecord {
     /// Recorded global pose represented as `[x, y, theta]`.
     pub pose: [f32; 3],
     /// Recorded global planar velocity represented as `[vx, vy]`.
     pub velocity: [f32; 2],
-    /// Frame of the observation relative to the node's reference point.
-    pub frame: FrameRecord,
 }
 
 #[cfg(feature = "gui")]
 impl UIComponent for GNSSObservationRecord {
-    fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
+    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
         ui.vertical(|ui| {
             ui.label(format!(
                 "Position: ({}, {}, {})",
@@ -361,17 +340,15 @@ impl UIComponent for GNSSObservationRecord {
                 "Velocity: ({}, {})",
                 self.velocity[0], self.velocity[1]
             ));
-            self.frame.show(ui, ctx, unique_id);
         });
     }
 }
 
 impl Recordable<GNSSObservationRecord> for GNSSObservation {
-    fn record(&self, context: &Context) -> GNSSObservationRecord {
+    fn record(&self, _context: &Context) -> GNSSObservationRecord {
         GNSSObservationRecord {
             pose: [self.pose.x, self.pose.y, self.pose.z],
             velocity: [self.velocity.x, self.velocity.y],
-            frame: self.frame.record(context),
         }
     }
 }
@@ -387,8 +364,6 @@ pub struct GNSSSensor {
     faults: Vec<GNSSSensorFaultModelType>,
     /// Filters applied before fault injection. If any filter excludes the observation, the observation is dropped and no fault is injected.
     filters: Vec<GNSSSensorFilterType>,
-    /// Frame of the sensor's pose observations, relative to the node's reference point.
-    frame: Frame,
 }
 
 impl GNSSSensor {
@@ -418,18 +393,16 @@ impl GNSSSensor {
                         context,
                     ))
                 }
-                GNSSSensorFaultModelConfig::External(config) => {
-                    GNSSSensorFaultModelType::External(ExternalFault::from_config(
-                        config,
-                        plugin_api,
-                        global_config,
-                        va_factory,
-                        initial_time,
-                        context,
-                    )?)
-                }
-                GNSSSensorFaultModelConfig::Python(config) => GNSSSensorFaultModelType::Python(
-                    PythonFaultModel::from_config(config, global_config, initial_time, context)?,
+                GNSSSensorFaultModelConfig::Plugin(config) => GNSSSensorFaultModelType::Plugin(
+                    plugin_api
+                        .as_ref()
+                        .ok_or_else(|| {
+                            SimusaError::new(
+                                SimusaErrorTypes::PluginAPIError,
+                                "Plugin API is not available.".to_string(),
+                            )
+                        })?
+                        .get_sensor_fault(config, global_config, va_factory, initial_time, context),
                 ),
             });
         }
@@ -440,19 +413,23 @@ impl GNSSSensor {
                 GNSSSensorFilterConfig::Range(config) => GNSSSensorFilterType::Range(
                     RangeFilter::from_config(config, initial_time, context),
                 ),
-                GNSSSensorFilterConfig::Python(config) => GNSSSensorFilterType::Python(
-                    PythonFilter::from_config(config, global_config, initial_time, context)?,
+                GNSSSensorFilterConfig::Plugin(config) => GNSSSensorFilterType::Plugin(
+                    plugin_api
+                        .as_ref()
+                        .ok_or_else(|| {
+                            SimusaError::new(
+                                SimusaErrorTypes::PluginAPIError,
+                                "Plugin API is not available.".to_string(),
+                            )
+                        })?
+                        .get_sensor_filter(
+                            config,
+                            global_config,
+                            va_factory,
+                            initial_time,
+                            context,
+                        ),
                 ),
-                GNSSSensorFilterConfig::External(config) => {
-                    GNSSSensorFilterType::External(ExternalFilter::from_config(
-                        config,
-                        plugin_api,
-                        global_config,
-                        va_factory,
-                        initial_time,
-                        context,
-                    )?)
-                }
             });
         }
 
@@ -465,7 +442,6 @@ impl GNSSSensor {
             last_time: None,
             faults: fault_models,
             filters,
-            frame: Frame::from_config(&config.frame),
         })
     }
 }
@@ -492,6 +468,7 @@ impl Sensor for GNSSSensor {
         &mut self,
         node: &mut Node,
         time: f32,
+        frame: &Frame,
         context: &Context,
     ) -> Vec<SensorObservation> {
         if let Some(last_time) = self.last_time
@@ -503,8 +480,8 @@ impl Sensor for GNSSSensor {
             .physics()
             .expect("Node with GNSS sensor should have Physics");
         let physic = arc_physic.read().unwrap();
-        let state = physic.state(time, context);
-        let attached_frame = self.frame.attach_to_state(&state);
+        let state = physic.state(time, context).unwrap();
+        let attached_frame = frame.attach_to_state(&state);
         let state = attached_frame.state();
 
         // let velocity_norm = state.velocity.fixed_rows::<2>(0).norm();
@@ -517,7 +494,6 @@ impl Sensor for GNSSSensor {
             pose: state.pose,
             velocity: rotated_velocity,
             applied_faults: Vec::new(),
-            frame: self.frame.clone(),
         });
 
         let mut keep_observation = Some(obs);
@@ -525,8 +501,7 @@ impl Sensor for GNSSSensor {
         for filter in self.filters.iter() {
             if let Some(obs) = keep_observation {
                 keep_observation = match filter {
-                    GNSSSensorFilterType::Python(f) => f.filter(time, obs, state, None, context),
-                    GNSSSensorFilterType::External(f) => f.filter(time, obs, state, None, context),
+                    GNSSSensorFilterType::Plugin(f) => f.filter(time, obs, state, None, context),
                     GNSSSensorFilterType::Range(f) => {
                         if let SensorObservation::GNSS(obs) = obs {
                             if f.match_exclusion(&GNSSSensorVariablesFilter::mapped_values(
@@ -566,15 +541,7 @@ impl Sensor for GNSSSensor {
             observation_list.push(observation);
             for fault_model in self.faults.iter_mut() {
                 match fault_model {
-                    GNSSSensorFaultModelType::Python(f) => f.add_faults(
-                        time,
-                        time,
-                        &mut observation_list,
-                        SensorObservation::GNSS(GNSSObservation::default()),
-                        node.environment(),
-                        context,
-                    ),
-                    GNSSSensorFaultModelType::External(f) => f.add_faults(
+                    GNSSSensorFaultModelType::Plugin(f) => f.add_faults(
                         time,
                         time,
                         &mut observation_list,
@@ -709,7 +676,6 @@ impl Sensor for GNSSSensor {
                                 applied_faults: vec![GNSSSensorFaultModelConfig::Clutter(
                                     f.config().clone(),
                                 )],
-                                frame: self.frame.clone(),
                             });
                             observation_list.push(obs);
                         }
@@ -758,10 +724,9 @@ impl Sensor for GNSSSensor {
 }
 
 impl Recordable<SensorRecord> for GNSSSensor {
-    fn record(&self, context: &Context) -> SensorRecord {
+    fn record(&self, _context: &Context) -> SensorRecord {
         SensorRecord::GNSSSensor(GNSSSensorRecord {
             last_time: self.last_time,
-            frame: self.frame.record(context),
         })
     }
 }

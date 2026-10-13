@@ -195,7 +195,7 @@ faults:
 - `Misdetection`: Randomly miss detections
 - `Misassociation`: Swap landmark/robots IDs randomly
 - `Clutter`: Add false positive detections
-- `Python`: Custom fault defined in Python
+- `Plugin`: Custom fault defined in by the `plugin_api`
 
 ## Sensor Filters
 

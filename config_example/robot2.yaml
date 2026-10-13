@@ -1,4 +1,5 @@
 name: robot2
+type: Robot
 navigator: 
   type: TrajectoryFollower
   trajectory: !include paths/path1.yaml

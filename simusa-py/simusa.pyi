@@ -93,12 +93,26 @@ class OccupancyGrid:
         """
         raise NotImplementedError()
         
-class ControllerError:
+class ControllerInput:
     def __init__(self):
-        self.lateral: float
-        self.theta: float
-        self.velocity: float
-        
+        self.node_position: Tuple[float, float] | None
+        self.node_orientation: float | None
+        self.node_linear_velocity: float | None
+        self.node_longitudinal_lateral_velocities: Tuple[float, float] | None
+        self.node_angular_velocity: float | None
+        self.world_state: WorldState | None
+        self.target_position: Tuple[float, float] | None
+        self.target_orientation: float | None
+        self.target_linear_velocity: float | None
+        self.target_longitudinal_lateral_velocities: Tuple[float, float] | None
+        self.target_angular_velocity: float | None
+        self.error_longitudinal: float | None
+        self.error_lateral: float | None
+        self.error_angular: float | None
+        self.error_linear_velocity: float | None
+        self.error_longitudinal_lateral_velocities: Tuple[float, float] | None
+        self.error_angular_velocity: float | None
+        self.custom: str | None
 
 class OrientedLandmarkObservation:
     def __init__(self):
@@ -161,6 +175,7 @@ class Observation:
         self.observer: str
         self.time: float
         self.sensor_observation: SensorObservation
+        self.frame: Pose
 
 
 class Command(Enum):
@@ -199,6 +214,11 @@ class GoToMessage:
     def __init__(self, target:Tuple[float, float]|None=None):
         self.target_point: Tuple[float, float]|None
 
+class SensorFrameMessage:
+    def __init__(self, frame:Tuple[float, float, float], sensor_name:str):
+        self.frame: Tuple[float, float, float]
+        self.sensor_name: str
+
 class SensorTriggerMessage:
     def __init__(self):
         pass
@@ -211,13 +231,38 @@ class MessageFlag(Enum):
     # Ask to kill the receiving node
     Kill = 3
 
-class MessageTypes(Enum):
+class MessageType(Enum):
     String: str
     GoTo: GoToMessage
     SensorTrigger: SensorTriggerMessage
+    Observations: List[Observation]
+    SensorFrame: SensorFrameMessage
+    Event: str
+    Custom: List[bytes]
 
     def __init__(self):
         self.kind: str
+
+    def from_goto(cmd: GoToMessage) -> MessageType:
+        raise NotImplementedError()
+
+    def from_sensor_trigger(cmd: SensorTriggerMessage) -> MessageType:
+        raise NotImplementedError()
+
+    def from_sensor_frame(cmd: SensorFrameMessage) -> MessageType:
+        raise NotImplementedError()
+
+    def from_string(cmd: str) -> MessageType:
+        raise NotImplementedError()
+
+    def from_observations(cmd: List[Observation]) -> MessageType:
+        raise NotImplementedError()
+
+    def from_event(cmd: str) -> MessageType:
+        raise NotImplementedError()
+
+    def from_custom(cmd: List[bytes]) -> MessageType:
+        raise NotImplementedError()
 
     def as_goto(self) -> GoToMessage | None:
         raise NotImplementedError()
@@ -225,28 +270,38 @@ class MessageTypes(Enum):
     def as_sensor_trigger(self) -> SensorTriggerMessage | None: 
         raise NotImplementedError()
 
-    def from_goto(cmd: GoToMessage) -> MessageTypes:
+    def as_sensor_frame(self) -> SensorFrameMessage | None: 
+            raise NotImplementedError()
+
+    def as_string(self) -> str | None:
         raise NotImplementedError()
 
-    def from_sensor_trigger(cmd: SensorTriggerMessage) -> MessageTypes:
+    def as_observations(self) -> List[Observation] | None:
         raise NotImplementedError()
+
+    def as_event(self) -> str | None:
+        raise NotImplementedError()
+
+    def as_custom(self) -> List[bytes] | None:
+        raise NotImplementedError()
+
 
 class Envelope:
     def __init__(self):
         self.msg_from: str
-        self.message: MessageTypes
+        self.message: MessageType
         self.timestamp: float
 
 class Node:
     def name(self):
         raise NotImplementedError()
     
-    def send_message(self, to: str, message: MessageTypes, time: float, flags: List[MessageFlag]=[]):
+    def send_message(self, to: str, message: MessageType, time: float, flags: List[MessageFlag]=[]):
         """Send a message to the given channel
 
         Args:
             to (str): Channel to send the message to. If relative (does not contain '/'), the root is /simusa/node/{node_name}/
-            message (MessageTypes): Message to send.
+            message (MessageType): Message to send.
             time (float): Timestamp to send
             flags (List[MessageFlag], optional): Flags for the message (eg. Kill). Defaults to [].
         """
@@ -277,7 +332,7 @@ class Client:
     def subscribe_instantaneous(self, key: str) -> None:
         raise NotImplementedError()
 
-    def send(self, to: str, message: MessageTypes, time: float, flags: List[MessageFlag] = []) -> None:
+    def send(self, to: str, message: MessageType, time: float, flags: List[MessageFlag] = []) -> None:
         raise NotImplementedError()
 
     def try_receive(self, time: float) -> Tuple[str, Envelope] | None:
@@ -324,7 +379,7 @@ class Controller:
     def record(self) -> str:
         raise NotImplementedError()
 
-    def make_command(self, node: Node, error: ControllerError, time: float) -> Command:
+    def make_command(self, node: Node, input: ControllerInput, time: float) -> Command:
         raise NotImplementedError()
     
     def pre_loop_hook(self, node: Node, time: float):
@@ -340,7 +395,7 @@ class Navigator:
     def record(self) -> str:
         raise NotImplementedError()
 
-    def compute_error(self, node: Node, world_state: WorldState) -> ControllerError:
+    def compute_output(self, node: Node, world_state: WorldState) -> ControllerInput:
         raise NotImplementedError()
     
     def pre_loop_hook(self, node: Node, time: float):

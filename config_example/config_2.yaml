@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=../config.schema.json
-version: 1.9.0
+version: 1.10.0
 log:
   included_nodes: []
   excluded_nodes: []
@@ -20,8 +20,9 @@ random_seed: null
 environment:
   # map: !include maps/landmarks_obstruction.yaml
   map: !include maps/random_map.yaml
-robots:
+nodes:
 - name: robot1
+  type: Robot
   navigator: 
     type: TrajectoryFollower
     trajectory: !include paths/path1.yaml
@@ -139,6 +140,7 @@ robots:
     reception_delay: 0.0
   state_estimator_bench: []
 - name: robot2
+  type: Robot
   navigator: 
     type: TrajectoryFollower
     trajectory: !include paths/path1.yaml
@@ -193,6 +195,7 @@ robots:
     reception_delay: 0.0
   state_estimator_bench: []
 - name: drone1
+  type: Robot
   navigator: 
     type: TrajectoryFollower
     trajectory: !include paths/path1.yaml
@@ -209,16 +212,14 @@ robots:
   sensor_manager:
     sensors:
       - name: "GNSS"
+        frame:
+          x: 0.0
+          y: 0.5
+          theta: 0.0
         config: 
           type: GNSS
-          frame:
-            x: 0.0
-            y: 0.5
-            theta: 0.0
-          
-        
-computation_units:
 - name: Central Unit
+  type: ComputationUnit
   network:
     range: 0.0
     reception_delay: 0.0

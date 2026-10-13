@@ -12,7 +12,7 @@ To write a plugin, let say for a state estimator, you need to have at least two 
 2. A second struct which implements the state estimator, with the StateEstimator interface.
 
 In the majority of cases, you will want to add two other structs:
-3. The Configuration, which allows a customization of the StateEstimator from the global config. This struct is in the form of a serde_json::Value when the plugin interface is called. That is your responsibility to deserialize it.
+3. The Configuration, which allows a customization of the StateEstimator from the global config. This struct is in the form of a crate::utils::GeneralValue when the plugin interface is called. That is your responsibility to deserialize it.
 4. The Record, which has two functions. First it allows to get back to a previous state (and should then include all the necessary information to get back in time), and second, it allows computing results at the end.
 
 ## Extensible modules
@@ -34,7 +34,7 @@ struct MyWonderfulPlugin {}
 impl PluginAPI for MyWonderfulPlugin {
     fn get_controller(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         _global_config: &SimulatorConfig,
         _va_factory: &Arc<DeterministRandomVariableFactory>,
         initial_time: f32,
@@ -47,7 +47,7 @@ impl PluginAPI for MyWonderfulPlugin {
 
     fn get_navigator(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         _global_config: &SimulatorConfig,
         _va_factory: &Arc<DeterministRandomVariableFactory>,
         initial_time: f32,
@@ -60,7 +60,7 @@ impl PluginAPI for MyWonderfulPlugin {
 
     fn get_physics(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         _global_config: &SimulatorConfig,
         _va_factory: &Arc<DeterministRandomVariableFactory>,
         initial_time: f32,
@@ -73,7 +73,7 @@ impl PluginAPI for MyWonderfulPlugin {
 
     fn get_state_estimator(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         _global_config: &SimulatorConfig,
         _va_factory: &Arc<DeterministRandomVariableFactory>,
         initial_time: f32,
@@ -86,7 +86,7 @@ impl PluginAPI for MyWonderfulPlugin {
 
     fn get_sensor(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         _global_config: &SimulatorConfig,
         initial_time: f32,
     ) -> Box<dyn Sensor> {
@@ -113,7 +113,7 @@ enum StateEstimatorConfig {
 impl PluginAPI for MyWonderfulPlugin {
     fn get_state_estimator(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         _global_config: &SimulatorConfig,
         _va_factory: &Arc<DeterministRandomVariableFactory>,
         _initial_time: f32,

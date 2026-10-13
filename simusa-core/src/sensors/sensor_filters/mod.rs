@@ -10,8 +10,6 @@ use crate::{
     context::Context, errors::SimusaResult, sensors::SensorObservation, state_estimators::State,
 };
 
-pub mod external_filter;
-pub mod python_filter;
 pub mod range_filter;
 pub mod string_filter;
 

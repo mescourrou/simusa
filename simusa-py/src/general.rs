@@ -3,78 +3,24 @@ use std::sync::{Arc, Mutex};
 
 use pyo3::prelude::*;
 
-use crate::{
+use simusa::{
     context::Context,
-    controllers::{
-        Controller,
-        pybinds::{ControllerWrapper, PythonController},
-    },
+    controllers::AbstractController,
     internal,
-    navigators::{
-        Navigator,
-        go_to::GoToMessage,
-        pybinds::{NavigatorWrapper, PythonNavigator},
-    },
-    networking::{
-        network::{MessageFlag, Network},
-        pybinds::MessageTypesWrapper,
-    },
-    physics::{
-        Physics,
-        pybinds::{PhysicsWrapper, PythonPhysics},
-    },
+    logger::InternalLog,
+    navigators::AbstractNavigator,
+    networking::network::Network,
+    physics::Physics,
     plugin_api::PluginAPI,
-    pywrappers::{
-        CommandWrapper, ControllerErrorWrapper, DisplacementObservationWrapper,
-        GNSSObservationWrapper, MultiClientWrapper, NodeWrapper, ObservationWrapper,
-        OrientedLandmarkObservationWrapper, OrientedRobotObservationWrapper, PluginAPIWrapper,
-        Pose, SensorObservationWrapper, SimulatorWrapper, SpeedObservationWrapper, StateWrapper,
-        UnicycleCommandWrapper, Vec2, Vec3, WorldStateWrapper, run_gui,
-    },
-    sensors::sensor_manager::SensorTriggerMessage,
     simulator::SimulatorConfig,
-    state_estimators::{
-        StateEstimator,
-        pybinds::{PythonStateEstimator, StateEstimatorWrapper},
-    },
-    utils::{
-        SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory,
-        python::call_py_method,
-    },
+    state_estimators::StateEstimator,
+    utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
 };
 
-/// Create Python bindings for Simusa components and add them to the provided Python module.
-pub fn make_python_bindings(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<SimulatorWrapper>()?;
-    m.add_class::<PluginAPIWrapper>()?;
-    m.add_class::<ControllerErrorWrapper>()?;
-    m.add_class::<PhysicsWrapper>()?;
-    m.add_class::<StateWrapper>()?;
-    m.add_class::<Pose>()?;
-    m.add_class::<Vec2>()?;
-    m.add_class::<Vec3>()?;
-    m.add_class::<WorldStateWrapper>()?;
-    m.add_class::<StateEstimatorWrapper>()?;
-    m.add_class::<ObservationWrapper>()?;
-    m.add_class::<SensorObservationWrapper>()?;
-    m.add_class::<GNSSObservationWrapper>()?;
-    m.add_class::<SpeedObservationWrapper>()?;
-    m.add_class::<DisplacementObservationWrapper>()?;
-    m.add_class::<OrientedLandmarkObservationWrapper>()?;
-    m.add_class::<OrientedRobotObservationWrapper>()?;
-    m.add_class::<ControllerWrapper>()?;
-    m.add_class::<CommandWrapper>()?;
-    m.add_class::<UnicycleCommandWrapper>()?;
-    m.add_class::<NavigatorWrapper>()?;
-    m.add_class::<NodeWrapper>()?;
-    m.add_class::<MultiClientWrapper>()?;
-    m.add_class::<MessageFlag>()?;
-    m.add_class::<MessageTypesWrapper>()?;
-    m.add_class::<GoToMessage>()?;
-    m.add_class::<SensorTriggerMessage>()?;
-    m.add_function(wrap_pyfunction!(run_gui, m)?)?;
-    Ok(())
-}
+use crate::{
+    controllers::PythonController, navigators::PythonNavigator, physics::PythonPhysics,
+    state_estimators::PythonStateEstimator, utils::call_py_method,
+};
 
 /// Plugin API bridge backed by a Python object. Holds references to Python component instances.
 #[derive(Debug)]
@@ -123,7 +69,7 @@ impl PluginAPI for PythonAPI {
 
     fn get_state_estimator(
         &self,
-        config: &serde_json::Value,
+        config: &::simusa::utils::GeneralValue,
         global_config: &SimulatorConfig,
         _va_factory: &Arc<DeterministRandomVariableFactory>,
         _network: &SharedRwLock<Network>,
@@ -132,7 +78,7 @@ impl PluginAPI for PythonAPI {
     ) -> Box<dyn StateEstimator> {
         internal!(
             context,
-            crate::logger::InternalLog::API,
+            simusa::logger::InternalLog::API,
             "Calling Python API"
         );
         self.state_estimators
@@ -154,24 +100,20 @@ impl PluginAPI for PythonAPI {
                 .unwrap()
                 .get_client(),
         );
-        internal!(context, crate::logger::InternalLog::API, "Got api {:?}", st);
+        internal!(context, InternalLog::API, "Got api {:?}", st);
         st
     }
 
     fn get_controller(
         &self,
-        config: &serde_json::Value,
+        config: &::simusa::utils::GeneralValue,
         global_config: &SimulatorConfig,
         _va_factory: &Arc<DeterministRandomVariableFactory>,
         _network: &SharedRwLock<Network>,
         initial_time: f32,
         context: &Context,
-    ) -> Box<dyn Controller> {
-        internal!(
-            context,
-            crate::logger::InternalLog::API,
-            "Calling Python API"
-        );
+    ) -> Box<dyn AbstractController> {
+        internal!(context, InternalLog::API, "Calling Python API");
         self.controllers
             .lock()
             .unwrap()
@@ -191,24 +133,20 @@ impl PluginAPI for PythonAPI {
                 .unwrap()
                 .get_client(),
         );
-        internal!(context, crate::logger::InternalLog::API, "Got api {:?}", st);
+        internal!(context, InternalLog::API, "Got api {:?}", st);
         st
     }
 
     fn get_navigator(
         &self,
-        config: &serde_json::Value,
+        config: &::simusa::utils::GeneralValue,
         global_config: &SimulatorConfig,
         _va_factory: &Arc<DeterministRandomVariableFactory>,
         _network: &SharedRwLock<Network>,
         initial_time: f32,
         context: &Context,
-    ) -> Box<dyn Navigator> {
-        internal!(
-            context,
-            crate::logger::InternalLog::API,
-            "Calling Python API"
-        );
+    ) -> Box<dyn AbstractNavigator> {
+        internal!(context, InternalLog::API, "Calling Python API");
         self.navigators
             .lock()
             .unwrap()
@@ -221,24 +159,20 @@ impl PluginAPI for PythonAPI {
                 initial_time
             )));
         let st = Box::new(self.navigators.lock().unwrap().last().unwrap().get_client());
-        internal!(context, crate::logger::InternalLog::API, "Got api {:?}", st);
+        internal!(context, InternalLog::API, "Got api {:?}", st);
         st
     }
 
     fn get_physics(
         &self,
-        config: &serde_json::Value,
+        config: &::simusa::utils::GeneralValue,
         global_config: &SimulatorConfig,
         _va_factory: &Arc<DeterministRandomVariableFactory>,
         _network: &SharedRwLock<Network>,
         initial_time: f32,
         context: &Context,
     ) -> Box<dyn Physics> {
-        internal!(
-            context,
-            crate::logger::InternalLog::API,
-            "Calling Python API"
-        );
+        internal!(context, InternalLog::API, "Calling Python API");
         self.physics
             .lock()
             .unwrap()
@@ -251,7 +185,18 @@ impl PluginAPI for PythonAPI {
                 initial_time
             )));
         let st = Box::new(self.physics.lock().unwrap().last().unwrap().get_client());
-        internal!(context, crate::logger::InternalLog::API, "Got api {:?}", st);
+        internal!(context, InternalLog::API, "Got api {:?}", st);
         st
     }
 }
+
+macro_rules! impl_from_plain_with_from_ref {
+    ($from_type: ty, $to_type: ty) => {
+        impl From<$from_type> for $to_type {
+            fn from(value: $from_type) -> Self {
+                Self::from(&value)
+            }
+        }
+    };
+}
+pub(crate) use impl_from_plain_with_from_ref;

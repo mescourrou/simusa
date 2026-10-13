@@ -6,9 +6,8 @@
 //!   delivery conditions.
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet},
     fmt::Debug,
-    hash::Hash,
     sync::{
         Arc, Mutex,
         mpsc::{self, Receiver, Sender},
@@ -25,7 +24,7 @@ pub trait ChannelProcessing<NodeIdType, ConditionArgType>: Send + Sync + Debug {
     /// Processes pending inbound messages and dispatches them to subscribers.
     fn process_messages(
         &self,
-        client_condition_args: Option<&HashMap<NodeIdType, ConditionArgType>>,
+        client_condition_args: Option<&BTreeMap<NodeIdType, ConditionArgType>>,
     );
     /// Returns a mutable `Any` view for downcasting to concrete channel types.
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
@@ -40,11 +39,11 @@ type ReceiverType<MessageType> = Receiver<(MessageType, f32)>;
 #[derive(Clone)]
 pub struct Channel<
     MessageType: Clone + Send + 'static + Default,
-    NodeIdType: Hash + Eq + Clone + Send + Sync + 'static,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + std::cmp::Ord,
     ConditionArgType: Clone + Send + 'static + Default = u8,
 > {
-    senders: SharedMutex<HashMap<(NodeIdType, usize), SenderType<MessageType>>>,
-    receivers: SharedMutex<HashMap<(NodeIdType, usize), ReceiverType<MessageType>>>,
+    senders: SharedMutex<BTreeMap<(NodeIdType, usize), SenderType<MessageType>>>,
+    receivers: SharedMutex<BTreeMap<(NodeIdType, usize), ReceiverType<MessageType>>>,
     condition: SharedMutex<dyn Fn(ConditionArgType, ConditionArgType) -> bool + Send + 'static>,
     time_round: f32,
     client_count: SharedMutex<usize>,
@@ -53,7 +52,7 @@ pub struct Channel<
 
 impl<
     MessageType: Clone + Send + 'static + Default,
-    NodeIdType: Hash + Eq + Clone + Send + Sync + 'static,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + std::cmp::Ord,
     ConditionArgType: Clone + Send + 'static + Default,
 > Debug for Channel<MessageType, NodeIdType, ConditionArgType>
 {
@@ -68,7 +67,7 @@ impl<
 
 impl<
     MessageType: Clone + Send + 'static + Default,
-    NodeIdType: Hash + Eq + Clone + Send + Sync + 'static + Debug,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + Debug + std::cmp::Ord,
     ConditionArgType: Clone + Send + 'static + Default,
 > Channel<MessageType, NodeIdType, ConditionArgType>
 {
@@ -77,8 +76,8 @@ impl<
     /// `time_round` controls time rounding for generated clients.
     pub fn new(time_round: f32, name: &str) -> Self {
         Self {
-            senders: Arc::new(Mutex::new(HashMap::new())),
-            receivers: Arc::new(Mutex::new(HashMap::new())),
+            senders: Arc::new(Mutex::new(BTreeMap::new())),
+            receivers: Arc::new(Mutex::new(BTreeMap::new())),
             condition: Arc::new(Mutex::new(|_, _| true)),
             time_round,
             client_count: Arc::new(Mutex::new(0)),
@@ -96,8 +95,8 @@ impl<
         name: &str,
     ) -> Self {
         Self {
-            senders: Arc::new(Mutex::new(HashMap::new())),
-            receivers: Arc::new(Mutex::new(HashMap::new())),
+            senders: Arc::new(Mutex::new(BTreeMap::new())),
+            receivers: Arc::new(Mutex::new(BTreeMap::new())),
             condition: Arc::new(Mutex::new(condition)),
             time_round,
             client_count: Arc::new(Mutex::new(0)),
@@ -142,16 +141,16 @@ impl<
 
 impl<
     MessageType: Clone + Send + 'static + Default,
-    NodeIdType: Hash + Eq + Clone + Send + Sync + 'static + Debug,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + Debug + std::cmp::Ord,
     ConditionArgType: Clone + Send + 'static + Default,
 > ChannelProcessing<NodeIdType, ConditionArgType>
     for Channel<MessageType, NodeIdType, ConditionArgType>
 {
     fn process_messages(
         &self,
-        client_condition_args: Option<&HashMap<NodeIdType, ConditionArgType>>,
+        client_condition_args: Option<&BTreeMap<NodeIdType, ConditionArgType>>,
     ) {
-        let mut dead_clients = HashSet::new();
+        let mut dead_clients = BTreeSet::new();
         // Lock sender and receiver to avoid list manipulation and keeping ids consistent between the receiving phase and the removing phase
         let mut receivers = self.receivers.lock().unwrap();
         let mut senders = self.senders.lock().unwrap();

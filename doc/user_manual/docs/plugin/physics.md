@@ -17,7 +17,7 @@ The `Recordable<PhysicsRecord>` has to be implemented, but it can be as minimal 
 ```Rust
 impl Recordable<PhysicsRecord> for MyWonderfulPhysics {
     fn record(&self, _context: &Context) -> PhysicsRecord {
-        PhysicsRecord::External(ExternalPhysicsRecord {
+        PhysicsRecord::Plugin(PluginPhysicsRecord {
             record: serde_json::to_value(MyWonderfulPhysicsRecord {}).unwrap(),
         })
     }
@@ -69,7 +69,7 @@ impl Physics for MyWonderfulPhysics {
 
 impl Recordable<PhysicsRecord> for MyWonderfulPhysics {
     fn record(&self, context: &Context) -> PhysicsRecord {
-        PhysicsRecord::External(ExternalPhysicsRecord {
+        PhysicsRecord::Plugin(PluginPhysicsRecord {
             record: serde_json::to_value(MyWonderfulPhysicsRecord {
                 state: self.state.record(context),
             })

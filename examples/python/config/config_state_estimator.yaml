@@ -4,10 +4,14 @@ log:
     # type: Internal
     # value: [type: All]
 results:
-  result_path: "../result.json"
-  show_figures: false # Disabled for automatic testing
-  analyse_script: "../../../python_scripts/analyse_results.py"
-  figures_path: "../figures"
+  result_path: "result.json"
+  analyser:
+    type: Python
+    show_figures: false # Disabled for automatic testing
+    script_path: "../../../config_example/analyse_results.py"
+    function_name: "analyse_results"
+    additionnal_params:
+      figures_path: "figures"
 time_analysis:
   exporter:
     type: TraceEventExporter
@@ -15,8 +19,9 @@ time_analysis:
 max_time: 60.
 environment:
   map: !include "maps/landmarks_square.yaml"
-robots:
+nodes:
   - name: "robot1"
+    type: Robot
     navigator: 
       type: TrajectoryFollower
       trajectory: !include "paths/path1.yaml"
@@ -32,9 +37,8 @@ robots:
     state_estimator_bench:
       - name: "Filter"
         config: 
-          type: External
-          config:
-            period: 0.2
+          type: Plugin
+          period: 0.2
     sensor_manager:
       sensors:
         - name: "LandmarkSensor"
@@ -42,6 +46,7 @@ robots:
             type: OrientedLandmark
             detection_distance: 6.0
   - name: "robot2"
+    type: Robot
     navigator: 
       type: TrajectoryFollower
       trajectory: !include "paths/path1.yaml"
@@ -57,9 +62,8 @@ robots:
     state_estimator_bench:
       - name: "Filter"
         config: 
-          type: External
-          config:
-            period: 0.2
+          type: Plugin
+          period: 0.2
     sensor_manager:
       sensors:
         - name: "LandmarkSensor"

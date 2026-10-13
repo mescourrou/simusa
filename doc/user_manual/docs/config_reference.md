@@ -20,16 +20,16 @@ Your configuration file controls each of these components for every robot and co
 
 **Each robot has configuration for:**
 
-- [Navigation Configuration](config/navigation.md) - GoTo, TrajectoryFollower, Python, External
+- [Navigation Configuration](config/navigation.md) - GoTo, TrajectoryFollower, Plugin
   - How robots choose targets and plan paths
 
-- [Controller Configuration](config/controller.md) - PID, Python, External
+- [Controller Configuration](config/controller.md) - PID, Plugin
   - How robots convert targets into motor commands
 
-- [Physics Configuration](config/physics.md) - Internal, Python, External
+- [Physics Configuration](config/physics.md) - Internal, Plugin
   - How robots move (unicycle, holonomic, bicycle)
 
-- [State Estimator Configuration](config/state_estimator.md) - Perfect, Python, External
+- [State Estimator Configuration](config/state_estimator.md) - Perfect, Plugin
   - How robots estimate their state from sensors
 
 - [Sensor Manager Configuration](config/sensors.md) - RobotSensor, OrientedLandmarkSensor, SpeedSensor, etc.
@@ -68,7 +68,7 @@ The root of your configuration file includes:
 ## Configuration File Structure
 
 ```yaml
-version: 1.8.0
+version: 1.10.0
 max_time: 100.0
 log:
   log_level: Info
@@ -80,15 +80,18 @@ environment:
   map_path: my_map.yaml
 optimization:
   threads: 0
-robots:
+nodes:
   - name: robot1
+    type: Robot
     navigator: { ... }        # See Navigation Configuration
     controller: { ... }       # See Controller Configuration
     physics: { ... }          # See Physics Configuration
     state_estimator: { ... }  # See State Estimator Configuration
     sensor_manager: { ... }   # See Sensor Manager Configuration
     network: { ... }          # See Network Configuration
-computation_units: [ ... ]    # See Computation Units
+- name: cu1
+    type: ComputationUnit
+    [ ... ]    # See Computation Units
 scenario: { ... }             # See Scenario Configuration
 ```
 

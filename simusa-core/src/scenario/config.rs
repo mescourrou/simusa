@@ -5,12 +5,11 @@
 //! Triggers are represented by [`EventTriggerConfig`], actions by [`EventTypeConfig`], and
 //! complete entries by [`EventConfig`] inside [`ScenarioConfig`].
 
-use serde::{Deserialize, Serialize};
 use simusa_macros::config_derives;
 
-use crate::config::NumberConfig;
 #[cfg(feature = "gui")]
 use crate::gui::UIComponent;
+use crate::{config::NumberConfig, networking::message_types::MessageType};
 
 /// Root scenario configuration.
 ///
@@ -271,6 +270,8 @@ pub enum EventTypeConfig {
     Spawn(SpawnEventConfig),
     /// Kills a node by name.
     Kill(String),
+    /// Sends a message to a channel.
+    SendMessage(SendMessageEventConfig),
 }
 
 impl Default for EventTypeConfig {
@@ -288,6 +289,9 @@ impl UIComponent for EventTypeConfig {
             }
             Self::Kill(target) => {
                 ui.label(format!("Kill Event (target: {})", target));
+            }
+            Self::SendMessage(message) => {
+                message.show(ui, ctx, unique_id);
             }
         }
     }
@@ -325,8 +329,44 @@ impl UIComponent for SpawnEventConfig {
     }
 }
 
+/// Configuration to send a message to a channel as an Event action.
+#[config_derives]
+#[derive(Default)]
+pub struct SendMessageEventConfig {
+    /// Name of the channel to send the message to (if relative, it is relative to the root: prefer absolute paths).
+    pub channel: String,
+    /// Message to send (can be any type that implements [`MessageType`]).
+    pub message: Box<MessageType>,
+}
+
+impl Check for SendMessageEventConfig {
+    fn do_check(&self) -> CheckResult {
+        let mut result = CheckResult::new();
+        if self.channel.is_empty() {
+            result.add_error("Channel name cannot be empty.".to_string());
+        }
+        if !self.channel.starts_with('/') {
+            result.add_warning(
+                "Channel name is not absolute, consider using an absolute path.".to_string(),
+            );
+        }
+        result
+    }
+}
+
+#[cfg(feature = "gui")]
+impl UIComponent for SendMessageEventConfig {
+    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
+        ui.label(format!(
+            "Send Message Event (to: {}, message: {:?})",
+            self.channel, self.message
+        ));
+    }
+}
+
 /// Record emitted when an event is evaluated/executed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[config_derives]
+#[derive(Default)]
 pub struct EventRecord {
     /// Trigger configuration that led to this record.
     pub trigger: EventTriggerConfig,

@@ -1,11 +1,14 @@
 extern crate proc_macro;
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{ToTokens, format_ident, quote};
-use syn::{Data, DeriveInput, LitStr, parse::Parse, parse_macro_input, spanned::Spanned};
+use syn::{
+    Data, DeriveInput, LitStr, Token, parse::Parse, parse_macro_input, punctuated::Punctuated,
+    spanned::Spanned,
+};
 
 #[proc_macro_derive(ToVec)]
 pub fn derive_tovec(item: TokenStream) -> TokenStream {
@@ -303,7 +306,7 @@ fn parse_ui_show_all(attrs: &[syn::Attribute]) -> syn::Result<Option<String>> {
     Ok(None)
 }
 
-#[proc_macro_derive(UIComponent, attributes(show_all))]
+#[proc_macro_derive(UIComponent, attributes(show_all, ui_name, plugin))]
 pub fn derive_ui_component(item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::DeriveInput);
 
@@ -327,7 +330,25 @@ pub fn derive_ui_component(item: TokenStream) -> TokenStream {
                 let id_str = parse_ui_name(&variant.attrs)
                     .expect("Failed to parse UI name")
                     .unwrap_or_else(|| id.to_string());
-
+                let mut is_plugin_variant = None;
+                for attr in &variant.attrs {
+                    if attr.path().is_ident("plugin") {
+                        let list = attr
+                            .meta
+                            .require_list()
+                            .expect("Expected #[plugin(plugin_name, unique_key)] to be a list");
+                        let plugin_name = list
+                            .parse_args_with(Punctuated::<LitStr, Token![,]>::parse_terminated)
+                            .expect("Expected plugin name to be a string literal")[0]
+                            .clone();
+                        let unique_key = list
+                            .parse_args_with(Punctuated::<LitStr, Token![,]>::parse_terminated)
+                            .expect("Expected unique key to be a string literal")[0]
+                            .clone();
+                        is_plugin_variant = Some((plugin_name, unique_key));
+                        break;
+                    }
+                }
                 match &variant.fields {
                     syn::Fields::Named(fields) => {
                         // Named fields: Variant { field1, field2, ... }
@@ -337,23 +358,43 @@ pub fn derive_ui_component(item: TokenStream) -> TokenStream {
                             .filter_map(|f| f.ident.as_ref())
                             .collect();
                         if !fields.named.is_empty() {
-                            show_mut_match_impl.extend(quote! {
-                                Self::#id(cfg) => cfg.show_mut(
-                                    ui,
-                                    ctx,
-                                    buffer_stack,
-                                    global_config,
-                                    current_node_name,
-                                    unique_id,
-                                ),
-                            });
-                            show_match_impl.extend(quote! {
-                                Self::#id(cfg) => cfg.show(
-                                    ui,
-                                    ctx,
-                                    unique_id,
-                                ),
-                            });
+                            if let Some((plugin_name, unique_key)) = is_plugin_variant {
+                                show_mut_match_impl.extend(quote! {
+                                    Self::#id(cfg) => crate::gui::utils::edit_plugin_config(
+                                        ui,
+                                        #plugin_name,
+                                        #unique_key,
+                                        unique_id,
+                                        buffer_stack,
+                                        cfg
+                                    ),
+                                });
+                                show_match_impl.extend(quote! {
+                                    Self::#id(cfg) => crate::gui::utils::show_plugin_config(
+                                        ui,
+                                        #plugin_name,
+                                        cfg
+                                    ),
+                                });
+                            } else {
+                                show_mut_match_impl.extend(quote! {
+                                    Self::#id(cfg) => cfg.show_mut(
+                                        ui,
+                                        ctx,
+                                        buffer_stack,
+                                        global_config,
+                                        current_node_name,
+                                        unique_id,
+                                    ),
+                                });
+                                show_match_impl.extend(quote! {
+                                    Self::#id(cfg) => cfg.show(
+                                        ui,
+                                        ctx,
+                                        unique_id,
+                                    ),
+                                });
+                            }
                             if do_show_all.is_some() {
                                 let default_fields = field_names.iter().map(|fname| {
                                     quote! { #fname: Default::default() }
@@ -383,23 +424,43 @@ pub fn derive_ui_component(item: TokenStream) -> TokenStream {
                     syn::Fields::Unnamed(fields) => {
                         // // Unnamed fields: Variant(field1, field2, ...)
                         if !fields.unnamed.is_empty() {
-                            show_mut_match_impl.extend(quote! {
-                                Self::#id(cfg) => cfg.show_mut(
-                                    ui,
-                                    ctx,
-                                    buffer_stack,
-                                    global_config,
-                                    current_node_name,
-                                    unique_id,
-                                ),
-                            });
-                            show_match_impl.extend(quote! {
-                                Self::#id(cfg) => cfg.show(
-                                    ui,
-                                    ctx,
-                                    unique_id,
-                                ),
-                            });
+                            if let Some((plugin_name, unique_key)) = is_plugin_variant {
+                                show_mut_match_impl.extend(quote! {
+                                    Self::#id(cfg) => crate::gui::utils::edit_plugin_config(
+                                        ui,
+                                        #plugin_name,
+                                        #unique_key,
+                                        unique_id,
+                                        buffer_stack,
+                                        cfg
+                                    ),
+                                });
+                                show_match_impl.extend(quote! {
+                                    Self::#id(cfg) => crate::gui::utils::show_plugin_config(
+                                        ui,
+                                        #plugin_name,
+                                        cfg
+                                    ),
+                                });
+                            } else {
+                                show_mut_match_impl.extend(quote! {
+                                    Self::#id(cfg) => cfg.show_mut(
+                                        ui,
+                                        ctx,
+                                        buffer_stack,
+                                        global_config,
+                                        current_node_name,
+                                        unique_id,
+                                    ),
+                                });
+                                show_match_impl.extend(quote! {
+                                    Self::#id(cfg) => cfg.show(
+                                        ui,
+                                        ctx,
+                                        unique_id,
+                                    ),
+                                });
+                            }
                             if do_show_all.is_some() {
                                 let default_fields = fields.unnamed.iter().map(|_| {
                                     quote! { Default::default() }
@@ -619,6 +680,7 @@ pub fn config_derives(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_str = attr.to_string();
 
     let mut check_derive = quote! { Check, };
+    let mut partial_eq_derive = quote! { PartialEq, };
     let mut deserialize_derive = quote! { serde::Deserialize, };
     let mut serialize_derive = quote! { serde::Serialize, };
     let mut tagged_derive = quote! { #[serde(tag = "type")] };
@@ -631,6 +693,7 @@ pub fn config_derives(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut unknown_fields_derive = quote! {
         #[serde(deny_unknown_fields)]
     };
+    let mut to_vec_derive = quote! { simusa_macros::ToVec, };
     for attribute in attr_str.split(',') {
         let trimmed = attribute.trim();
         match trimmed {
@@ -646,6 +709,9 @@ pub fn config_derives(attr: TokenStream, item: TokenStream) -> TokenStream {
             "tag_content" => {
                 tagged_derive = quote! {  #[serde(tag = "type", content = "value")] };
             }
+            "skip_partial_eq" => {
+                partial_eq_derive = quote! {};
+            }
             "untagged" => {
                 tagged_derive = quote! {  #[serde(untagged)] };
             }
@@ -655,6 +721,9 @@ pub fn config_derives(attr: TokenStream, item: TokenStream) -> TokenStream {
             "skip_jsonschema" => {
                 jsonschema_derive = quote! {};
                 jsonschema_derive_struct = quote! {};
+            }
+            "skip_to_vec" => {
+                to_vec_derive = quote! {};
             }
             "" => {}
             _ => {
@@ -697,9 +766,9 @@ pub fn config_derives(attr: TokenStream, item: TokenStream) -> TokenStream {
             #deserialize_derive
             Debug,
             Clone,
-            PartialEq,
+            #partial_eq_derive
             #check_derive
-            simusa_macros::ToVec,
+            #to_vec_derive
         )]
         #jsonschema_derive
         #unknown_fields_derive
@@ -833,7 +902,7 @@ impl Parse for EnumVariablesVariant {
 pub fn enum_variables(input: TokenStream) -> TokenStream {
     let parsed = parse_macro_input!(input as EnumVariablesInput);
     let enum_name = parsed.enum_name;
-    let mut sub_enums = HashMap::new();
+    let mut sub_enums = BTreeMap::new();
     for variant in &parsed.variants {
         for sub_enum in &variant.sub_enums {
             if !sub_enums.contains_key(&sub_enum.variant_name) {

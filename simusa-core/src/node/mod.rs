@@ -15,26 +15,26 @@ use serde::{Deserialize, Serialize};
 use simusa_com::pub_sub::{MultiClientTrait, PathKey};
 use simusa_macros::EnumToString;
 
-use core::f32;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::context::Context;
+use crate::controllers::AbstractController;
 use crate::environment::Environment;
+use crate::interfaces::navigator_controller::ControllerInputVariables;
+use crate::navigators::AbstractNavigator;
 use crate::networking::network::MessageFlag;
 use crate::physics::robot_models::Command;
 use crate::simulator::SimusaBrokerMultiClient;
-use crate::state_estimators::State;
+use crate::state_estimators::{State, WorldStateRecord};
 use crate::time_analysis::TimeAnalysisNode;
 use crate::utils::read_only_lock::RoLock;
 use crate::utils::{SharedMutex, SharedRoLock, SharedRwLock};
 use crate::{
     api::internal_api::{self, NodeClient, NodeServer},
     constants::TIME_ROUND,
-    controllers::Controller,
     errors::SimusaResult,
-    navigators::Navigator,
     networking::network::Network,
     physics::Physics,
     recordable::Recordable,
@@ -42,8 +42,6 @@ use crate::{
     state_estimators::{BenchStateEstimator, BenchStateEstimatorRecord, StateEstimator},
     utils::maths::round_precision,
 };
-#[cfg(not(feature = "monothreaded"))]
-use crate::simulator::TimeCv;
 use crate::{internal, networking};
 
 /// Mode State machine.
@@ -74,8 +72,11 @@ pub struct NodeMetaData {
     pub labels: Vec<String>,
     /// Current lifecycle state of the node.
     pub state: NodeState,
-    /// Current ground-truth planar position when available.
-    pub position: Option<[f32; 2]>,
+    /// Physics of the node if it has one.
+    ///
+    /// WARNING: When the node is terminated, the physics is still available but the
+    /// state() function will return None if called in the future.
+    pub physics: Option<Arc<dyn RoLock<Box<dyn Physics>>>>,
 }
 
 // Node itself
@@ -83,14 +84,13 @@ pub struct NodeMetaData {
 /// Structure managing one node.
 ///
 /// It is composed of modules to manage different aspects:
-/// * `navigator` is of [`Navigator`] trait, and defines the error to be sent
-///   to the [`Controller`] to follow the required trajectory.
-/// * `controller` is of [`Controller`] trait, it defines the command to be sent
+/// * `navigator` is of [`AbstractNavigator`] trait, and computes the input of the Controller ([`ControllerInputVariables`]) such as errors.
+/// * `controller` is of [`AbstractController`] trait, it defines the command to be sent
 ///   to the [`Physics`] module.
 /// * `physics` is of [`Physics`] trait. It simulates the node behaviour, its real
 ///   state. It contains a ground truth to evaluate the [`StateEstimator`].
 /// * `state_estimator` is of [`StateEstimator`] trait. It estimates the node
-///   state, and send it to the [`Navigator`].
+///   state, and send it to the [`AbstractNavigator`].
 ///
 /// * `sensor_manager`, of type [`SensorManager`], manages the [`Sensor`](crate::sensors::Sensor)s. The
 ///   observations of the sensors are sent to the [`StateEstimator`].
@@ -100,10 +100,10 @@ pub struct NodeMetaData {
 ///   the landmark map.
 #[derive(Debug)]
 pub struct Node {
-    /// [`Navigator`] module, implementing the navigation strategy.
-    pub(self) navigator: Option<SharedRwLock<Box<dyn Navigator>>>,
-    /// [`Controller`] module, implementing the control strategy.
-    pub(self) controller: Option<SharedRwLock<Box<dyn Controller>>>,
+    /// [`AbstractNavigator`] module, implementing the navigation strategy.
+    pub(self) navigator: Option<SharedRwLock<Box<dyn AbstractNavigator>>>,
+    /// [`AbstractController`] module, implementing the control strategy.
+    pub(self) controller: Option<SharedRwLock<Box<dyn AbstractController>>>,
     /// [`Physics`] module, implementing the physics strategy.
     pub(self) physics: Option<SharedRwLock<Box<dyn Physics>>>,
     /// [`StateEstimator`] module, implementing the state estimation strategy.
@@ -118,17 +118,20 @@ pub struct Node {
     pub(self) node_server: Option<NodeServer>,
 
     pub(self) other_node_names: Vec<String>,
-    pub(self) other_node_physics: SharedRoLock<BTreeMap<String, SharedRoLock<Box<dyn Physics>>>>,
     pub(self) time_analysis: Option<SharedMutex<TimeAnalysisNode>>,
     pub(self) send_records: bool,
 
     pub(self) node_meta_data: SharedRwLock<NodeMetaData>,
-    pub(self) meta_data_list: Option<SharedRoLock<HashMap<String, SharedRoLock<NodeMetaData>>>>,
+    pub(self) meta_data_list: Option<SharedRoLock<BTreeMap<String, SharedRoLock<NodeMetaData>>>>,
     pub(self) node_message_client: SimusaBrokerMultiClient,
 
     pub(self) current_command: Option<Command>,
 
     pub(self) environment: Arc<Environment>,
+
+    pub(self) last_estimation: Option<WorldStateRecord>,
+    pub(self) last_controller_input: Option<ControllerInputVariables>,
+    pub(self) last_command: Option<Command>,
 }
 
 impl Node {
@@ -137,8 +140,7 @@ impl Node {
     /// It is used to initialize the sensor manager, which need to know the list of all nodes.
     pub(crate) fn post_creation_init(
         &mut self,
-        physics_list: SharedRoLock<BTreeMap<String, SharedRoLock<Box<dyn Physics>>>>,
-        meta_data_list: SharedRoLock<HashMap<String, SharedRoLock<NodeMetaData>>>,
+        meta_data_list: SharedRoLock<BTreeMap<String, SharedRoLock<NodeMetaData>>>,
         initial_time: f32,
         context: &Context,
     ) -> NodeClient {
@@ -148,8 +150,6 @@ impl Node {
             crate::logger::InternalLog::SetupSteps,
             "Node post-creation initialization"
         );
-
-        self.other_node_physics = physics_list;
 
         // Using meta_data_list to get names as only nodes with physics are in physics_list.
         for name in meta_data_list.read().unwrap().keys() {
@@ -190,7 +190,7 @@ impl Node {
             navigator
                 .write()
                 .unwrap()
-                .post_init(self, &context)
+                .call_post_init(self, &context)
                 .unwrap();
         }
 
@@ -198,7 +198,7 @@ impl Node {
             controller
                 .write()
                 .unwrap()
-                .post_init(self, &context)
+                .call_post_init(self, &context)
                 .unwrap();
         }
 
@@ -216,170 +216,11 @@ impl Node {
         node_client
     }
 
-    /// Run the node to reach the given time.
-    ///
-    /// ## Arguments
-    /// * `time` -- Time to reach.
-    #[cfg(not(feature = "monothreaded"))]
-    pub(crate) fn run_next_time_step(
-        &mut self,
-        time: f32,
-        time_cv: &TimeCv,
-        context: &Context,
-    ) -> SimusaResult<()> {
-        self.process_messages();
-        self.run_time_step(time, time_cv, context)
-    }
-
     /// Process all the messages: one-way (network) and two-way (services).
     ///
     /// Processing messages mean here to transfer all the pending messages from the network to the corresponding modules (physics, state estimator, navigator, controller, sensor manager).
     pub(crate) fn process_messages(&self) -> bool {
         self.node_message_client.next_message_time().is_some()
-    }
-
-    /// Run only one time step.
-    ///
-    /// The update step is done in this order:
-    /// 1. Update the physics
-    /// 2. Call to `pre_loop_hook`s.
-    /// 3. Prediction step of the state estimators
-    /// 4. Generate the observations (and send them)
-    /// 5. Correction step of the state estimator
-    /// 6. If it is the time for the state estimator to do its prediction step or required by either controller or navigator:
-    ///     1. The navigator computes the error from the state estimation
-    ///     2. The command is computed by the Controller
-    ///     3. The command is applied to the Physics (but Physics state is not updated yet).
-    ///
-    /// The network messages are handled between each steps.
-    ///
-    /// Then, the node state is saved.
-    #[cfg(not(feature = "monothreaded"))]
-    fn run_time_step(
-        &mut self,
-        time: f32,
-        time_cv: &TimeCv,
-        context: &Context,
-    ) -> SimusaResult<()> {
-        use crate::info;
-        use crate::errors::{SimusaError, SimusaErrorTypes};
-
-        let context = context.new_callstack_level("run_time_step");
-        if self.node_meta_data.read().unwrap().state != NodeState::Running {
-            return Err(SimusaError::new(
-                SimusaErrorTypes::ImplementationError,
-                "Only a Running node should be run!".to_string(),
-            ));
-        }
-        info!(context, "Run time {}", time);
-
-        // Update the true state
-        self.physics_update(time, &context);
-
-        self.handle_messages(time, &context);
-        self.sync_with_others(time_cv, time, &context);
-
-        // Pre loop calls to manage messages
-        self.pre_loop_hooks(time, &context);
-
-        self.handle_messages(time, &context);
-        internal!(
-            context,
-            crate::logger::InternalLog::NodeSyncDetailed,
-            "Pre prediction step wait"
-        );
-        self.sync_with_others(time_cv, time, &context);
-
-        let do_control_loop = self.prediction_step(time, &context);
-
-        self.handle_messages(time, &context);
-        internal!(
-            context,
-            crate::logger::InternalLog::NodeSyncDetailed,
-            "Post prediction step wait"
-        );
-        self.sync_with_others(time_cv, time, &context);
-
-        self.make_observations(time, &context);
-
-        self.handle_messages(time, &context);
-        internal!(
-            context,
-            crate::logger::InternalLog::NodeSyncDetailed,
-            "Post observation wait"
-        );
-        self.sync_with_others(time_cv, time, &context);
-
-        self.correction_step(time, &context);
-
-        self.handle_messages(time, &context);
-        internal!(
-            context,
-            crate::logger::InternalLog::NodeSyncDetailed,
-            "Post correction step wait"
-        );
-        self.sync_with_others(time_cv, time, &context);
-
-        self.nav_and_control_step(time, do_control_loop, &context);
-
-        self.handle_messages(time, &context);
-        internal!(
-            context,
-            crate::logger::InternalLog::NodeSyncDetailed,
-            "Pre-save wait"
-        );
-        self.sync_with_others(time_cv, time, &context);
-
-        Ok(())
-    }
-
-    /// Synchronize this node with the other nodes at an intermediate barrier.
-    ///
-    /// The method repeatedly processes pending messages while waiting for the
-    /// synchronization parity to change.
-    #[cfg(not(feature = "monothreaded"))]
-    pub(crate) fn sync_with_others(&mut self, time_cv: &TimeCv, time: f32, context: &Context) {
-        let context = context.new_callstack_level("sync_with_others");
-        let mut lk = time_cv.waiting.lock().unwrap();
-        let waiting_parity = *time_cv.intermediate_parity.lock().unwrap();
-        *lk += 1;
-        internal!(
-            context,
-            crate::logger::InternalLog::NodeSyncDetailed,
-            "Increase intermediate waiting nodes: {}",
-            *lk
-        );
-
-        loop {
-            while self.process_messages() {
-                *lk -= 1;
-                internal!(
-                    context,
-                    crate::logger::InternalLog::NodeSyncDetailed,
-                    "Messages to process: handle messages"
-                );
-                self.handle_messages(time, &context);
-                *lk += 1;
-            }
-            time_cv.condvar.notify_all();
-            if !self.process_messages() {
-                lk = time_cv.condvar.wait(lk).unwrap();
-            }
-            if waiting_parity != *time_cv.intermediate_parity.lock().unwrap() {
-                internal!(
-                    context,
-                    crate::logger::InternalLog::NodeSyncDetailed,
-                    "End wait"
-                );
-                return;
-            }
-            internal!(
-                context,
-                crate::logger::InternalLog::NodeSyncDetailed,
-                "New loop: waiting = {}",
-                *lk
-            );
-        }
     }
 
     /// Handle all pending service and network messages up to `time`.
@@ -431,7 +272,7 @@ impl Node {
             );
         }
         if let Some(navigator) = &self.navigator
-            && let Some(next_time) = navigator.read().unwrap().next_time_step(&context)
+            && let Some(next_time) = navigator.read().unwrap().call_next_time_step(&context)
         {
             if next_time > min_time_excluded {
                 next_time_step = next_time_step.min(next_time);
@@ -443,7 +284,7 @@ impl Node {
             );
         }
         if let Some(controller) = &self.controller
-            && let Some(next_time) = controller.read().unwrap().next_time_step(&context)
+            && let Some(next_time) = controller.read().unwrap().call_next_time_step(&context)
         {
             if next_time > min_time_excluded {
                 next_time_step = next_time_step.min(next_time);
@@ -516,13 +357,14 @@ impl Node {
         let context = context.new_callstack_level("physics_update");
         if let Some(physics) = &self.physics {
             physics.write().unwrap().update_state(time, &context);
-            let pose = physics.read().unwrap().state(time, &context).pose;
-            self.node_meta_data.write().unwrap().position = Some([pose[0], pose[1]]);
         }
     }
 
     pub(crate) fn pre_loop_hooks(&mut self, time: f32, context: &Context) {
         let context = context.new_callstack_level("pre_loop_hooks");
+        self.last_command = None;
+        self.last_controller_input = None;
+        self.last_estimation = None;
         if let Some(state_estimator) = self.state_estimator() {
             state_estimator
                 .write()
@@ -542,13 +384,13 @@ impl Node {
             controller
                 .write()
                 .unwrap()
-                .pre_loop_hook(self, time, &context);
+                .call_pre_loop_hook(self, time, &context);
         }
         if let Some(navigator) = self.navigator() {
             navigator
                 .write()
                 .unwrap()
-                .pre_loop_hook(self, time, &context);
+                .call_pre_loop_hook(self, time, &context);
         }
     }
 
@@ -606,6 +448,13 @@ impl Node {
                     .unwrap()
                     .finished_time_analysis(ta.unwrap());
             }
+            self.last_estimation = Some(
+                state_estimator
+                    .read()
+                    .unwrap()
+                    .world_state(&context)
+                    .record(&context),
+            );
             true
         } else {
             false
@@ -662,6 +511,13 @@ impl Node {
                             .unwrap()
                             .finished_time_analysis(ta.unwrap());
                     }
+                    self.last_estimation = Some(
+                        state_estimator
+                            .read()
+                            .unwrap()
+                            .world_state(&context)
+                            .record(&context),
+                    );
                 }
 
                 if let Some(state_estimator_bench) = &self.state_estimator_bench() {
@@ -694,7 +550,7 @@ impl Node {
         time: f32,
         do_control_loop: bool,
         context: &Context,
-    ) {
+    ) -> SimusaResult<()> {
         let context = context.new_callstack_level("nav_and_control_step");
         if do_control_loop
             || (self.navigator().is_some()
@@ -705,7 +561,7 @@ impl Node {
                         .unwrap()
                         .read()
                         .unwrap()
-                        .next_time_step(&context)
+                        .call_next_time_step(&context)
                         .unwrap_or(f32::INFINITY))
             || (self.controller().is_some()
                 && time
@@ -715,12 +571,20 @@ impl Node {
                         .unwrap()
                         .read()
                         .unwrap()
-                        .next_time_step(&context)
+                        .call_next_time_step(&context)
                         .unwrap_or(f32::INFINITY))
         {
             let state_estimator = &self.state_estimator().unwrap();
             let world_state = state_estimator.read().unwrap().world_state(&context);
 
+            let requested_variables = self
+                .controller()
+                .as_ref()
+                .unwrap()
+                .read()
+                .unwrap()
+                .call_required_variables()
+                .to_vec();
             // Compute the error to the planned path
             let ta = self.time_analysis.as_ref().map(|time_analysis| {
                 time_analysis
@@ -728,13 +592,13 @@ impl Node {
                     .unwrap()
                     .time_analysis(time, "control_loop_navigator_compute_error".to_string())
             });
-            let error = self
+            let controller_input = self
                 .navigator()
                 .as_ref()
                 .unwrap()
                 .write()
                 .unwrap()
-                .compute_error(self, world_state, &context);
+                .call_compute_output(self, world_state, &context, &requested_variables)?;
             if let Some(time_analysis) = &self.time_analysis {
                 time_analysis
                     .lock()
@@ -742,7 +606,8 @@ impl Node {
                     .finished_time_analysis(ta.unwrap());
             }
 
-            // Compute the command from the error
+            self.last_controller_input = Some(controller_input.clone());
+            // Compute the command from the controller_input
             let ta = self.time_analysis.as_ref().map(|time_analysis| {
                 time_analysis
                     .lock()
@@ -755,14 +620,14 @@ impl Node {
                 .unwrap()
                 .write()
                 .unwrap()
-                .make_command(self, &error, time, &context);
+                .call_make_command(self, controller_input, time, &context);
             if let Some(time_analysis) = &self.time_analysis {
                 time_analysis
                     .lock()
                     .unwrap()
                     .finished_time_analysis(ta.unwrap());
             }
-
+            self.last_command = Some(command.clone());
             // Apply the command to the physics
             self.physics
                 .as_ref()
@@ -772,6 +637,8 @@ impl Node {
                 .apply_command(&command, time, &context);
             self.current_command = Some(command);
         }
+
+        Ok(())
     }
 }
 
@@ -847,7 +714,7 @@ impl Node {
     }
 
     /// Get a Arc clone of navigator module.
-    pub fn navigator(&self) -> Option<SharedRwLock<Box<dyn Navigator>>> {
+    pub fn navigator(&self) -> Option<SharedRwLock<Box<dyn AbstractNavigator>>> {
         match &self.navigator {
             Some(n) => Some(Arc::clone(n)),
             None => None,
@@ -855,7 +722,7 @@ impl Node {
     }
 
     /// Get a Arc clone of controller module.
-    pub fn controller(&self) -> Option<SharedRwLock<Box<dyn Controller>>> {
+    pub fn controller(&self) -> Option<SharedRwLock<Box<dyn AbstractController>>> {
         match &self.controller {
             Some(c) => Some(Arc::clone(c)),
             None => None,
@@ -867,29 +734,6 @@ impl Node {
         &self.environment
     }
 
-    /// Get shared read-only access to the physics module of another node by name.
-    /// Returns `None` if the node name is not found or if the physics module is not available.
-    pub fn get_other_node_physics(
-        &self,
-        node_name: &str,
-    ) -> Option<SharedRoLock<Box<dyn Physics>>> {
-        self.other_node_physics
-            .read()
-            .unwrap()
-            .get(node_name)
-            .cloned()
-    }
-
-    /// Get shared read-only access to the physics modules of all other nodes.
-    /// The returned map is keyed by node name and contains shared read-only locks to the physics modules.
-    /// The map is maintained by the simulator and updated as nodes are added or removed.
-    /// It allows this node to query the physics state of other nodes for coordination, collision checking, or other purposes.
-    pub fn get_all_node_physics(
-        &self,
-    ) -> &SharedRoLock<BTreeMap<String, SharedRoLock<Box<dyn Physics>>>> {
-        &self.other_node_physics
-    }
-
     /// Get shared read-only access to this node metadata.
     pub fn meta_data(&self) -> SharedRoLock<NodeMetaData> {
         self.node_meta_data.clone() as Arc<dyn RoLock<NodeMetaData>>
@@ -898,9 +742,9 @@ impl Node {
     /// Get the optional shared metadata map for all nodes.
     pub fn meta_data_list(
         &self,
-    ) -> Option<SharedRoLock<HashMap<String, SharedRoLock<NodeMetaData>>>> {
+    ) -> Option<SharedRoLock<BTreeMap<String, SharedRoLock<NodeMetaData>>>> {
         self.meta_data_list.clone()
-            as Option<Arc<dyn RoLock<HashMap<String, SharedRoLock<NodeMetaData>>>>>
+            as Option<Arc<dyn RoLock<BTreeMap<String, SharedRoLock<NodeMetaData>>>>>
     }
 
     /// Mark this node as [`NodeState::Zombie`]. The kill is done later.
@@ -913,7 +757,7 @@ impl Node {
         self.node_meta_data.write().unwrap().state = NodeState::Terminated;
         self.node_server
             .as_ref()
-            .unwrap()
+            .expect("Node server is not available")
             .state_update
             .as_ref()
             .unwrap()
@@ -924,7 +768,7 @@ impl Node {
                     self.node_meta_data.read().unwrap().state.clone(),
                 ),
             ))
-            .unwrap();
+            .expect("Failed to send state update");
     }
 }
 
@@ -937,20 +781,30 @@ impl Node {
             name: meta_data.name.clone(),
             model_name: meta_data.model_name.clone(),
             labels: meta_data.labels.clone(),
-            navigator: self
-                .navigator
-                .as_ref()
-                .unwrap()
-                .read()
-                .unwrap()
-                .record(&context),
-            controller: self
-                .controller
-                .as_ref()
-                .unwrap()
-                .read()
-                .unwrap()
-                .record(&context),
+            navigator: if self.last_controller_input.is_some() {
+                Some(
+                    self.navigator
+                        .as_ref()
+                        .unwrap()
+                        .read()
+                        .unwrap()
+                        .record(&context),
+                )
+            } else {
+                None
+            },
+            controller: if self.last_command.is_some() {
+                Some(
+                    self.controller
+                        .as_ref()
+                        .unwrap()
+                        .read()
+                        .unwrap()
+                        .record(&context),
+                )
+            } else {
+                None
+            },
             physics: self
                 .physics
                 .as_ref()
@@ -958,13 +812,18 @@ impl Node {
                 .read()
                 .unwrap()
                 .record(&context),
-            state_estimator: self
-                .state_estimator
-                .as_ref()
-                .unwrap()
-                .read()
-                .unwrap()
-                .record(&context),
+            state_estimator: if self.last_estimation.is_some() {
+                Some(
+                    self.state_estimator
+                        .as_ref()
+                        .unwrap()
+                        .read()
+                        .unwrap()
+                        .record(&context),
+                )
+            } else {
+                None
+            },
             state_estimator_bench: Vec::new(),
             sensors: self
                 .sensor_manager
@@ -974,6 +833,12 @@ impl Node {
                 .unwrap()
                 .record(&context),
             state: meta_data.state.clone(),
+            command: self.last_command.clone(),
+            controller_input: self
+                .last_controller_input
+                .as_ref()
+                .map(|c| c.record(&context)),
+            estimated_world_state: self.last_estimation.clone(),
         };
         let other_state_estimators = self.state_estimator_bench.clone();
         for additional_state_estimator in other_state_estimators

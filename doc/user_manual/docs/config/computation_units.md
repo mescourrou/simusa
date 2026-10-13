@@ -67,15 +67,8 @@ computation_units:
     state_estimators:
       - name: global_slam
         config:
-          type: Python
-          file: central_slam.py
-          class_name: CentralSLAM
-          prediction_period: 0.1
-          targets:
-            - robot1
-            - robot2
-            - robot3
-          map_path: maps/global_map.yaml
+          type: Plugin
+          my_config...
 ```
 
 Each robot must send its sensor data to the central unit:
@@ -85,7 +78,8 @@ Each robot must send its sensor data to the central unit:
     sensors:
       - name: lidar
         send_to: [Central Localization]
-        config: { type: OrientedLandmarkSensor, map_path: maps/landmarks.yaml }
+        config:
+          type: OrientedLandmarkSensor
 ```
 
 ### Multiple Specialized Units
@@ -98,11 +92,8 @@ computation_units:
     state_estimators:
       - name: slam
         config:
-          type: Python
-          file: slam_estimator.py
-          class_name: SLAMEstimator
-          targets: [robot1, robot2]
-          prediction_period: 0.1
+          type: Plugin
+          my_config...
 
   - name: Planning Unit
     state_estimators:

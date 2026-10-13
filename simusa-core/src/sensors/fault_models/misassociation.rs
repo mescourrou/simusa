@@ -240,31 +240,35 @@ impl MisassociationFault {
         old_label: String,
         position: Vector2<f32>,
         environment: &Arc<Environment>,
-        _context: &Context,
+        context: &Context,
     ) -> String {
-        let mut id_list: Vec<(String, Vector2<f32>)> = match &self.source {
-            Source::Robots => environment
-                .get_meta_data()
-                .read()
-                .unwrap()
-                .iter()
-                .filter_map(|(name, data)| {
-                    if matches!(data.read().unwrap().state, NodeState::Running)
-                        && let Some(position) = data.read().unwrap().position
-                    {
-                        Some((name.clone(), Vector2::new(position[0], position[1])))
-                    } else {
-                        None
-                    }
-                })
-                .collect(),
-            Source::Map => environment
-                .map()
-                .landmarks()
-                .iter()
-                .map(|l| (l.id.to_string(), l.pose.fixed_rows::<2>(0).into()))
-                .collect(),
-        };
+        let mut id_list: Vec<(String, Vector2<f32>)> =
+            match &self.source {
+                Source::Robots => environment
+                    .get_meta_data()
+                    .read()
+                    .unwrap()
+                    .iter()
+                    .filter_map(|(name, data)| {
+                        if matches!(data.read().unwrap().state, NodeState::Running)
+                            && let Some(physics) = &data.read().unwrap().physics
+                        {
+                            let time = context.get_time().unwrap();
+                            physics.read().unwrap().state(time, context).map(|state| {
+                                (name.clone(), Vector2::new(state.pose.x, state.pose.y))
+                            })
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
+                Source::Map => environment
+                    .map()
+                    .landmarks()
+                    .iter()
+                    .map(|l| (l.id.to_string(), l.pose.fixed_rows::<2>(0).into()))
+                    .collect(),
+            };
 
         if self.sort == Sort::Random {
             let mut rng = ChaCha8Rng::seed_from_u64((self.global_seed + seed).to_bits() as u64);

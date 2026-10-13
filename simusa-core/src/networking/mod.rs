@@ -14,7 +14,6 @@
 pub mod message_types;
 pub mod network;
 pub mod network_manager;
-pub mod pybinds;
 
 /// Errors that can occur while using networking and service communication APIs.
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
@@ -66,8 +65,8 @@ mod tests {
         sync::{Arc, Mutex},
     };
 
+    use crate::utils::GeneralValue;
     use serde::{Deserialize, Serialize};
-    use serde_json::Value;
     use simusa_com::pub_sub::{MultiClientTrait, PathKey};
 
     use crate::{
@@ -77,10 +76,13 @@ mod tests {
         debug,
         logger::LogLevel,
         networking::{
-            message_types::MessageTypes,
+            message_types::MessageType,
             network::{Envelope, Network, NetworkConfig},
         },
-        node::{Node, node_factory::RobotConfig},
+        node::{
+            Node,
+            node_factory::{NodeConfig, NodeTypeConfig, RobotConfig},
+        },
         physics::robot_models::Command,
         plugin_api::PluginAPI,
         recordable::Recordable,
@@ -93,7 +95,6 @@ mod tests {
         state_estimators::{
             BenchStateEstimatorConfig, StateEstimator, StateEstimatorConfig, StateEstimatorRecord,
             WorldState,
-            external_estimator::{ExternalEstimatorConfig, ExternalEstimatorRecord},
         },
         utils::{
             SharedMutex, SharedRwLock,
@@ -130,7 +131,7 @@ mod tests {
             if node.name() == "node1" {
                 println!("{} Sending message...", node.name());
                 let message = Envelope {
-                    message: MessageTypes::String(self.message.clone()),
+                    message: MessageType::String(self.message.clone()),
                     from: node.name().to_string(),
                     timestamp: time,
                     ..Default::default()
@@ -151,7 +152,7 @@ mod tests {
             if node.name() == "node2" {
                 while let Some((_path, envelope)) = self.message_client.try_receive(time) {
                     let message: String = envelope.message.clone().into();
-                    println!("Receiving message: {} from {}", &message, envelope.from);
+                    println!("Receiving message: {} from {}", message, envelope.from);
                     *self.last_message.lock().unwrap() = Some(message);
                     *self.last_from.lock().unwrap() = Some(envelope.from.clone());
                 }
@@ -168,12 +169,12 @@ mod tests {
 
     impl Recordable<StateEstimatorRecord> for StateEstimatorTest {
         fn record(&self, _context: &Context) -> StateEstimatorRecord {
-            StateEstimatorRecord::External(ExternalEstimatorRecord {
-                record: serde_json::to_value(StateEstimatorRecordTest {
+            StateEstimatorRecord::Plugin(GeneralValue(
+                serde_json::to_value(StateEstimatorRecordTest {
                     last_time: self.last_time,
                 })
                 .unwrap(),
-            })
+            ))
         }
     }
 
@@ -186,7 +187,7 @@ mod tests {
     impl PluginAPI for PluginAPITest {
         fn get_state_estimator(
             &self,
-            _config: &serde_json::Value,
+            _config: &crate::utils::GeneralValue,
             _global_config: &SimulatorConfig,
             _va_factory: &Arc<DeterministRandomVariableFactory>,
             network: &SharedRwLock<Network>,
@@ -213,7 +214,6 @@ mod tests {
 
     #[test]
     fn send_message_test() {
-        // Simulator::init_environment(log::LevelFilter::Debug, Vec::new(), Vec::new()); // For debug
         let mut config = SimulatorConfig::default();
         config.log.log_level = LogLevel::Off;
         // config.log.log_level = LogLevel::Internal(vec![crate::logger::InternalLog::All]);
@@ -221,28 +221,30 @@ mod tests {
             NumberConfig::Num(p) => p,
             _ => 1.,
         } * 1.1;
-        config.robots.push(RobotConfig {
+        config.nodes.push(NodeConfig {
             name: "node1".to_string(),
-            state_estimator_bench: vec![BenchStateEstimatorConfig {
-                name: "own".to_string(),
-                config: StateEstimatorConfig::External(ExternalEstimatorConfig {
-                    config: Value::Bool(false),
-                }),
-            }],
+            node_type: NodeTypeConfig::Robot(Box::new(RobotConfig {
+                state_estimator_bench: vec![BenchStateEstimatorConfig {
+                    name: "own".to_string(),
+                    config: StateEstimatorConfig::Plugin(GeneralValue::bool(false)),
+                }],
+                ..Default::default()
+            })),
             ..Default::default()
         });
-        config.robots.push(RobotConfig {
+        config.nodes.push(NodeConfig {
             name: "node2".to_string(),
-            network: NetworkConfig {
-                reception_delay: 0.,
+            node_type: NodeTypeConfig::Robot(Box::new(RobotConfig {
+                network: NetworkConfig {
+                    reception_delay: 0.,
+                    ..Default::default()
+                },
+                state_estimator_bench: vec![BenchStateEstimatorConfig {
+                    name: "own".to_string(),
+                    config: StateEstimatorConfig::Plugin(GeneralValue::bool(true)),
+                }],
                 ..Default::default()
-            },
-            state_estimator_bench: vec![BenchStateEstimatorConfig {
-                name: "own".to_string(),
-                config: StateEstimatorConfig::External(ExternalEstimatorConfig {
-                    config: Value::Bool(true),
-                }),
-            }],
+            })),
             ..Default::default()
         });
 
@@ -281,7 +283,6 @@ mod tests {
 
     #[test]
     fn deadlock_service_test() {
-        // Simulator::init_environment(log::LevelFilter::Debug, Vec::new(), Vec::new()); // For debug
         let mut config = SimulatorConfig::default();
         config.log.log_level = LogLevel::Off;
         // config.log.log_level = LogLevel::Internal(vec![crate::logger::InternalLog::All]);
@@ -289,28 +290,34 @@ mod tests {
             NumberConfig::Num(p) => p,
             _ => 1.,
         } * 1.1;
-        config.robots.push(RobotConfig {
+        config.nodes.push(NodeConfig {
             name: "node1".to_string(),
-            sensor_manager: SensorManagerConfig {
-                sensors: vec![ManagedSensorConfig {
-                    name: "RobotSensor".to_string(),
-                    send_to: Vec::new(),
-                    config: SensorConfig::Robot(RobotSensorConfig::default()), // Test valid while RobotSensor uses service for other node poses.
-                    ..Default::default()
-                }],
-            },
+            node_type: NodeTypeConfig::Robot(Box::new(RobotConfig {
+                sensor_manager: SensorManagerConfig {
+                    sensors: vec![ManagedSensorConfig {
+                        name: "RobotSensor".to_string(),
+                        send_to: Vec::new(),
+                        config: SensorConfig::Robot(RobotSensorConfig::default()), // Test valid while RobotSensor uses service for other node poses.
+                        ..Default::default()
+                    }],
+                },
+                ..Default::default()
+            })),
             ..Default::default()
         });
-        config.robots.push(RobotConfig {
+        config.nodes.push(NodeConfig {
             name: "node2".to_string(),
-            sensor_manager: SensorManagerConfig {
-                sensors: vec![ManagedSensorConfig {
-                    name: "RobotSensor".to_string(),
-                    send_to: Vec::new(),
-                    config: SensorConfig::Robot(RobotSensorConfig::default()),
-                    ..Default::default()
-                }],
-            },
+            node_type: NodeTypeConfig::Robot(Box::new(RobotConfig {
+                sensor_manager: SensorManagerConfig {
+                    sensors: vec![ManagedSensorConfig {
+                        name: "RobotSensor".to_string(),
+                        send_to: Vec::new(),
+                        config: SensorConfig::Robot(RobotSensorConfig::default()),
+                        ..Default::default()
+                    }],
+                },
+                ..Default::default()
+            })),
             ..Default::default()
         });
 

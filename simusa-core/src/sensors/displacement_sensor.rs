@@ -7,38 +7,32 @@
 
 use std::sync::Arc;
 
-use super::fault_models::fault_model::FaultModel;
+use super::fault_models::FaultModel;
 use super::{Sensor, SensorObservation, SensorRecord};
 
 use crate::config::NumberConfig;
 use crate::constants::TIME_ROUND;
 
 use crate::context::Context;
-use crate::errors::SimusaResult;
+use crate::errors::{SimusaError, SimusaErrorTypes, SimusaResult};
 #[cfg(feature = "gui")]
 use crate::gui::UIComponent;
 use crate::internal;
 use crate::plugin_api::PluginAPI;
 use crate::recordable::Recordable;
 use crate::sensors::fault_models::additive::{AdditiveFault, AdditiveFaultConfig};
-use crate::sensors::fault_models::external_fault::{ExternalFault, ExternalFaultConfig};
-use crate::sensors::fault_models::python_fault_model::{PythonFaultModel, PythonFaultModelConfig};
 use crate::sensors::sensor_filters::SensorFilter;
-use crate::sensors::sensor_filters::external_filter::{ExternalFilter, ExternalFilterConfig};
-use crate::sensors::sensor_filters::python_filter::{PythonFilter, PythonFilterConfig};
 use crate::sensors::sensor_filters::range_filter::{RangeFilter, RangeFilterConfig};
 use crate::simulator::SimulatorConfig;
 use crate::state_estimators::{State, StateRecord};
 use crate::utils::determinist_random_variable::DeterministRandomVariableFactory;
 use crate::utils::enum_tools::EnumVariables;
-use crate::utils::frame::{Frame, FrameConfig, FrameRecord};
+use crate::utils::frame::Frame;
 use crate::utils::geometry::smallest_theta_diff;
 use crate::utils::periodicity::{Periodicity, PeriodicityConfig};
 use nalgebra::{Matrix3, Vector2};
 use serde_derive::{Deserialize, Serialize};
 use simusa_macros::{EnumToString, UIComponent, config_derives, enum_variables};
-
-extern crate nalgebra as na;
 
 enum_variables!(
     "Variables of the [`DisplacementSensor`]."
@@ -77,17 +71,18 @@ enum_variables!(
 #[show_all = "Faults"]
 pub enum DisplacementSensorFaultModelConfig {
     /// Additive fault applied in the frame of the robot before displacement.
+    #[check]
     AdditivePreDisplacement(
         AdditiveFaultConfig<DisplacementSensorVariablesFaults, DisplacementSensorVariablesProp>,
     ),
     /// Additive fault applied in the frame of the robot after displacement.
+    #[check]
     AdditivePostDisplacement(
         AdditiveFaultConfig<DisplacementSensorVariablesFaults, DisplacementSensorVariablesProp>,
     ),
-    /// Python-implemented custom fault model.
-    Python(PythonFaultModelConfig),
     /// Plugin-provided external fault model.
-    External(ExternalFaultConfig),
+    #[plugin("DisplacementSensorFaultModel", "displacement-sensor-fault-model")]
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for DisplacementSensorFaultModelConfig {
@@ -107,10 +102,8 @@ pub enum DisplacementSensorFaultModelType {
     AdditivePostDisplacement(
         AdditiveFault<DisplacementSensorVariablesFaults, DisplacementSensorVariablesProp>,
     ),
-    /// Instantiated Python fault model.
-    Python(PythonFaultModel),
-    /// Instantiated external fault model.
-    External(ExternalFault),
+    /// Instantiated plugin fault model.
+    Plugin(Box<dyn FaultModel>),
 }
 
 impl DisplacementSensorFaultModelType {
@@ -122,8 +115,7 @@ impl DisplacementSensorFaultModelType {
         context: &Context,
     ) -> crate::errors::SimusaResult<()> {
         match self {
-            Self::Python(f) => f.post_init(node, initial_time, context),
-            Self::External(f) => f.post_init(node, initial_time, context),
+            Self::Plugin(f) => f.post_init(node, initial_time, context),
             Self::AdditivePreDisplacement(_) | Self::AdditivePostDisplacement(_) => Ok(()),
         }
     }
@@ -137,17 +129,14 @@ impl DisplacementSensorFaultModelType {
 /// Default value: [`DisplacementSensorFilterConfig::Range`] with [`RangeFilterConfig::default`].
 #[config_derives]
 #[derive(UIComponent)]
-#[show_all = "Faults"]
+#[show_all = "Filter"]
 pub enum DisplacementSensorFilterConfig {
     /// Range-based filtering on enumerated variables: excludes observations where numeric values fall outside specified bounds.
     #[check]
     Range(RangeFilterConfig<DisplacementSensorVariablesFilter>),
-    /// Python-based custom filtering: delegates exclusion logic to user-defined Python methods.
-    #[check]
-    Python(PythonFilterConfig),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
-    #[check]
-    External(ExternalFilterConfig),
+    #[plugin("DisplacementSensorFilter", "displacement-sensor-filter")]
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for DisplacementSensorFilterConfig {
@@ -161,10 +150,8 @@ impl Default for DisplacementSensorFilterConfig {
 pub enum DisplacementSensorFilterType {
     /// Instantiated range filter for displacement sensor variables.
     Range(RangeFilter<DisplacementSensorVariablesFilter>),
-    /// Instantiated Python filter for displacement sensor observations.
-    Python(PythonFilter),
-    /// Instantiated external filter for displacement sensor observations.
-    External(ExternalFilter),
+    /// Instantiated plugin filter for displacement sensor observations.
+    Plugin(Box<dyn SensorFilter>),
 }
 
 impl DisplacementSensorFilterType {
@@ -176,8 +163,7 @@ impl DisplacementSensorFilterType {
         context: &Context,
     ) -> crate::errors::SimusaResult<()> {
         match self {
-            Self::Python(f) => f.post_init(node, initial_time, context),
-            Self::External(f) => f.post_init(node, initial_time, context),
+            Self::Plugin(f) => f.post_init(node, initial_time, context),
             Self::Range(_) => Ok(()),
         }
     }
@@ -206,9 +192,6 @@ pub struct DisplacementSensorConfig {
     pub filters: Vec<DisplacementSensorFilterConfig>,
     /// If `true`, use Lie-movement mode (currently not implemented).
     pub lie_movement: bool,
-    /// Frame configuration for the sensor observations.
-    #[check]
-    pub frame: FrameConfig,
 }
 
 impl Default for DisplacementSensorConfig {
@@ -221,7 +204,6 @@ impl Default for DisplacementSensorConfig {
             faults: Vec::new(),
             filters: Vec::new(),
             lie_movement: false,
-            frame: FrameConfig::default(),
         }
     }
 }
@@ -263,15 +245,6 @@ impl UIComponent for DisplacementSensorConfig {
                     ui.checkbox(&mut self.lie_movement, "");
                 });
 
-                self.frame.show_mut(
-                    ui,
-                    ctx,
-                    buffer_stack,
-                    global_config,
-                    current_node_name,
-                    unique_id,
-                );
-
                 DisplacementSensorFilterConfig::show_all_mut(
                     &mut self.filters,
                     ui,
@@ -308,8 +281,6 @@ impl UIComponent for DisplacementSensorConfig {
 
                 ui.label(format!("Lie movement: {}", self.lie_movement));
 
-                self.frame.show(ui, ctx, unique_id);
-
                 DisplacementSensorFilterConfig::show_all(&self.filters, ui, ctx, unique_id);
 
                 DisplacementSensorFaultModelConfig::show_all(&self.faults, ui, ctx, unique_id);
@@ -323,7 +294,6 @@ pub struct DisplacementSensorRecord {
     last_time: Option<f32>,
     last_state: StateRecord,
     lie_movement: bool, // Default is false
-    frame: FrameRecord,
 }
 
 #[cfg(feature = "gui")]
@@ -339,7 +309,6 @@ impl UIComponent for DisplacementSensorRecord {
         ui.label(format!("Lie movement: {}", self.lie_movement));
         ui.label("Last state: ");
         self.last_state.show(ui, ctx, unique_id);
-        self.frame.show(ui, ctx, unique_id);
     }
 }
 
@@ -352,42 +321,56 @@ pub struct DisplacementObservation {
     pub rotation: f32,
     /// Fault models applied to this observation.
     pub applied_faults: Vec<DisplacementSensorFaultModelConfig>,
-    /// Frame of the observation.
-    pub frame: Frame,
+}
+
+impl DisplacementObservation {
+    /// Converts a [`DisplacementObservationRecord`] into a [`DisplacementObservation`].
+    pub fn from_record(record: &DisplacementObservationRecord) -> Self {
+        Self {
+            translation: Vector2::new(record.translation[0], record.translation[1]),
+            rotation: record.rotation,
+            applied_faults: record.applied_faults.clone(),
+        }
+    }
 }
 
 impl Recordable<DisplacementObservationRecord> for DisplacementObservation {
-    fn record(&self, context: &Context) -> DisplacementObservationRecord {
+    fn record(&self, _context: &Context) -> DisplacementObservationRecord {
         DisplacementObservationRecord {
-            translation: self.translation,
+            translation: self.translation.into(),
             rotation: self.rotation,
             applied_faults: self.applied_faults.clone(),
-            frame: self.frame.record(context),
         }
     }
 }
 
 /// Serializable record representation of [`DisplacementObservation`].
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[config_derives]
 pub struct DisplacementObservationRecord {
     /// Recorded planar translation in the sensor frame.
-    pub translation: Vector2<f32>,
+    pub translation: [f32; 2],
     /// Recorded rotation during displacement.
     pub rotation: f32,
     /// Fault models applied at observation generation time.
     pub applied_faults: Vec<DisplacementSensorFaultModelConfig>,
-    /// Recorded frame of the observation.
-    pub frame: FrameRecord,
+}
+
+impl Default for DisplacementObservationRecord {
+    fn default() -> Self {
+        Self {
+            translation: [0.0, 0.0],
+            rotation: 0.0,
+            applied_faults: Vec::new(),
+        }
+    }
 }
 
 #[cfg(feature = "gui")]
 impl UIComponent for DisplacementObservationRecord {
-    fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
+    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
         ui.vertical(|ui| {
             ui.label(format!("Translation: {:?}", self.translation));
             ui.label(format!("Rotation: {}", self.rotation));
-            ui.label("Frame: ");
-            self.frame.show(ui, ctx, unique_id);
         });
     }
 }
@@ -404,7 +387,6 @@ pub struct DisplacementSensor {
     faults: Vec<DisplacementSensorFaultModelType>,
     filters: Vec<DisplacementSensorFilterType>,
     lie_movement: bool,
-    frame: Frame,
 }
 
 impl DisplacementSensor {
@@ -431,23 +413,24 @@ impl DisplacementSensor {
                         AdditiveFault::from_config(cfg, va_factory, initial_time, context),
                     )
                 }
-                DisplacementSensorFaultModelConfig::Python(cfg) => {
-                    DisplacementSensorFaultModelType::Python(PythonFaultModel::from_config(
-                        cfg,
-                        global_config,
-                        initial_time,
-                        context,
-                    )?)
-                }
-                DisplacementSensorFaultModelConfig::External(cfg) => {
-                    DisplacementSensorFaultModelType::External(ExternalFault::from_config(
-                        cfg,
-                        plugin_api,
-                        global_config,
-                        va_factory,
-                        initial_time,
-                        context,
-                    )?)
+                DisplacementSensorFaultModelConfig::Plugin(cfg) => {
+                    DisplacementSensorFaultModelType::Plugin(
+                        plugin_api
+                            .as_ref()
+                            .ok_or_else(|| {
+                                SimusaError::new(
+                                    SimusaErrorTypes::PluginAPIError,
+                                    "Plugin API is not available.".to_string(),
+                                )
+                            })?
+                            .get_sensor_fault(
+                                cfg,
+                                global_config,
+                                va_factory,
+                                initial_time,
+                                context,
+                            ),
+                    )
                 }
             });
         }
@@ -458,23 +441,24 @@ impl DisplacementSensor {
                 DisplacementSensorFilterConfig::Range(cfg) => DisplacementSensorFilterType::Range(
                     RangeFilter::from_config(cfg, initial_time, context),
                 ),
-                DisplacementSensorFilterConfig::Python(cfg) => {
-                    DisplacementSensorFilterType::Python(PythonFilter::from_config(
-                        cfg,
-                        global_config,
-                        initial_time,
-                        context,
-                    )?)
-                }
-                DisplacementSensorFilterConfig::External(cfg) => {
-                    DisplacementSensorFilterType::External(ExternalFilter::from_config(
-                        cfg,
-                        plugin_api,
-                        global_config,
-                        va_factory,
-                        initial_time,
-                        context,
-                    )?)
+                DisplacementSensorFilterConfig::Plugin(cfg) => {
+                    DisplacementSensorFilterType::Plugin(
+                        plugin_api
+                            .as_ref()
+                            .ok_or_else(|| {
+                                SimusaError::new(
+                                    SimusaErrorTypes::PluginAPIError,
+                                    "Plugin API is not available.".to_string(),
+                                )
+                            })?
+                            .get_sensor_filter(
+                                cfg,
+                                global_config,
+                                va_factory,
+                                initial_time,
+                                context,
+                            ),
+                    )
                 }
             });
         }
@@ -490,7 +474,6 @@ impl DisplacementSensor {
             faults: fault_models,
             filters,
             lie_movement: config.lie_movement,
-            frame: Frame::from_config(&config.frame),
         })
     }
 }
@@ -510,6 +493,7 @@ impl Sensor for DisplacementSensor {
             .read()
             .unwrap()
             .state(initial_time, context)
+            .unwrap()
             .clone();
         for filter in self.filters.iter_mut() {
             filter.post_init(node, initial_time, context)?;
@@ -524,6 +508,7 @@ impl Sensor for DisplacementSensor {
         &mut self,
         node: &mut Node,
         time: f32,
+        frame: &Frame,
         context: &Context,
     ) -> Vec<SensorObservation> {
         if let Some(last_time) = self.last_time
@@ -535,8 +520,8 @@ impl Sensor for DisplacementSensor {
             .physics()
             .expect("Node with Displacement sensor should have Physics");
         let physic = arc_physic.read().unwrap();
-        let state = physic.state(time, context);
-        let attached_frame = self.frame.attach_to_state(&state);
+        let state = physic.state(time, context).unwrap();
+        let attached_frame = frame.attach_to_state(&state);
         let state = attached_frame.state();
 
         let (tx, ty, r) = if self.lie_movement {
@@ -570,7 +555,6 @@ impl Sensor for DisplacementSensor {
             translation: Vector2::new(tx, ty),
             rotation: r,
             applied_faults: Vec::new(),
-            frame: self.frame.clone(),
         });
 
         let mut keep_observation = Some(obs);
@@ -578,10 +562,7 @@ impl Sensor for DisplacementSensor {
         for filter in self.filters.iter() {
             if let Some(o) = keep_observation {
                 keep_observation = match filter {
-                    DisplacementSensorFilterType::External(f) => {
-                        f.filter(time, o, state, None, context)
-                    }
-                    DisplacementSensorFilterType::Python(f) => {
+                    DisplacementSensorFilterType::Plugin(f) => {
                         f.filter(time, o, state, None, context)
                     }
                     DisplacementSensorFilterType::Range(f) => {
@@ -619,15 +600,7 @@ impl Sensor for DisplacementSensor {
             observation_list.push(obs);
             for fault_model in self.faults.iter_mut() {
                 match fault_model {
-                    DisplacementSensorFaultModelType::Python(f) => f.add_faults(
-                        time,
-                        time,
-                        &mut observation_list,
-                        SensorObservation::Displacement(DisplacementObservation::default()),
-                        node.environment(),
-                        context,
-                    ),
-                    DisplacementSensorFaultModelType::External(f) => f.add_faults(
+                    DisplacementSensorFaultModelType::Plugin(f) => f.add_faults(
                         time,
                         time,
                         &mut observation_list,
@@ -828,7 +801,6 @@ impl Recordable<SensorRecord> for DisplacementSensor {
             last_time: self.last_time,
             last_state: self.last_state.record(context),
             lie_movement: self.lie_movement,
-            frame: self.frame.record(context),
         })
     }
 }

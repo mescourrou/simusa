@@ -2,6 +2,7 @@
 
 set -e
 
+INTERACTIVE=1
 
 POSITIONAL_ARGS=()
 while [[ $# -gt 0 ]]; do
@@ -10,6 +11,14 @@ while [[ $# -gt 0 ]]; do
       USE_VERSION="$2"
       shift # past argument
       shift # past value
+      ;;
+    --cargo-version)
+      USE_VERSION="cargo"
+      shift # past argument
+      ;;
+    --non-interactive)
+      INTERACTIVE=0
+      shift # past argument
       ;;
     -*|--*)
       echo "Unknown option $1"
@@ -23,7 +32,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [ -n "$USE_VERSION" ]; then
-    CURRENT_RELEASE="$USE_VERSION"
+    if [ "$USE_VERSION" == "cargo" ]; then
+        CURRENT_RELEASE=$(cat Cargo.toml | grep '^version =' | head -n 1 | sed 's/version = "//' | sed 's/"//')
+    else
+        CURRENT_RELEASE="$USE_VERSION"
+    fi
 else
     CURRENT_RELEASE=$(git branch --show-current | sed 's/release\/v//')
 fi
@@ -32,13 +45,27 @@ echo "Preparing release $CURRENT_RELEASE"
 
 if [ -z "$CURRENT_RELEASE" ]; then
     echo "Could not determine current release from git branch"
-    exit 1
+    if [ "$INTERACTIVE" -eq 1 ]; then
+        read -p "Enter release version: " CURRENT_RELEASE
+    else
+        echo "Please specify the release version with --hotfix <version>"
+        exit 1
+    fi
 fi
 
 CARGO_RELEASE_VERSION=$(cat Cargo.toml | grep '^version =' | head -n 1 | sed 's/version = "//' | sed 's/"//')
 if [ "$CARGO_RELEASE_VERSION" != "$CURRENT_RELEASE" ]; then
     echo "Cargo version ($CARGO_RELEASE_VERSION) does not match release version ($CURRENT_RELEASE)"
-    exit 1
+    if [ "$INTERACTIVE" -eq 1 ]; then
+        read -p "Do you want to update Cargo.toml to version $CURRENT_RELEASE? (y/n) " yn
+        case $yn in
+            [Yy]* ) sed -i "s/^version = \".*\"/version = \"$CURRENT_RELEASE\"/" Cargo.toml;;
+            * ) echo "Please update Cargo.toml to version $CURRENT_RELEASE and try again"; exit 1;;
+        esac
+    else
+        echo "Please update Cargo.toml to version $CURRENT_RELEASE and try again"
+        exit 1
+    fi
 fi
 
 CHANGELOG_VERSION_LINE=$(cat CHANGELOGS.md | grep "$CURRENT_RELEASE" | head -n 1)
@@ -48,24 +75,55 @@ if [ -z "$CHANGELOG_VERSION_LINE" ]; then
 fi
 
 # Check that when subcrate import other workspace crates, they use the same version as the workspace version
-DIRS=$(find . -name Cargo.toml -not -path "./target/*" | xargs dirname | grep "^./simusa-" | sed 's/^\.\///')
-DEPS="simusa $DIRS"
-for dir in $DIRS; do
-    for dep in $DEPS; do
-        if [ "$dir" != "$dep" ]; then
-            # Check if dir/Cargo.toml contains a dependency on dep with the correct version
-            DEP_VERSION=$(cat "$dir/Cargo.toml" | grep "^$dep" | head -n 1 | sed 's/.*version = "//' | sed 's/".*//')
-            if [ -n "$DEP_VERSION" ] && [ "$DEP_VERSION" != "$CURRENT_RELEASE" ]; then
-                echo "Error: $dir depends on $dep with version $DEP_VERSION, but current release is $CURRENT_RELEASE"
-                echo "File $dir/Cargo.toml"
-                exit 1
-            fi
+# DIRS=$(find . -name Cargo.toml -not -path "./target/*" | xargs dirname | grep "^./simusa-" | sed 's/^\.\///')
+# DEPS="simusa $DIRS"
+# for dir in $DIRS; do
+#     for dep in $DEPS; do
+#         if [ "$dir" != "$dep" ]; then
+#             # Check if dir/Cargo.toml contains a dependency on dep with the correct version
+#             DEP_VERSION=$(cat "$dir/Cargo.toml" | grep "^$dep" | head -n 1 | sed 's/.*version = "//' | sed 's/".*//')
+#             if [ -n "$DEP_VERSION" ] && [ "$DEP_VERSION" != "$CURRENT_RELEASE" ]; then
+#                 echo "Error: $dir depends on $dep with version $DEP_VERSION, but current release is $CURRENT_RELEASE"
+#                 echo "File $dir/Cargo.toml"
+#                 if [ "$INTERACTIVE" -eq 1 ]; then
+#                     read -p "Do you want to update $dir/Cargo.toml to version $CURRENT_RELEASE? (Yn) " yn
+#                     case $yn in
+#                         [Yy]* | "" ) 
+#                         * ) echo "Please update $dir/Cargo.toml to version $CURRENT_RELEASE and try again"; exit 1;;
+#                     esac
+#                 else
+#                     echo "Please update $dir/Cargo.toml to version $CURRENT_RELEASE and try again"
+#                     exit 1
+#                 fi
+#             fi
+#         fi
+#     done
+# done
+
+# Check that local crates declared in [workspace.dependencies] use the release version
+WS_DEPS_SECTION() { sed -n '/^\[workspace\.dependencies\]/,/^\[/p' Cargo.toml; }
+WS_DEPS=$(WS_DEPS_SECTION | grep -E 'path[[:space:]]*=' | sed -E 's/^([A-Za-z0-9_-]+).*/\1/')
+for dep in $WS_DEPS; do
+    DEP_VERSION=$(WS_DEPS_SECTION | grep -E "^$dep[[:space:]]*=" | sed -E 's/.*version[[:space:]]*=[[:space:]]*"([^"]*)".*/\1/')
+    if [ "$DEP_VERSION" != "$CURRENT_RELEASE" ]; then
+        echo "Workspace dependency $dep has version $DEP_VERSION, but current release is $CURRENT_RELEASE"
+        if [ "$INTERACTIVE" -eq 1 ]; then
+            read -p "Update $dep to $CURRENT_RELEASE in Cargo.toml? (Yn) " yn
+            case $yn in
+                [Yy]* | "" )
+                    sed -i -E "/^\[workspace\.dependencies\]/,/^\[/ s/^($dep[[:space:]]*=.*version[[:space:]]*=[[:space:]]*\")[^\"]*\"/\1$CURRENT_RELEASE\"/" Cargo.toml;;
+                * ) echo "Please update $dep in Cargo.toml and try again"; exit 1;;
+            esac
+        else
+            echo "Please update $dep in Cargo.toml and try again"
+            exit 1
         fi
-    done
+    fi
 done
 
 cargo fmt --all
 cargo clippy --all-targets -- -D warnings
+cargo clippy -p simusa --no-default-features -- -D warnings
 cargo clippy -p simusa --features monothreaded -- -D warnings
 cargo build --release
 ./generate_config_doc.py

@@ -6,22 +6,24 @@
 use std::{str::FromStr, sync::Arc};
 
 use pyo3::{prelude::*, types::PyDict};
-use serde_json::Value;
 use simusa_com::rfc::{self, RemoteFunctionCall, RemoteFunctionCallHost};
 
-use crate::{
+use simusa::{
     context::Context,
     errors::SimusaResult,
     internal,
+    logger::InternalLog,
     node::Node,
-    physics::{external_physics::ExternalPhysicsRecord, robot_models::Command},
-    pywrappers::{CommandWrapper, NodeWrapper, StateWrapper},
+    physics::{Physics, PhysicsRecord, robot_models::Command},
     recordable::Recordable,
     state_estimators::State,
-    utils::python::{call_py_method, call_py_method_void},
+    utils::GeneralValue,
 };
 
-use super::{Physics, PhysicsRecord};
+use crate::{
+    utils::{call_py_method, call_py_method_void},
+    wrappers::{CommandWrapper, NodeWrapper, StateWrapper},
+};
 
 #[derive(Debug, Clone)]
 /// Async simulator-side physics adapter communicating with Python through RFC channels.
@@ -45,8 +47,8 @@ impl Physics for PythonPhysicAsyncClient {
         self.post_init.call(pynode).unwrap()
     }
 
-    fn state(&self, _time: f32, _context: &Context) -> State {
-        self.last_state.clone()
+    fn state(&self, _time: f32, _context: &Context) -> Option<State> {
+        Some(self.last_state.clone())
     }
 
     fn update_state(&mut self, time: f32, _context: &Context) {
@@ -141,7 +143,7 @@ impl PythonPhysics {
     fn post_init(&mut self, node: NodeWrapper, context: &Context) -> SimusaResult<()> {
         internal!(
             context,
-            crate::logger::InternalLog::API,
+            InternalLog::API,
             "Calling python implementation of post_init"
         );
         call_py_method_void!(self.model, "post_init", (node,));
@@ -151,13 +153,13 @@ impl PythonPhysics {
     fn apply_command(&mut self, command: &Command, time: f32, context: &Context) {
         internal!(
             context,
-            crate::logger::InternalLog::API,
+            InternalLog::API,
             "Calling python implementation of apply_command"
         );
         call_py_method_void!(
             self.model,
             "apply_command",
-            CommandWrapper::from_rust(command),
+            CommandWrapper::from(command),
             time
         );
     }
@@ -165,7 +167,7 @@ impl PythonPhysics {
     fn update_state(&mut self, time: f32, context: &Context) {
         internal!(
             context,
-            crate::logger::InternalLog::API,
+            InternalLog::API,
             "Calling python implementation of update_state"
         );
         call_py_method_void!(self.model, "update_state", (time,));
@@ -174,35 +176,31 @@ impl PythonPhysics {
     fn state(&mut self, time: f32, context: &Context) -> State {
         internal!(
             context,
-            crate::logger::InternalLog::API,
+            InternalLog::API,
             "Calling python implementation of state"
         );
         // let robot_record = robot.record();
         let state = call_py_method!(self.model, "state", StateWrapper, (time,));
-        state.to_rust()
+        state.into()
     }
 
     fn record(&self, context: &Context) -> PhysicsRecord {
         internal!(
             context,
-            crate::logger::InternalLog::API,
+            InternalLog::API,
             "Calling python implementation of record"
         );
         let record_str: String = call_py_method!(self.model, "record", String,);
-        let record = ExternalPhysicsRecord {
-            record: Value::from_str(&record_str).expect(
-                "Impossible to get serde_json::Value from the input serialized python structure",
-            ),
-        };
-        // record.clone()
-        // StateEstimatorRecord::External(PythonPhysics::record(&self))
-        PhysicsRecord::External(record)
+        let record = GeneralValue::from_str(&record_str).expect(
+            "Impossible to get crate::utils::GeneralValue from the input serialized python structure",
+        );
+        PhysicsRecord::Plugin(record)
     }
 
     fn next_time_step(&self, context: &Context) -> Option<f32> {
         internal!(
             context,
-            crate::logger::InternalLog::API,
+            InternalLog::API,
             "Calling python implementation of next_time_step"
         );
         call_py_method!(self.model, "next_time_step", Option<f32>,)

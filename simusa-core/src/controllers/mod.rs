@@ -6,15 +6,12 @@
 //! It also exposes strategy-specific configuration and runtime record enums:
 //! [`ControllerConfig`] and [`ControllerRecord`].
 
-pub mod external_controller;
 pub mod pid;
-pub mod python_controller;
-
-pub mod pybinds;
 
 use crate::{
     context::Context,
-    errors::SimusaResult,
+    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
+    interfaces::navigator_controller::{ControllerInputVariable, ControllerInputVariables},
     node::node_factory::FromConfigArguments,
     physics::{PhysicsConfig, robot_models::Command},
     recordable::Recordable,
@@ -22,41 +19,18 @@ use crate::{
 };
 #[cfg(feature = "gui")]
 use crate::{
-    gui::{UIComponent, utils::string_combobox},
+    gui::{
+        UIComponent,
+        utils::{edit_plugin_config, show_plugin_config, string_combobox},
+    },
+    simulator::SimulatorConfig,
     utils::enum_tools::ToVec,
 };
 use std::sync::{Arc, RwLock};
 
-use crate::simulator::SimulatorConfig;
-
 use config_checker::*;
 use serde_derive::{Deserialize, Serialize};
 use simusa_macros::config_derives;
-
-/// Errors used by the controllers: lateral, orientation and velocity.
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct ControllerError {
-    /// Lateral error.
-    pub lateral: f32,
-    /// Longitudinal error.
-    pub longitudinal: f32,
-    /// Orientation error.
-    pub theta: f32,
-    /// Velocity error.
-    pub velocity: f32,
-}
-
-#[cfg(feature = "gui")]
-impl UIComponent for ControllerError {
-    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
-        ui.vertical(|ui| {
-            ui.label(format!("longitudinal: {}", self.longitudinal));
-            ui.label(format!("lateral: {}", self.lateral));
-            ui.label(format!("theta: {}", self.theta));
-            ui.label(format!("velocity: {}", self.velocity));
-        });
-    }
-}
 
 /// Enumerates the strategies configurations.
 #[config_derives]
@@ -64,12 +38,8 @@ pub enum ControllerConfig {
     #[check]
     /// Configuration for [`PID`](pid::PIDConfig).
     PID(pid::PIDConfig),
-    #[check]
-    /// Configuration for [`ExternalController`](external_controller::ExternalControllerConfig).
-    External(external_controller::ExternalControllerConfig),
-    #[check]
-    /// Configuration for [`PythonController`](python_controller::PythonControllerConfig).
-    Python(python_controller::PythonControllerConfig),
+    /// Configuration for a plugin [`Controller`].
+    Plugin(crate::utils::GeneralValue),
 }
 
 #[cfg(feature = "gui")]
@@ -96,16 +66,7 @@ impl UIComponent for ControllerConfig {
         if current_str != self.to_string() {
             match current_str.as_str() {
                 "PID" => *self = ControllerConfig::PID(pid::PIDConfig::default()),
-                "External" => {
-                    *self = ControllerConfig::External(
-                        external_controller::ExternalControllerConfig::default(),
-                    )
-                }
-                "Python" => {
-                    *self = ControllerConfig::Python(
-                        python_controller::PythonControllerConfig::default(),
-                    )
-                }
+                "Plugin" => *self = ControllerConfig::Plugin(crate::utils::GeneralValue::default()),
                 _ => panic!("Where did you find this value?"),
             };
         }
@@ -118,21 +79,13 @@ impl UIComponent for ControllerConfig {
                 current_node_name,
                 unique_id,
             ),
-            ControllerConfig::External(c) => c.show_mut(
+            ControllerConfig::Plugin(c) => edit_plugin_config(
                 ui,
-                ctx,
-                buffer_stack,
-                global_config,
-                current_node_name,
+                "Plugin Controller",
+                "plugin-controller",
                 unique_id,
-            ),
-            ControllerConfig::Python(c) => c.show_mut(
-                ui,
-                ctx,
                 buffer_stack,
-                global_config,
-                current_node_name,
-                unique_id,
+                c,
             ),
         }
     }
@@ -143,8 +96,7 @@ impl UIComponent for ControllerConfig {
         });
         match self {
             ControllerConfig::PID(c) => c.show(ui, ctx, unique_id),
-            ControllerConfig::External(c) => c.show(ui, ctx, unique_id),
-            ControllerConfig::Python(c) => c.show(ui, ctx, unique_id),
+            ControllerConfig::Plugin(c) => show_plugin_config(ui, "Plugin Controller", c),
         }
     }
 }
@@ -154,10 +106,8 @@ impl UIComponent for ControllerConfig {
 pub enum ControllerRecord {
     /// Runtime record for [`pid::PID`].
     PID(pid::PIDRecord),
-    /// Runtime record for [`external_controller::ExternalController`].
-    External(external_controller::ExternalControllerRecord),
-    /// Runtime record for [`python_controller::PythonController`].
-    Python(python_controller::PythonControllerRecord),
+    /// Runtime record for a plugin [`Controller`].
+    Plugin(crate::utils::GeneralValue),
 }
 
 #[cfg(feature = "gui")]
@@ -169,37 +119,47 @@ impl UIComponent for ControllerRecord {
                     r.show(ui, ctx, unique_id);
                 });
             }
-            Self::External(r) => {
-                egui::CollapsingHeader::new("ExternalController").show(ui, |ui| {
-                    r.show(ui, ctx, unique_id);
-                });
-            }
-            Self::Python(r) => {
-                egui::CollapsingHeader::new("ExternalPythonController").show(ui, |ui| {
-                    r.show(ui, ctx, unique_id);
-                });
-            }
+            Self::Plugin(r) => show_plugin_config(ui, "Plugin Controller", r),
         });
     }
 }
 
 use crate::node::Node;
 
+/// Trait for the input of a [`Controller`], which can be created from [`ControllerInputVariables`].
+///
+/// Should not be implemented directly, but rather through the
+/// [`declare_controller_input!`](crate::interfaces::navigator_controller::declare_controller_input) macro.
+pub trait ControllerInput: From<ControllerInputVariables> + Sized {
+    /// Returns the list of variables requested by the controller from the navigator.
+    fn required_variables() -> &'static [ControllerInputVariable];
+}
+
 /// Controller strategy that computes [`Command`] values from control errors.
 pub trait Controller:
     std::fmt::Debug + std::marker::Send + std::marker::Sync + Recordable<ControllerRecord>
 {
+    /// Returns the type of input expected by the controller, which can be converted from [`ControllerInputVariables`].
+    type InputType: ControllerInput;
+
+    /// Returns the list of variables requested by the controller from the navigator.
+    ///
+    /// Override with caution: the [`Controller::InputType`] might not be compatible with the requested variables.
+    fn required_variables(&self) -> &[ControllerInputVariable] {
+        Self::InputType::required_variables()
+    }
+
     /// Performs optional one-time initialization when the node starts, before entering simulation loop.
     #[allow(unused_variables)]
     fn post_init(&mut self, node: &mut Node, context: &Context) -> SimusaResult<()> {
         Ok(())
     }
 
-    /// Compute the command from the given error.
+    /// Compute the command from the given input.
     ///
     /// ## Arguments
     /// * `robot` - Reference to the robot to access modules.
-    /// * `error` - Error to be corrected.
+    /// * `input` - Input coming from the navigator, converted into [`ControllerInputVariables`].
     /// * `time` - Current time.
     /// * `context` - Shared simulation context used for logging and communication metadata.
     ///
@@ -208,7 +168,7 @@ pub trait Controller:
     fn make_command(
         &mut self,
         robot: &mut Node,
-        error: &ControllerError,
+        input: Self::InputType,
         time: f32,
         context: &Context,
     ) -> Command;
@@ -220,6 +180,69 @@ pub trait Controller:
     #[allow(unused_variables)]
     fn next_time_step(&self, context: &Context) -> Option<f32> {
         None
+    }
+}
+
+/// Trait for abstracting the [`Controller`] trait with dynamic conversion from
+/// [`Navigator::OutputType`](crate::navigators::Navigator::OutputType) to
+/// [`Controller::InputType`], to be
+/// used in the [`Node`] struct.
+///
+/// This trait is implemented automatically for any type that implements [`Controller`].
+/// Should not be implemented directly!
+pub trait AbstractController:
+    std::fmt::Debug + std::marker::Send + std::marker::Sync + Recordable<ControllerRecord>
+{
+    /// Returns the list of variables requested by the controller from the navigator.
+    fn call_required_variables(&self) -> &[ControllerInputVariable];
+
+    /// Post-creation initialization of the controller, called at the end of the simulator creation.
+    fn call_post_init(&mut self, node: &mut Node, context: &Context) -> SimusaResult<()>;
+
+    /// Call of the hook at the beginning of the simulation loop, just after updating physics.
+    fn call_pre_loop_hook(&mut self, node: &mut Node, time: f32, context: &Context);
+
+    /// Compute the command from the given input.
+    fn call_make_command(
+        &mut self,
+        robot: &mut Node,
+        variables: ControllerInputVariables,
+        time: f32,
+        context: &Context,
+    ) -> Command;
+
+    /// Optional: return the time of the next time step. Needed if using messages
+    fn call_next_time_step(&self, context: &Context) -> Option<f32>;
+}
+
+impl<T> AbstractController for T
+where
+    T: Controller,
+{
+    fn call_make_command(
+        &mut self,
+        robot: &mut Node,
+        variables: ControllerInputVariables,
+        time: f32,
+        context: &Context,
+    ) -> Command {
+        self.make_command(robot, variables.into(), time, context)
+    }
+
+    fn call_required_variables(&self) -> &[ControllerInputVariable] {
+        self.required_variables()
+    }
+
+    fn call_next_time_step(&self, context: &Context) -> Option<f32> {
+        self.next_time_step(context)
+    }
+
+    fn call_post_init(&mut self, node: &mut Node, context: &Context) -> SimusaResult<()> {
+        self.post_init(node, context)
+    }
+
+    fn call_pre_loop_hook(&mut self, node: &mut Node, time: f32, context: &Context) {
+        self.pre_loop_hook(node, time, context)
     }
 }
 
@@ -238,25 +261,30 @@ pub fn make_controller_from_config(
     config: &ControllerConfig,
     from_config_params: &FromConfigArguments,
     physics_config: &PhysicsConfig,
-) -> SimusaResult<SharedRwLock<Box<dyn Controller>>> {
+) -> SimusaResult<SharedRwLock<Box<dyn AbstractController>>> {
     Ok(Arc::new(RwLock::new(match config {
         ControllerConfig::PID(c) => Box::new(pid::PID::from_config(
             c,
             physics_config,
             from_config_params.initial_time,
             from_config_params.context,
-        )) as Box<dyn Controller>,
-        ControllerConfig::External(c) => Box::new(
-            external_controller::ExternalController::from_config(c, from_config_params)?,
-        ) as Box<dyn Controller>,
-        ControllerConfig::Python(c) => Box::new(
-            python_controller::PythonController::from_config(
+        )) as Box<dyn AbstractController>,
+        ControllerConfig::Plugin(c) => from_config_params
+            .plugin_api
+            .as_ref()
+            .ok_or_else(|| {
+                SimusaError::new(
+                    SimusaErrorTypes::PluginAPIError,
+                    "Plugin API not set!".to_string(),
+                )
+            })?
+            .get_controller(
                 c,
                 from_config_params.global_config,
+                from_config_params.va_factory,
+                from_config_params.network,
                 from_config_params.initial_time,
                 from_config_params.context,
-            )
-            .unwrap(),
-        ) as Box<dyn Controller>,
+            ),
     })))
 }

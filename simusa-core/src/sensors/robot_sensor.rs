@@ -4,13 +4,13 @@
 //! It supports configurable filters through
 //! [`RobotSensorFilterConfig`] and fault pipelines configured by [`RobotSensorFaultModelConfig`].
 
-use super::fault_models::fault_model::FaultModel;
+use super::fault_models::FaultModel;
 use super::{Sensor, SensorObservation, SensorRecord};
 
 use crate::constants::TIME_ROUND;
 
 use crate::context::Context;
-use crate::errors::SimusaResult;
+use crate::errors::{SimusaError, SimusaErrorTypes, SimusaResult};
 #[cfg(feature = "gui")]
 use crate::gui::UIComponent;
 use crate::internal;
@@ -18,27 +18,22 @@ use crate::plugin_api::PluginAPI;
 use crate::recordable::Recordable;
 use crate::sensors::fault_models::additive::{AdditiveFault, AdditiveFaultConfig};
 use crate::sensors::fault_models::clutter::{ClutterFault, ClutterFaultConfig};
-use crate::sensors::fault_models::external_fault::{ExternalFault, ExternalFaultConfig};
 use crate::sensors::fault_models::misassociation::{
     MisassociationFault, MisassociationFaultConfig,
 };
 use crate::sensors::fault_models::misdetection::{MisdetectionFault, MisdetectionFaultConfig};
-use crate::sensors::fault_models::python_fault_model::{PythonFaultModel, PythonFaultModelConfig};
 use crate::sensors::sensor_filters::SensorFilter;
-use crate::sensors::sensor_filters::external_filter::{ExternalFilter, ExternalFilterConfig};
-use crate::sensors::sensor_filters::python_filter::{PythonFilter, PythonFilterConfig};
 use crate::sensors::sensor_filters::range_filter::{RangeFilter, RangeFilterConfig};
 use crate::sensors::sensor_filters::string_filter::{StringFilter, StringFilterConfig};
 use crate::simulator::SimulatorConfig;
 use crate::state_estimators::State;
 use crate::utils::determinist_random_variable::DeterministRandomVariableFactory;
 use crate::utils::enum_tools::EnumVariables;
-use crate::utils::frame::{Frame, FrameConfig, FrameRecord};
+use crate::utils::frame::Frame;
 use crate::utils::periodicity::{Periodicity, PeriodicityConfig};
 use serde_derive::{Deserialize, Serialize};
 
-extern crate nalgebra as na;
-use na::Vector3;
+use nalgebra::Vector3;
 use simusa_macros::{EnumToString, UIComponent, config_derives, enum_variables};
 
 use std::sync::Arc;
@@ -96,12 +91,9 @@ pub enum RobotSensorFaultModelConfig {
     /// Misassociation fault model.
     #[check]
     Misassociation(MisassociationFaultConfig),
-    /// Python-implemented fault model.
-    #[check]
-    Python(PythonFaultModelConfig),
     /// Plugin-provided external fault model.
-    #[check]
-    External(ExternalFaultConfig),
+    #[plugin("RobotSensorFaultModel", "robot-sensor-fault-model")]
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for RobotSensorFaultModelConfig {
@@ -123,10 +115,8 @@ pub enum RobotSensorFaultModelType {
     Misdetection(MisdetectionFault),
     /// Instantiated misassociation fault model.
     Misassociation(MisassociationFault),
-    /// Instantiated Python fault model.
-    Python(PythonFaultModel),
-    /// Instantiated external fault model.
-    External(ExternalFault),
+    /// Instantiated plugin fault model.
+    Plugin(Box<dyn FaultModel>),
 }
 
 impl RobotSensorFaultModelType {
@@ -138,8 +128,7 @@ impl RobotSensorFaultModelType {
         context: &Context,
     ) -> crate::errors::SimusaResult<()> {
         match self {
-            Self::Python(f) => f.post_init(node, initial_time, context),
-            Self::External(f) => f.post_init(node, initial_time, context),
+            Self::Plugin(f) => f.post_init(node, initial_time, context),
             Self::AdditiveRobotCentered(_)
             | Self::AdditiveObservationCentered(_)
             | Self::Clutter(_)
@@ -179,12 +168,9 @@ pub enum RobotSensorFilterConfig {
     /// String pattern filtering on observed object labels: excludes observations matching configured regexp patterns.
     #[check]
     Label(StringFilterConfig),
-    /// Python-based custom filtering: delegates exclusion logic to user-defined Python methods.
-    #[check]
-    Python(PythonFilterConfig),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
-    #[check]
-    External(ExternalFilterConfig),
+    #[plugin("RobotSensorFilter", "robot-sensor-filter")]
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for RobotSensorFilterConfig {
@@ -202,10 +188,8 @@ pub enum RobotSensorFilterType {
     Id(StringFilter),
     /// Instantiated string filter for observed object labels.
     Label(StringFilter),
-    /// Instantiated Python filter for Robot sensor observations.
-    Python(PythonFilter),
-    /// Instantiated external filter for Robot sensor observations.
-    External(ExternalFilter),
+    /// Instantiated plugin filter for Robot sensor observations.
+    Plugin(Box<dyn SensorFilter>),
 }
 
 impl RobotSensorFilterType {
@@ -217,8 +201,7 @@ impl RobotSensorFilterType {
         context: &Context,
     ) -> crate::errors::SimusaResult<()> {
         match self {
-            Self::Python(f) => f.post_init(node, initial_time, context),
-            Self::External(f) => f.post_init(node, initial_time, context),
+            Self::Plugin(f) => f.post_init(node, initial_time, context),
             Self::Range(_) | Self::Id(_) | Self::Label(_) => Ok(()),
         }
     }
@@ -252,9 +235,6 @@ pub struct RobotSensorConfig {
     pub filters: Vec<RobotSensorFilterConfig>,
     /// If `true`, line-of-sight occlusion checks are bypassed.
     pub xray: bool,
-    /// Frame of the sensor with respect to the robot frame. The observations will be given in this frame.
-    #[check]
-    pub frame: FrameConfig,
 }
 
 impl Check for RobotSensorConfig {
@@ -282,7 +262,6 @@ impl Default for RobotSensorConfig {
             faults: Vec::new(),
             filters: Vec::new(),
             xray: false,
-            frame: FrameConfig::default(),
         }
     }
 }
@@ -332,15 +311,6 @@ impl UIComponent for RobotSensorConfig {
                     ui.checkbox(&mut self.xray, "");
                 });
 
-                self.frame.show_mut(
-                    ui,
-                    ctx,
-                    buffer_stack,
-                    global_config,
-                    current_node_name,
-                    unique_id,
-                );
-
                 RobotSensorFilterConfig::show_all_mut(
                     &mut self.filters,
                     ui,
@@ -383,8 +353,6 @@ impl UIComponent for RobotSensorConfig {
                     ui.label(format!("X-Ray mode: {}", self.xray));
                 });
 
-                self.frame.show(ui, ctx, unique_id);
-
                 RobotSensorFilterConfig::show_all(&self.filters, ui, ctx, unique_id);
 
                 RobotSensorFaultModelConfig::show_all(&self.faults, ui, ctx, unique_id);
@@ -396,7 +364,6 @@ impl UIComponent for RobotSensorConfig {
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct RobotSensorRecord {
     last_time: Option<f32>,
-    frame: FrameRecord,
 }
 
 #[cfg(feature = "gui")]
@@ -409,7 +376,6 @@ impl UIComponent for RobotSensorRecord {
                 None => "None".to_string(),
             }
         ));
-        self.frame.show(ui, _ctx, _unique_id);
     }
 }
 
@@ -424,23 +390,33 @@ pub struct OrientedRobotObservation {
     pub pose: Vector3<f32>,
     /// Fault models applied to this observation.
     pub applied_faults: Vec<RobotSensorFaultModelConfig>,
-    /// Frame of the observation with respect to the robot frame.
-    pub frame: Frame,
+}
+
+impl OrientedRobotObservation {
+    /// Converts a [`OrientedRobotObservationRecord`] into a [`OrientedRobotObservation`].
+    pub fn from_record(record: &OrientedRobotObservationRecord) -> Self {
+        Self {
+            name: record.name.clone(),
+            labels: record.labels.clone(),
+            pose: Vector3::new(record.pose[0], record.pose[1], record.pose[2]),
+            applied_faults: Vec::new(),
+        }
+    }
 }
 
 impl Recordable<OrientedRobotObservationRecord> for OrientedRobotObservation {
-    fn record(&self, context: &Context) -> OrientedRobotObservationRecord {
+    fn record(&self, _context: &Context) -> OrientedRobotObservationRecord {
         OrientedRobotObservationRecord {
             name: self.name.clone(),
             labels: self.labels.clone(),
             pose: self.pose.to_owned().into(),
-            frame: self.frame.record(context),
         }
     }
 }
 
 /// Serializable record representation of an [`OrientedRobotObservation`].
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[config_derives]
+#[derive(Default)]
 pub struct OrientedRobotObservationRecord {
     /// Name of the Robot
     pub name: String,
@@ -448,13 +424,11 @@ pub struct OrientedRobotObservationRecord {
     pub labels: Vec<String>,
     /// Pose of the Robot
     pub pose: [f32; 3],
-    /// Frame of the observation with respect to the robot frame.
-    pub frame: FrameRecord,
 }
 
 #[cfg(feature = "gui")]
 impl UIComponent for OrientedRobotObservationRecord {
-    fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
+    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
         ui.vertical(|ui| {
             ui.label(format!("Name: {}", self.name));
             ui.label("Labels:");
@@ -465,7 +439,6 @@ impl UIComponent for OrientedRobotObservationRecord {
                 "Pose: ({}, {}, {})",
                 self.pose[0], self.pose[1], self.pose[2]
             ));
-            self.frame.show(ui, ctx, unique_id);
         });
     }
 }
@@ -482,7 +455,6 @@ pub struct RobotSensor {
     xray: bool,
     faults: Vec<RobotSensorFaultModelType>,
     filters: Vec<RobotSensorFilterType>,
-    frame: Frame,
 }
 
 impl RobotSensor {
@@ -529,19 +501,17 @@ impl RobotSensor {
                         cfg, va_factory, context,
                     ))
                 }
-                RobotSensorFaultModelConfig::Python(cfg) => RobotSensorFaultModelType::Python(
-                    PythonFaultModel::from_config(cfg, global_config, initial_time, context)?,
+                RobotSensorFaultModelConfig::Plugin(cfg) => RobotSensorFaultModelType::Plugin(
+                    plugin_api
+                        .as_ref()
+                        .ok_or_else(|| {
+                            SimusaError::new(
+                                SimusaErrorTypes::PluginAPIError,
+                                "Plugin API not set!".to_string(),
+                            )
+                        })?
+                        .get_sensor_fault(cfg, global_config, va_factory, initial_time, context),
                 ),
-                RobotSensorFaultModelConfig::External(cfg) => {
-                    RobotSensorFaultModelType::External(ExternalFault::from_config(
-                        cfg,
-                        plugin_api,
-                        global_config,
-                        va_factory,
-                        initial_time,
-                        context,
-                    )?)
-                }
             });
         }
 
@@ -557,19 +527,17 @@ impl RobotSensor {
                 RobotSensorFilterConfig::Label(cfg) => RobotSensorFilterType::Label(
                     StringFilter::from_config(cfg, initial_time, context),
                 ),
-                RobotSensorFilterConfig::Python(cfg) => RobotSensorFilterType::Python(
-                    PythonFilter::from_config(cfg, global_config, initial_time, context)?,
+                RobotSensorFilterConfig::Plugin(cfg) => RobotSensorFilterType::Plugin(
+                    plugin_api
+                        .as_ref()
+                        .ok_or_else(|| {
+                            SimusaError::new(
+                                SimusaErrorTypes::PluginAPIError,
+                                "Plugin API not set!".to_string(),
+                            )
+                        })?
+                        .get_sensor_filter(cfg, global_config, va_factory, initial_time, context),
                 ),
-                RobotSensorFilterConfig::External(cfg) => {
-                    RobotSensorFilterType::External(ExternalFilter::from_config(
-                        cfg,
-                        plugin_api,
-                        global_config,
-                        va_factory,
-                        initial_time,
-                        context,
-                    )?)
-                }
             });
         }
 
@@ -584,12 +552,11 @@ impl RobotSensor {
             faults: fault_models,
             xray: config.xray,
             filters,
-            frame: Frame::from_config(&config.frame),
         })
     }
 }
 
-use crate::node::Node;
+use crate::node::{Node, NodeState};
 
 impl Sensor for RobotSensor {
     fn post_init(
@@ -611,6 +578,7 @@ impl Sensor for RobotSensor {
         &mut self,
         node: &mut Node,
         time: f32,
+        frame: &Frame,
         context: &Context,
     ) -> Vec<SensorObservation> {
         let mut observation_list = Vec::<SensorObservation>::new();
@@ -626,11 +594,11 @@ impl Sensor for RobotSensor {
         );
         let state = if let Some(arc_physics) = node.physics() {
             let physics = arc_physics.read().unwrap();
-            physics.state(time, context).clone()
+            physics.state(time, context).unwrap()
         } else {
             State::new() // 0
         };
-        let attached_frame = self.frame.attach_to_state(&state);
+        let attached_frame = frame.attach_to_state(&state);
         let state = attached_frame.state();
 
         let rotation_matrix =
@@ -642,8 +610,9 @@ impl Sensor for RobotSensor {
             rotation_matrix
         );
 
-        for (i, (other_node_name, other_node_physics)) in node
-            .get_all_node_physics()
+        for (i, (other_node_name, other_node_meta_data)) in node
+            .meta_data_list()
+            .unwrap()
             .read()
             .unwrap()
             .iter()
@@ -652,6 +621,21 @@ impl Sensor for RobotSensor {
             if other_node_name == &node.name() {
                 continue;
             }
+            let other_node_meta_data = other_node_meta_data.read().unwrap();
+            if other_node_meta_data.state == NodeState::Terminated {
+                continue;
+            }
+            let other_state = if let Some(other_node_physics) =
+                other_node_meta_data.physics.as_ref()
+            {
+                other_node_physics
+                    .read()
+                    .unwrap()
+                    .state(time, context).expect("Node that are not Terminated and have physics should have a state at the current time")
+            } else {
+                // Node without physics, skip it
+                continue;
+            };
             internal!(
                 context,
                 crate::logger::InternalLog::SensorManagerDetailed,
@@ -659,11 +643,6 @@ impl Sensor for RobotSensor {
                 other_node_name
             );
 
-            let other_state = other_node_physics
-                .read()
-                .unwrap()
-                .state(time, context)
-                .clone();
             if node.environment().is_target_observable(
                 &other_state.pose.fixed_rows::<2>(0).clone_owned(),
                 Some(0.),
@@ -687,7 +666,6 @@ impl Sensor for RobotSensor {
                     labels,
                     pose,
                     applied_faults: Vec::new(),
-                    frame: self.frame.clone(),
                 });
 
                 let mut keep_observation = Some(obs);
@@ -695,10 +673,7 @@ impl Sensor for RobotSensor {
                 for filter in self.filters.iter() {
                     if let Some(obs) = keep_observation {
                         keep_observation = match filter {
-                            RobotSensorFilterType::Python(f) => {
-                                f.filter(time, obs, state, Some(&other_state), context)
-                            }
-                            RobotSensorFilterType::External(f) => {
+                            RobotSensorFilterType::Plugin(f) => {
                                 f.filter(time, obs, state, Some(&other_state), context)
                             }
                             RobotSensorFilterType::Id(f) => {
@@ -767,17 +742,7 @@ impl Sensor for RobotSensor {
                     new_obs.push(observation); // Not adding directly to observation_list to apply faults only once
                     for fault_model in self.faults.iter_mut() {
                         match fault_model {
-                            RobotSensorFaultModelType::Python(f) => f.add_faults(
-                                time,
-                                time + robot_seed,
-                                &mut new_obs,
-                                SensorObservation::OrientedRobot(
-                                    OrientedRobotObservation::default(),
-                                ),
-                                node.environment(),
-                                context,
-                            ),
-                            RobotSensorFaultModelType::External(f) => f.add_faults(
+                            RobotSensorFaultModelType::Plugin(f) => f.add_faults(
                                 time,
                                 time + robot_seed,
                                 &mut new_obs,
@@ -999,7 +964,6 @@ impl Sensor for RobotSensor {
                                                     f.config().clone(),
                                                 ),
                                             ],
-                                            frame: self.frame.clone(),
                                         },
                                     );
                                     new_obs.push(obs);
@@ -1079,10 +1043,9 @@ impl Sensor for RobotSensor {
 }
 
 impl Recordable<SensorRecord> for RobotSensor {
-    fn record(&self, context: &Context) -> SensorRecord {
+    fn record(&self, _context: &Context) -> SensorRecord {
         SensorRecord::RobotSensor(RobotSensorRecord {
             last_time: self.last_time,
-            frame: self.frame.record(context),
         })
     }
 }

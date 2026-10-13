@@ -123,6 +123,11 @@ impl Context {
         self.current_sim_time.as_ref().map(|x| *x.read().unwrap())
     }
 
+    /// Get the current log level from the context.
+    pub fn get_loglevel(&self) -> LogLevel {
+        self.enabled_loglevel.read().unwrap().clone()
+    }
+
     /// Creates a new context with the same properties as the current one, but with an additional call added to the callstack.
     /// This can be used to track the execution flow across different function calls and modules, providing more detailed logging information.
     pub fn new_callstack_level<S: ToString + ?Sized>(&self, call: &S) -> Self {
@@ -162,6 +167,7 @@ impl Context {
         if level > *enabled_loglevel {
             return;
         }
+        let mut do_print = true;
         let matched_category = if let LogLevel::Internal(l) = &level {
             if let LogLevel::Internal(enabled_list) = &*enabled_loglevel {
                 if enabled_list.contains(&InternalLog::All) {
@@ -174,6 +180,9 @@ impl Context {
                             break;
                         }
                     }
+                    if matched_category.is_none() {
+                        do_print = false;
+                    }
                     matched_category
                 }
             } else {
@@ -182,7 +191,7 @@ impl Context {
         } else {
             None
         };
-        if !message.is_empty() {
+        if !message.is_empty() && do_print {
             let mut config_write_targets = self.config_write_targets.lock().unwrap();
             let mut manual_write_targets = self.manual_write_targets.lock().unwrap();
             let time = self.get_time();
@@ -257,7 +266,7 @@ impl Context {
     }
 
     /// Log an internal message with the "Internal" log level and given categories (at least one should be enabled so that the message is logged).
-    pub(crate) fn log_internal(&self, message: &str, category: Vec<InternalLog>) {
+    pub fn log_internal(&self, message: &str, category: Vec<InternalLog>) {
         self.log(LogLevel::Internal(category), message);
     }
 }

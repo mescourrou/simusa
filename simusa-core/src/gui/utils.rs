@@ -121,7 +121,7 @@ pub fn json_config(
     buffer_key: &String,
     error_key: &String,
     buffer_stack: &mut BTreeMap<String, String>,
-    value: &mut serde_json::Value,
+    value: &mut crate::utils::GeneralValue,
 ) {
     if !buffer_stack.contains_key(buffer_key) {
         buffer_stack.insert(buffer_key.clone(), value.to_string());
@@ -167,4 +167,41 @@ pub fn text_singleline_with_apply(
         *value = buffer_stack.get(buffer_key).unwrap().clone();
         buffer_stack.remove(buffer_key);
     }
+}
+
+/// Edit the config of a plugin as a JSON editor (very basic for now).
+pub fn edit_plugin_config(
+    ui: &mut egui::Ui,
+    plugin_name: &str,
+    unique_key: &str,
+    unique_id: &str,
+    buffer_stack: &mut BTreeMap<String, String>,
+    config: &mut crate::utils::GeneralValue,
+) {
+    egui::CollapsingHeader::new(plugin_name).show(ui, |ui| {
+        ui.vertical(|ui| {
+            ui.label("Config (JSON):");
+            json_config(
+                ui,
+                &format!("{}-key-{}", unique_key, unique_id),
+                &format!("{}-error-key-{}", unique_key, unique_id),
+                buffer_stack,
+                config,
+            );
+        });
+    });
+}
+
+/// Show the config of a plugin as a JSON text.
+pub fn show_plugin_config(
+    ui: &mut egui::Ui,
+    plugin_name: &str,
+    config: &crate::utils::GeneralValue,
+) {
+    egui::CollapsingHeader::new(plugin_name).show(ui, |ui| {
+        ui.vertical(|ui| {
+            ui.label("Config (JSON):");
+            ui.label(format!("{}", config));
+        });
+    });
 }

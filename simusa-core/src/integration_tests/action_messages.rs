@@ -12,7 +12,7 @@ use crate::{
         trajectory_follower::TrajectoryFollowerConfig,
     },
     networking::network::Network,
-    node::node_factory::{RecordType, RobotConfig},
+    node::node_factory::{NodeConfig, NodeTypeConfig, RecordType, RobotConfig},
     plugin_api::PluginAPI,
     sensors::{
         SensorConfig,
@@ -22,7 +22,7 @@ use crate::{
     simulator::{ResultConfig, Simulator, SimulatorConfig},
     state_estimators::{
         BenchStateEstimatorConfig, StateEstimator, StateEstimatorConfig,
-        external_estimator::ExternalEstimatorConfig, perfect_estimator::PerfectEstimatorConfig,
+        perfect_estimator::PerfectEstimatorConfig,
     },
     utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
 };
@@ -34,7 +34,7 @@ struct PluginAPITest<SE: StateEstimator + 'static> {
 impl<SE: StateEstimator> PluginAPI for PluginAPITest<SE> {
     fn get_state_estimator(
         &self,
-        _config: &serde_json::Value,
+        _config: &crate::utils::GeneralValue,
         _global_config: &SimulatorConfig,
         _va_factory: &Arc<DeterministRandomVariableFactory>,
         _network: &SharedRwLock<Network>,
@@ -62,17 +62,14 @@ mod kill_node {
         constants::TIME_ROUND,
         context::Context,
         networking::{
-            message_types::MessageTypes,
+            message_types::MessageType,
             network::{Envelope, MessageFlag},
         },
         node::Node,
         physics::robot_models::Command,
         recordable::Recordable,
         sensors::Observation,
-        state_estimators::{
-            StateEstimator, StateEstimatorRecord, WorldState,
-            external_estimator::ExternalEstimatorRecord,
-        },
+        state_estimators::{StateEstimator, StateEstimatorRecord, WorldState},
         utils::maths::round_precision,
     };
 
@@ -98,7 +95,7 @@ mod kill_node {
                     PathKey::from_str("/simusa/command/node2").unwrap(),
                     Envelope {
                         from: node.name(),
-                        message: MessageTypes::default(),
+                        message: MessageType::default(),
                         timestamp: time,
                         message_flags: vec![MessageFlag::Kill],
                     },
@@ -129,9 +126,7 @@ mod kill_node {
 
     impl Recordable<StateEstimatorRecord> for StateEstimatorTest {
         fn record(&self, _context: &Context) -> StateEstimatorRecord {
-            StateEstimatorRecord::External(ExternalEstimatorRecord {
-                record: serde_json::Value::default(),
-            })
+            StateEstimatorRecord::Plugin(crate::utils::GeneralValue::default())
         }
     }
 }
@@ -144,34 +139,41 @@ fn kill_node() {
     // config.log.log_level = LogLevel::Internal(vec![crate::logger::InternalLog::All]);
     config.max_time = 10.;
     config.results = Some(ResultConfig::default());
-    config.robots.push(RobotConfig {
+    config.nodes.push(NodeConfig {
         name: "node1".to_string(),
-        state_estimator: StateEstimatorConfig::Perfect(PerfectEstimatorConfig {
-            targets: vec!["self".to_string(), "node2".to_string(), "node3".to_string()],
-            ..Default::default()
-        }),
-        state_estimator_bench: vec![BenchStateEstimatorConfig {
-            name: "own".to_string(),
-            config: StateEstimatorConfig::External(ExternalEstimatorConfig {
-                config: serde_json::Value::Null,
+        node_type: NodeTypeConfig::Robot(Box::new(RobotConfig {
+            state_estimator: StateEstimatorConfig::Perfect(PerfectEstimatorConfig {
+                targets: vec!["self".to_string(), "node2".to_string(), "node3".to_string()],
+                ..Default::default()
             }),
-        }],
+            state_estimator_bench: vec![BenchStateEstimatorConfig {
+                name: "own".to_string(),
+                config: StateEstimatorConfig::Plugin(crate::utils::GeneralValue::default()),
+            }],
+            ..Default::default()
+        })),
         ..Default::default()
     });
-    config.robots.push(RobotConfig {
+    config.nodes.push(NodeConfig {
         name: "node2".to_string(),
-        state_estimator: StateEstimatorConfig::Perfect(PerfectEstimatorConfig {
-            targets: vec!["self".to_string(), "node1".to_string(), "node3".to_string()],
+        node_type: NodeTypeConfig::Robot(Box::new(RobotConfig {
+            state_estimator: StateEstimatorConfig::Perfect(PerfectEstimatorConfig {
+                targets: vec!["self".to_string(), "node1".to_string(), "node3".to_string()],
+                ..Default::default()
+            }),
             ..Default::default()
-        }),
+        })),
         ..Default::default()
     });
-    config.robots.push(RobotConfig {
+    config.nodes.push(NodeConfig {
         name: "node3".to_string(),
-        state_estimator: StateEstimatorConfig::Perfect(PerfectEstimatorConfig {
-            targets: vec!["self".to_string(), "node1".to_string(), "node2".to_string()],
+        node_type: NodeTypeConfig::Robot(Box::new(RobotConfig {
+            state_estimator: StateEstimatorConfig::Perfect(PerfectEstimatorConfig {
+                targets: vec!["self".to_string(), "node1".to_string(), "node2".to_string()],
+                ..Default::default()
+            }),
             ..Default::default()
-        }),
+        })),
         ..Default::default()
     });
 
@@ -212,7 +214,7 @@ mod trigger_sensor {
         context::Context,
         info,
         networking::{
-            message_types::MessageTypes,
+            message_types::MessageType,
             network::{Envelope, Network},
         },
         node::Node,
@@ -221,10 +223,7 @@ mod trigger_sensor {
         recordable::Recordable,
         sensors::{Observation, sensor_manager::SensorTriggerMessage},
         simulator::SimulatorConfig,
-        state_estimators::{
-            StateEstimator, StateEstimatorRecord, WorldState,
-            external_estimator::ExternalEstimatorRecord,
-        },
+        state_estimators::{StateEstimator, StateEstimatorRecord, WorldState},
         utils::{
             SharedMutex, SharedRwLock,
             determinist_random_variable::DeterministRandomVariableFactory, maths::round_precision,
@@ -270,7 +269,7 @@ mod trigger_sensor {
                     PathKey::from_str("/simusa/nodes/robot1/sensors/RobotSensor").unwrap(),
                     Envelope {
                         from: node.name(),
-                        message: MessageTypes::SensorTrigger(SensorTriggerMessage {}),
+                        message: MessageType::SensorTrigger(SensorTriggerMessage {}),
                         timestamp: time,
                         ..Default::default()
                     },
@@ -301,9 +300,7 @@ mod trigger_sensor {
 
     impl Recordable<StateEstimatorRecord> for StateEstimatorTest {
         fn record(&self, _context: &Context) -> StateEstimatorRecord {
-            StateEstimatorRecord::External(ExternalEstimatorRecord {
-                record: serde_json::Value::default(),
-            })
+            StateEstimatorRecord::Plugin(crate::utils::GeneralValue::default())
         }
     }
 
@@ -315,14 +312,14 @@ mod trigger_sensor {
     impl PluginAPI for PluginAPITest {
         fn get_state_estimator(
             &self,
-            config: &serde_json::Value,
+            config: &crate::utils::GeneralValue,
             _global_config: &SimulatorConfig,
             _va_factory: &Arc<DeterministRandomVariableFactory>,
             _network: &SharedRwLock<Network>,
             initial_time: f32,
             _context: &Context,
         ) -> Box<dyn StateEstimator> {
-            if config.as_bool().unwrap() {
+            if config.to_value().as_bool().unwrap() {
                 Box::new(StateEstimatorTest {
                     last_time: initial_time,
                     is_the_triggered: false,
@@ -340,10 +337,20 @@ mod trigger_sensor {
 }
 
 #[test]
-fn trigger_sensor() {
+fn trigger_sensor_pooled() {
+    trigger_sensor(4);
+}
+
+#[test]
+fn trigger_sensor_monothreaded() {
+    trigger_sensor(1);
+}
+
+fn trigger_sensor(nb_threads: usize) {
     let trigger_times = VecDeque::<f32>::from(vec![3.2, 5., 6., 7.5, 9.1, 9.9, 10.0, 21.3]);
 
     let mut config = SimulatorConfig::default();
+    config.optimization.threads = nb_threads;
     config.log.log_level = LogLevel::Off;
     // config.log.included_nodes = vec!["robot1".to_string()];
     // config.log.excluded_nodes = vec!["simulator".to_string()];
@@ -351,44 +358,46 @@ fn trigger_sensor() {
     // config.log.log_level = LogLevel::Internal(vec![crate::logger::InternalLog::All]);
     config.max_time = 25.;
     config.results = None;
-    config.robots.push(RobotConfig {
+    config.nodes.push(NodeConfig {
         name: "robot1".to_string(),
-        navigator: NavigatorConfig::TrajectoryFollower(TrajectoryFollowerConfig {
-            trajectory: TrajectoryConfig {
-                point_list: vec![vec![0., 0.], vec![1., 1.]],
-                do_loop: false,
+        node_type: NodeTypeConfig::Robot(Box::new(RobotConfig {
+            navigator: NavigatorConfig::TrajectoryFollower(TrajectoryFollowerConfig {
+                trajectory: TrajectoryConfig {
+                    point_list: vec![vec![0., 0.], vec![1., 1.]],
+                    do_loop: false,
+                },
+                ..Default::default()
+            }),
+            state_estimator_bench: vec![BenchStateEstimatorConfig {
+                name: "triggered".to_string(),
+                config: StateEstimatorConfig::Plugin(crate::utils::GeneralValue::bool(false)),
+            }],
+            sensor_manager: SensorManagerConfig {
+                sensors: vec![ManagedSensorConfig {
+                    name: "RobotSensor".to_string(),
+                    config: SensorConfig::Robot(RobotSensorConfig {
+                        detection_distance: 100.,
+                        activation_time: None,
+                        ..Default::default()
+                    }),
+                    triggered: true,
+                    ..Default::default()
+                }],
             },
             ..Default::default()
-        }),
-        state_estimator_bench: vec![BenchStateEstimatorConfig {
-            name: "triggered".to_string(),
-            config: StateEstimatorConfig::External(ExternalEstimatorConfig {
-                config: serde_json::Value::Bool(false),
-            }),
-        }],
-        sensor_manager: SensorManagerConfig {
-            sensors: vec![ManagedSensorConfig {
-                name: "RobotSensor".to_string(),
-                config: SensorConfig::Robot(RobotSensorConfig {
-                    detection_distance: 100.,
-                    activation_time: None,
-                    ..Default::default()
-                }),
-                triggered: true,
-                ..Default::default()
-            }],
-        },
+        })),
         ..Default::default()
     });
-    config.robots.push(RobotConfig {
+    config.nodes.push(NodeConfig {
         name: "robot2".to_string(),
-        navigator: NavigatorConfig::GoTo(GoToConfig::default()),
-        state_estimator_bench: vec![BenchStateEstimatorConfig {
-            name: "triggering".to_string(),
-            config: StateEstimatorConfig::External(ExternalEstimatorConfig {
-                config: serde_json::Value::Bool(true),
-            }),
-        }],
+        node_type: NodeTypeConfig::Robot(Box::new(RobotConfig {
+            navigator: NavigatorConfig::GoTo(GoToConfig::default()),
+            state_estimator_bench: vec![BenchStateEstimatorConfig {
+                name: "triggering".to_string(),
+                config: StateEstimatorConfig::Plugin(crate::utils::GeneralValue::bool(true)),
+            }],
+            ..Default::default()
+        })),
         ..Default::default()
     });
 

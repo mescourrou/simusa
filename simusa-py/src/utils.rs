@@ -11,10 +11,10 @@ use pyo3::{PyClass, prelude::*};
 use pyo3::{PyResult, Python};
 use serde::{Deserialize, Serialize};
 
-use crate::context::Context;
-use crate::errors::{SimusaError, SimusaErrorTypes, SimusaResult};
-use crate::info;
-use crate::simulator::SimulatorConfig;
+use simusa::context::Context;
+use simusa::errors::{SimusaError, SimusaErrorTypes, SimusaResult};
+use simusa::info;
+use simusa::simulator::SimulatorConfig;
 
 /// Ensure that the Python virtual environment's site-packages are included in sys.path.
 /// This is useful when the Rust application embeds Python and needs to access packages
@@ -188,7 +188,7 @@ pub fn load_class_from_python_script<T: PythonClassConfig>(
     let json_config = serde_json::to_string(&config)
         .unwrap_or_else(|_| format!("Error during converting Python {} config to json", log_info));
 
-    let script_path = global_config.base_path.as_ref().join(config.file());
+    let script_path = global_config.get_base_path().join(config.file());
     let python_script = match fs::read_to_string(script_path.clone()) {
         Err(e) => {
             return Err(SimusaError::new(

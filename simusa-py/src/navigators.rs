@@ -10,54 +10,61 @@
 use std::{str::FromStr, sync::Arc};
 
 use pyo3::{prelude::*, types::PyDict};
-use serde_json::Value;
 
 use simusa_com::rfc::{self, RemoteFunctionCall, RemoteFunctionCallHost};
 
-use crate::{
+use simusa::{
     context::Context,
-    controllers::ControllerError,
     errors::SimusaResult,
+    interfaces::navigator_controller::ControllerInputVariable,
     internal,
-    navigators::external_navigator::ExternalNavigatorRecord,
+    logger::InternalLog,
+    navigators::{Navigator, NavigatorRecord},
     node::Node,
-    pywrappers::{ControllerErrorWrapper, NodeWrapper, WorldStateWrapper},
     recordable::Recordable,
     state_estimators::WorldState,
-    utils::python::{call_py_method, call_py_method_void},
+    utils::GeneralValue,
 };
 
-use super::{Navigator, NavigatorRecord};
+use crate::{
+    controllers::{PythonControllerInput, PythonControllerInputWrapper},
+    utils::{call_py_method, call_py_method_void},
+    wrappers::{NodeWrapper, WorldStateWrapper},
+};
 
 /// Simulator-side RPC handles used by Rust nodes to call Python navigator logic asynchronously.
 #[derive(Debug, Clone)]
 pub struct PythonNavigatorAsyncClient {
     /// Remote call to `post_init`.
-    pub post_init: RemoteFunctionCall<NodeWrapper, SimusaResult<()>>,
+    pub post_init: RemoteFunctionCall<NodeWrapper, SimusaResult<Vec<ControllerInputVariable>>>,
     /// Remote call to `compute_error`.
-    pub compute_error: RemoteFunctionCall<(NodeWrapper, WorldState), ControllerError>,
+    pub compute_output:
+        RemoteFunctionCall<(NodeWrapper, WorldState), SimusaResult<PythonControllerInput>>,
     /// Remote call to `record`.
     pub record: RemoteFunctionCall<(), NavigatorRecord>,
     /// Remote call to `pre_loop_hook`.
     pub pre_loop_hook: RemoteFunctionCall<(NodeWrapper, f32), ()>,
     /// Remote call to `next_time_step`.
     pub next_time_step: RemoteFunctionCall<(), Option<f32>>,
+    pub available_variables: Vec<ControllerInputVariable>,
 }
 
 impl Navigator for PythonNavigatorAsyncClient {
+    type OutputType = PythonControllerInput;
     fn post_init(&mut self, node: &mut Node, context: &Context) -> SimusaResult<()> {
         let node_py = NodeWrapper::from_rust(node, context.clone());
-        self.post_init.call(node_py).unwrap()
+        self.available_variables = self.post_init.call(node_py).unwrap()?;
+        Ok(())
     }
 
-    fn compute_error(
+    fn compute_output(
         &mut self,
         node: &mut Node,
         world_state: WorldState,
         context: &Context,
-    ) -> ControllerError {
+    ) -> SimusaResult<PythonControllerInput> {
         let node_py = NodeWrapper::from_rust(node, context.clone());
-        self.compute_error.call((node_py, world_state)).unwrap()
+        self.compute_output.call((node_py, world_state)).unwrap()
     }
 
     fn pre_loop_hook(&mut self, node: &mut Node, time: f32, context: &Context) {
@@ -81,8 +88,9 @@ impl Recordable<NavigatorRecord> for PythonNavigatorAsyncClient {
 pub struct PythonNavigator {
     model: Py<PyAny>,
     client: PythonNavigatorAsyncClient,
-    post_init: Arc<RemoteFunctionCallHost<NodeWrapper, SimusaResult<()>>>,
-    compute_error: Arc<RemoteFunctionCallHost<(NodeWrapper, WorldState), ControllerError>>,
+    post_init: Arc<RemoteFunctionCallHost<NodeWrapper, SimusaResult<Vec<ControllerInputVariable>>>>,
+    compute_output:
+        Arc<RemoteFunctionCallHost<(NodeWrapper, WorldState), SimusaResult<PythonControllerInput>>>,
     record: Arc<RemoteFunctionCallHost<(), NavigatorRecord>>,
     pre_loop_hook: Arc<RemoteFunctionCallHost<(NodeWrapper, f32), ()>>,
     next_time_step: Arc<RemoteFunctionCallHost<(), Option<f32>>>,
@@ -103,13 +111,14 @@ impl PythonNavigator {
             model: py_model,
             client: PythonNavigatorAsyncClient {
                 post_init: post_init_client,
-                compute_error: compute_error_client,
+                compute_output: compute_error_client,
                 record: record_client,
                 pre_loop_hook: pre_loop_hook_client,
                 next_time_step: next_time_step_client,
+                available_variables: Vec::new(),
             },
             post_init: Arc::new(post_init_host),
-            compute_error: Arc::new(compute_error_host),
+            compute_output: Arc::new(compute_error_host),
             record: Arc::new(record_host),
             pre_loop_hook: Arc::new(pre_loop_hook_host),
             next_time_step: Arc::new(next_time_step_host),
@@ -131,9 +140,9 @@ impl PythonNavigator {
         self.post_init
             .clone()
             .try_recv_closure_mut(|node| self.post_init(node, context));
-        self.compute_error
+        self.compute_output
             .clone()
-            .try_recv_closure_mut(|(node, state)| self.compute_error(node, &state, context));
+            .try_recv_closure_mut(|(node, state)| Ok(self.compute_output(node, &state, context)));
         self.record.try_recv_closure(|()| self.record(context));
         self.pre_loop_hook
             .clone()
@@ -143,54 +152,56 @@ impl PythonNavigator {
             .try_recv_closure(|()| self.next_time_step(context));
     }
 
-    fn post_init(&mut self, node: NodeWrapper, context: &Context) -> SimusaResult<()> {
+    fn post_init(
+        &mut self,
+        node: NodeWrapper,
+        context: &Context,
+    ) -> SimusaResult<Vec<ControllerInputVariable>> {
         internal!(
             context,
-            crate::logger::InternalLog::API,
+            InternalLog::API,
             "Calling python implementation of post_init"
         );
         call_py_method_void!(self.model, "post_init", (node,));
-        Ok(())
+        Ok(ControllerInputVariable::all().to_vec())
     }
 
-    fn compute_error(
+    fn compute_output(
         &mut self,
         node: NodeWrapper,
         state: &WorldState,
         context: &Context,
-    ) -> ControllerError {
+    ) -> PythonControllerInput {
         internal!(
             context,
-            crate::logger::InternalLog::API,
-            "Calling python implementation of compute_error"
+            InternalLog::API,
+            "Calling python implementation of compute_output"
         );
         let result = call_py_method!(
             self.model,
-            "compute_error",
-            ControllerErrorWrapper,
-            (node, WorldStateWrapper::from_rust(state))
+            "compute_output",
+            PythonControllerInputWrapper,
+            (node, WorldStateWrapper::from(state))
         );
-        result.to_rust()
+        result.into()
     }
 
     fn record(&self, context: &Context) -> NavigatorRecord {
         internal!(
             context,
-            crate::logger::InternalLog::API,
+            InternalLog::API,
             "Calling python implementation of record"
         );
         let record_str: String = call_py_method!(self.model, "record", String,);
-        NavigatorRecord::External(ExternalNavigatorRecord {
-            record: Value::from_str(&record_str).expect(
-                "Impossible to get serde_json::Value from the input serialized python structure",
-            ),
-        })
+        NavigatorRecord::Plugin(GeneralValue::from_str(&record_str).expect(
+            "Impossible to get crate::utils::GeneralValue from the input serialized python structure",
+        ))
     }
 
     fn pre_loop_hook(&mut self, node: NodeWrapper, time: f32, context: &Context) {
         internal!(
             context,
-            crate::logger::InternalLog::API,
+            InternalLog::API,
             "Calling python implementation of pre_loop_hook"
         );
         call_py_method_void!(self.model, "pre_loop_hook", node, time);
@@ -199,7 +210,7 @@ impl PythonNavigator {
     fn next_time_step(&self, context: &Context) -> Option<f32> {
         internal!(
             context,
-            crate::logger::InternalLog::API,
+            InternalLog::API,
             "Calling python implementation of next_time_step"
         );
         call_py_method!(self.model, "next_time_step", Option<f32>,)
@@ -225,11 +236,11 @@ impl NavigatorWrapper {
 
     fn post_init(&mut self, _node: NodeWrapper) {}
 
-    fn compute_error(
+    fn compute_output(
         &mut self,
         _node: NodeWrapper,
         _state: WorldStateWrapper,
-    ) -> ControllerErrorWrapper {
+    ) -> PythonControllerInputWrapper {
         unimplemented!()
     }
 

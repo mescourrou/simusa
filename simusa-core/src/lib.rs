@@ -21,7 +21,6 @@
 //! use std::path::Path;
 //! use simusa::simulator::Simulator;
 //!
-//! Simulator::init_environment();
 //! let mut simulator = Simulator::from_config_path(
 //!     Path::new("config_example/config.yaml"),
 //!     None,
@@ -31,14 +30,13 @@
 //! simulator.compute_results().unwrap();
 //! ```
 
-use pyo3::prelude::*;
-
 pub use simusa_com;
 
 pub mod config;
 pub mod context;
 pub mod controllers;
 pub mod environment;
+pub mod interfaces;
 pub mod logger;
 pub mod navigators;
 pub mod networking;
@@ -52,10 +50,9 @@ pub mod state_estimators;
 pub mod utils;
 
 pub mod plugin_api;
-pub mod pybinds;
-pub mod pywrappers;
 
 pub mod api;
+pub mod result_analyser;
 pub mod time_analysis;
 
 #[cfg(test)]
@@ -63,13 +60,6 @@ mod integration_tests;
 
 #[cfg(feature = "gui")]
 pub mod gui;
-
-#[pymodule]
-/// Python module initializer for the `simusa` package.
-pub fn simusa(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    pybinds::make_python_bindings(m)?;
-    Ok(())
-}
 
 pub mod constants;
 pub mod errors;

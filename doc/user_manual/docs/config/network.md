@@ -100,8 +100,9 @@ State estimates from one robot can be used by another if:
 ## Multi-Robot Communication Pattern
 
 ```yaml
-robots:
+nodes:
   - name: robot1
+    type: Robot
     network:
       range: 20.0
       reception_delay: 0.01
@@ -112,6 +113,7 @@ robots:
           config: { type: RobotSensor, detection_distance: 10.0 }
 
   - name: robot2
+    type: Robot
     network:
       range: 20.0
       reception_delay: 0.01
@@ -128,8 +130,9 @@ robots:
 Computation units (e.g., central control stations) also have network configuration:
 
 ```yaml
-computation_units:
+nodes:
   - name: Central Unit
+    type: ComputationUnit
     network:
       range: 0.0                     # Unlimited range for central unit
       reception_delay: 0.0
@@ -142,43 +145,51 @@ computation_units:
 
 ### No network constraints (all robots communicate)
 ```yaml
-robots:
+nodes:
   - name: robot1
+    type: Robot
     network: { range: 0.0, reception_delay: 0.0 }
   - name: robot2
+    type: Robot
     network: { range: 0.0, reception_delay: 0.0 }
 ```
 
 ### Limited WiFi range
 ```yaml
-robots:
+nodes:
   - name: robot1
+    type: Robot
     network: { range: 50.0, reception_delay: 0.02 }
   - name: robot2
+    type: Robot
     network: { range: 50.0, reception_delay: 0.02 }
 ```
 
 ### Realistic multi-hop network
 ```yaml
-robots:
+nodes:
   - name: relay
+    type: Robot
     network: { range: 100.0, reception_delay: 0.05 }
   - name: robot1
+    type: Robot
     network: { range: 100.0, reception_delay: 0.05 }
   - name: robot2
+    type: Robot
     network: { range: 100.0, reception_delay: 0.05 }
 ```
 
 ### Central unit with limited robot range
 ```yaml
-robots:
+nodes:
   - name: robot1
+    type: Robot
     network: { range: 30.0, reception_delay: 0.01 }
   - name: robot2
+    type: Robot
     network: { range: 30.0, reception_delay: 0.01 }
-
-computation_units:
   - name: Central Unit
+    type: ComputationUnit
     network: { range: 0.0, reception_delay: 0.0 }
 ```
 

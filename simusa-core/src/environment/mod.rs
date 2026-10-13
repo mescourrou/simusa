@@ -7,10 +7,8 @@
 //!
 //! Landmark geometry is represented by [`OrientedLandmark`].
 
-#[cfg(feature = "gui")]
-use std::collections::BTreeMap;
 use std::{
-    collections::HashMap,
+    collections::BTreeMap,
     sync::{Arc, RwLock},
 };
 
@@ -100,9 +98,9 @@ type CacheValue = (
 /// Runtime environment state containing map geometry and per-node metadata.
 pub struct Environment {
     map: Map,
-    meta_data_list: SharedRwLock<HashMap<String, SharedRoLock<NodeMetaData>>>,
+    meta_data_list: SharedRwLock<BTreeMap<String, SharedRoLock<NodeMetaData>>>,
     /// Cache for landmark_in_range, to avoid recomputing it multiple times for the same position and max_distance.
-    cache: SharedRwLock<HashMap<String, CacheValue>>,
+    cache: SharedRwLock<BTreeMap<String, CacheValue>>,
 }
 
 impl Environment {
@@ -116,8 +114,8 @@ impl Environment {
         let map = Map::from_config(&config.map, va_factory)?;
         Ok(Self {
             map,
-            meta_data_list: Arc::new(RwLock::new(HashMap::new())),
-            cache: Arc::new(RwLock::new(HashMap::new())),
+            meta_data_list: Arc::new(RwLock::new(BTreeMap::new())),
+            cache: Arc::new(RwLock::new(BTreeMap::new())),
         })
     }
 
@@ -622,7 +620,7 @@ impl Environment {
     }
 
     /// Returns shared access to node metadata indexed by node name.
-    pub fn get_meta_data(&self) -> &SharedRwLock<HashMap<String, SharedRoLock<NodeMetaData>>> {
+    pub fn get_meta_data(&self) -> &SharedRwLock<BTreeMap<String, SharedRoLock<NodeMetaData>>> {
         &self.meta_data_list
     }
 

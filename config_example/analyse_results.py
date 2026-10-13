@@ -1,11 +1,14 @@
 #!/usr/bin/python3
 
+import os
+
 import numpy as np
 import matplotlib.pyplot as plt
 import IPython
 
-def analyse(records: list, config: dict, figure_path: str, figure_type: str, additional_param: dict|None):
+def analyse_results(records: list, config: dict, additional_param: dict|None):
 
+    figure_path = additional_param["figures_path"] if additional_param is not None and "figures_path" in additional_param else ""
     # config = data["config"]
     # record = data["record"]
     
@@ -41,8 +44,8 @@ def analyse(records: list, config: dict, figure_path: str, figure_type: str, add
                     real_pose = perfect_physics["state"]["pose"]
                 if real_pose is None:
                     raise Exception()
-            except: # For external Physics (in python example)
-                state = record["node"][node_type]["physics"]["External"]["state"]
+            except: # For plugin Physics (in python example)
+                state = record["node"][node_type]["physics"]["Plugin"]["state"]
                 if "pose" in state:
                     real_pose = state["pose"][0:3]
                 else:
@@ -60,4 +63,6 @@ def analyse(records: list, config: dict, figure_path: str, figure_type: str, add
     ax.legend()
     
     if figure_path != "":
-        f.savefig(f"{figure_path}/Trajectories_all{figure_type}", bbox_inches='tight')
+        if not os.path.exists(figure_path):
+            os.makedirs(figure_path)
+        f.savefig(f"{figure_path}/Trajectories_all.pdf", bbox_inches='tight')

@@ -11,7 +11,7 @@ pub struct MyPlugin;
 impl PluginAPI for MyPlugin {
     fn get_state_estimator(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         global_config: &SimulatorConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
         network: &SharedRwLock<Network>,
@@ -49,11 +49,12 @@ use std::sync::Arc;
 
 use crate::{
     context::Context,
-    controllers::Controller,
-    navigators::Navigator,
+    controllers::AbstractController,
+    navigators::AbstractNavigator,
     networking::network::Network,
-    physics::Physics,
-    sensors::{Sensor, fault_models::fault_model::FaultModel, sensor_filters::SensorFilter},
+    physics::{Physics, fault_models::PhysicsFaultModel},
+    result_analyser::ResultAnalyserTrait,
+    sensors::{Sensor, fault_models::FaultModel, sensor_filters::SensorFilter},
     simulator::SimulatorConfig,
     state_estimators::StateEstimator,
     utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
@@ -62,12 +63,11 @@ use crate::{
 /// Trait to link the simulator to the external implementation.
 #[allow(unused_variables)]
 pub trait PluginAPI: Send + Sync {
-    /// Return the [`StateEstimator`] to be used by the
-    /// [`ExternalEstimator`](`crate::state_estimators::external_estimator::ExternalEstimator`).
+    /// Return the [`StateEstimator`] corresponding to the [`StateEstimatorConfig::Plugin`](crate::state_estimators::StateEstimatorConfig::Plugin) type.
     ///
     /// # Arguments
     /// * `config` - Config for the external state estimator. The configuration
-    ///   is given using [`serde_json::Value`]. It should be converted by the
+    ///   is given using [`crate::utils::GeneralValue`]. It should be converted by the
     ///   external plugin to the specific configuration.
     /// * `global_config` - Full configuration of the simulator.
     /// * `va_factory` - Factory for Determinists random variables to create random variables.
@@ -80,7 +80,7 @@ pub trait PluginAPI: Send + Sync {
     /// Returns the [`StateEstimator`] to use.
     fn get_state_estimator(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         global_config: &SimulatorConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
         network: &SharedRwLock<Network>,
@@ -90,12 +90,11 @@ pub trait PluginAPI: Send + Sync {
         panic!("The given PluginAPI does not provide a state estimator");
     }
 
-    /// Return the [`Controller`] to be used by the
-    /// [`ExternalController`](`crate::controllers::external_controller::ExternalController`).
+    /// Return the [`Controller`](crate::controllers::Controller) corresponding to the [`ControllerConfig::Plugin`](crate::controllers::ControllerConfig::Plugin).
     ///
     /// # Arguments
     /// * `config` - Config for the external controller. The configuration
-    ///   is given using [`serde_json::Value`]. It should be converted by the
+    ///   is given using [`crate::utils::GeneralValue`]. It should be converted by the
     ///   external plugin to the specific configuration.
     /// * `global_config` - Full configuration of the simulator.
     /// * `va_factory` - Factory for Determinists random variables to create random variables.
@@ -105,25 +104,24 @@ pub trait PluginAPI: Send + Sync {
     ///
     /// # Return
     ///
-    /// Returns the [`Controller`] to use.
+    /// Returns the [`Controller`](crate::controllers::Controller) to use, with the trait [`AbstractController`] automatically implemented.
     fn get_controller(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         global_config: &SimulatorConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
         network: &SharedRwLock<Network>,
         initial_time: f32,
         context: &Context,
-    ) -> Box<dyn Controller> {
+    ) -> Box<dyn AbstractController> {
         panic!("The given PluginAPI does not provide a controller");
     }
 
-    /// Return the [`Navigator`] to be used by the
-    /// [`ExternalNavigator`](`crate::navigators::external_navigator::ExternalNavigator`).
+    /// Return the [`Navigator`](crate::navigators::Navigator) corresponding to the [`NavigatorConfig::Plugin`](crate::navigators::NavigatorConfig::Plugin) type.
     ///
     /// # Arguments
     /// * `config` - Config for the external navigator. The configuration
-    ///   is given using [`serde_json::Value`]. It should be converted by the
+    ///   is given using [`crate::utils::GeneralValue`]. It should be converted by the
     ///   external plugin to the specific configuration.
     /// * `global_config` - Full configuration of the simulator.
     /// * `va_factory` - Factory for Determinists random variables to create random variables.
@@ -133,25 +131,25 @@ pub trait PluginAPI: Send + Sync {
     ///
     /// # Return
     ///
-    /// Returns the [`Navigator`] to use.
+    /// Returns the [`Navigator`](crate::navigators::Navigator) to use.
+    /// The trait [`AbstractNavigator`] is automatically implemented.
     fn get_navigator(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         global_config: &SimulatorConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
         network: &SharedRwLock<Network>,
         initial_time: f32,
         context: &Context,
-    ) -> Box<dyn Navigator> {
+    ) -> Box<dyn AbstractNavigator> {
         panic!("The given PluginAPI does not provide a navigator");
     }
 
-    /// Return the [`Physics`] to be used by the
-    /// [`ExternalPhysics`](`crate::physics::external_physics::ExternalPhysics`).
+    /// Return the [`Physics`] corresponding to the [`PhysicsConfig::Plugin`](crate::physics::PhysicsConfig::Plugin).
     ///
     /// # Arguments
     /// * `config` - Config for the external physics. The configuration
-    ///   is given using [`serde_json::Value`]. It should be converted by the
+    ///   is given using [`crate::utils::GeneralValue`]. It should be converted by the
     ///   external plugin to the specific configuration.
     /// * `global_config` - Full configuration of the simulator.
     /// * `va_factory` - Factory for Determinists random variables to create random variables.
@@ -164,7 +162,7 @@ pub trait PluginAPI: Send + Sync {
     /// Returns the [`Physics`] to use.
     fn get_physics(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         global_config: &SimulatorConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
         network: &SharedRwLock<Network>,
@@ -175,15 +173,14 @@ pub trait PluginAPI: Send + Sync {
     }
 
     /// Allow the plugin to check for requests from the simulator and react to them.
-    /// This is used at the configuration loading step to allow asynchronous plugins to check for requests, especially [`PythonAPI`](crate::pybinds::PythonAPI).
+    /// This is used at the configuration loading step to allow asynchronous plugins to check for requests, especially when using the Python API.
     fn check_requests(&self, context: &Context) {}
 
-    /// Return the [`Sensor`] to be used by the
-    /// [`ExternalSensor`](`crate::sensors::external_sensor::ExternalSensor`).
+    /// Return the [`Sensor`] corresponding to the [`SensorConfig::Plugin`](crate::sensors::SensorConfig::Plugin) type.
     ///
     /// # Arguments
     /// * `config` - Config for the external sensor. The configuration
-    ///   is given using [`serde_json::Value`]. It should be converted by the
+    ///   is given using [`crate::utils::GeneralValue`]. It should be converted by the
     ///   external plugin to the specific configuration.
     /// * `global_config` - Full configuration of the simulator.
     /// * `_va_factory` - Factory for Determinists random variables to create random variables if needed.
@@ -194,7 +191,7 @@ pub trait PluginAPI: Send + Sync {
     /// Returns the [`Sensor`] to use.
     fn get_sensor(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         global_config: &SimulatorConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
         network: &SharedRwLock<Network>,
@@ -216,12 +213,11 @@ pub trait PluginAPI: Send + Sync {
         Vec::new()
     }
 
-    /// Return the [`SensorFilter`] to be used by the
-    /// [`ExternalFilter`](`crate::sensors::sensor_filters::external_filter::ExternalFilter`).
+    /// Return the [`SensorFilter`] to be used by the `Plugin` sensor filter.
     ///
     /// # Arguments
     /// * `config` - Config for the external sensor filter. The configuration
-    ///   is given using [`serde_json::Value`]. It should be converted by the
+    ///   is given using [`crate::utils::GeneralValue`]. It should be converted by the
     ///   external plugin to the specific configuration.
     /// * `global_config` - Full configuration of the simulator.
     /// * `va_factory` - Factory for Determinists random variables.
@@ -233,7 +229,7 @@ pub trait PluginAPI: Send + Sync {
     /// Returns the [`SensorFilter`] to use.
     fn get_sensor_filter(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         global_config: &SimulatorConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
         initial_time: f32,
@@ -242,12 +238,11 @@ pub trait PluginAPI: Send + Sync {
         panic!("The given PluginAPI does not provide a sensor filter");
     }
 
-    /// Return the [`FaultModel`] to be used by the
-    /// [`ExternalFault`](`crate::sensors::fault_models::external_fault::ExternalFault`).
+    /// Return the [`FaultModel`] to be used by the `Plugin` options in sensor fault models
     ///
     /// # Arguments
     /// * `config` - Config for the external sensor fault. The configuration
-    ///   is given using [`serde_json::Value`]. It should be converted by the
+    ///   is given using [`crate::utils::GeneralValue`]. It should be converted by the
     ///   external plugin to the specific configuration.
     /// * `global_config` - Full configuration of the simulator.
     /// * `va_factory` - Factory for Determinists random variables.
@@ -259,12 +254,59 @@ pub trait PluginAPI: Send + Sync {
     /// Returns the [`FaultModel`] to use.
     fn get_sensor_fault(
         &self,
-        config: &serde_json::Value,
+        config: &crate::utils::GeneralValue,
         global_config: &SimulatorConfig,
         va_factory: &Arc<DeterministRandomVariableFactory>,
         initial_time: f32,
         context: &Context,
     ) -> Box<dyn FaultModel> {
         panic!("The given PluginAPI does not provide a sensor fault model");
+    }
+
+    /// Return the [`PhysicsFaultModel`] to be used by the
+    /// [`InternalPhysics`](`crate::physics::internal_physics::InternalPhysics`).
+    ///
+    /// # Arguments
+    /// * `config` - Config for the external sensor fault. The configuration
+    ///   is given using [`crate::utils::GeneralValue`]. It should be converted by the
+    ///   external plugin to the specific configuration.
+    /// * `global_config` - Full configuration of the simulator.
+    /// * `va_factory` - Factory for Determinists random variables.
+    /// * `initial_time` - Initial time of the simulation.
+    /// * `context` - Context for the simulation, to allow the sensor fault to log.
+    ///
+    /// # Return
+    ///
+    /// Returns the [`FaultModel`] to use.
+    fn get_physics_fault(
+        &self,
+        config: &crate::utils::GeneralValue,
+        global_config: &SimulatorConfig,
+        va_factory: &Arc<DeterministRandomVariableFactory>,
+        initial_time: f32,
+        context: &Context,
+    ) -> Box<dyn PhysicsFaultModel> {
+        panic!("The given PluginAPI does not provide a physics fault model");
+    }
+
+    /// Return the [`ResultAnalyserTrait`] to be used by the [`ResultAnalyser`](`crate::result_analyser::ResultAnalyser`).
+    ///
+    /// # Arguments
+    /// * `config` - Config for the external result analyser. The configuration
+    ///   is given using [`crate::utils::GeneralValue`]. It should be converted by the
+    ///   external plugin to the specific configuration.
+    /// * `global_config` - Full configuration of the simulator.
+    /// * `context` - Context for the simulation, to allow the result analyser to log.
+    ///
+    /// # Return
+    ///
+    /// Returns the [`ResultAnalyserTrait`] to use.
+    fn get_result_analyser(
+        &self,
+        config: &crate::utils::GeneralValue,
+        global_config: &SimulatorConfig,
+        context: &Context,
+    ) -> Box<dyn ResultAnalyserTrait> {
+        panic!("The given PluginAPI does not provide a result analyser");
     }
 }

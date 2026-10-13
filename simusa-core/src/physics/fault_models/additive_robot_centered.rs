@@ -11,9 +11,11 @@ use std::sync::{Arc, Mutex};
 
 use simusa_macros::{config_derives, enum_variables};
 
+#[cfg(feature = "gui")]
+use crate::gui::{UIComponent, utils::enum_combobox};
 use crate::{
     context::Context,
-    physics::{fault_models::fault_model::PhysicsFaultModel, robot_models::RobotModelConfig},
+    physics::{fault_models::PhysicsFaultModel, robot_models::RobotModelConfig},
     state_estimators::State,
     utils::{
         SharedMutex,
@@ -21,13 +23,9 @@ use crate::{
             DeterministRandomVariable, DeterministRandomVariableFactory, RandomVariableTypeConfig,
         },
         distributions::normal::NormalRandomVariableConfig,
+        enum_tools::ToVec,
         geometry::mod2pi,
     },
-};
-#[cfg(feature = "gui")]
-use crate::{
-    gui::{UIComponent, utils::enum_combobox},
-    utils::enum_tools::ToVec,
 };
 
 enum_variables!(

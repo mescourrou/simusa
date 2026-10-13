@@ -15,7 +15,7 @@ use crate::{
     config::NumberConfig,
     constants::TIME_ROUND,
     context::Context,
-    errors::SimusaResult,
+    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
     internal,
     node::Node,
     plugin_api::PluginAPI,
@@ -23,17 +23,13 @@ use crate::{
     sensors::{
         Sensor, SensorObservation, SensorRecord,
         fault_models::{
+            FaultModel,
             additive::{AdditiveFault, AdditiveFaultConfig},
             clutter::{ClutterFault, ClutterFaultConfig},
-            external_fault::{ExternalFault, ExternalFaultConfig},
-            fault_model::FaultModel,
             misdetection::{MisdetectionFault, MisdetectionFaultConfig},
-            python_fault_model::{PythonFaultModel, PythonFaultModelConfig},
         },
         sensor_filters::{
             SensorFilter,
-            external_filter::{ExternalFilter, ExternalFilterConfig},
-            python_filter::{PythonFilter, PythonFilterConfig},
             range_filter::{RangeFilter, RangeFilterConfig},
         },
     },
@@ -42,7 +38,7 @@ use crate::{
     utils::{
         determinist_random_variable::DeterministRandomVariableFactory,
         enum_tools::EnumVariables,
-        frame::{Frame, FrameConfig, FrameRecord},
+        frame::Frame,
         geometry::{is_angle_inside, segments_intersection},
         periodicity::{Periodicity, PeriodicityConfig},
     },
@@ -119,12 +115,9 @@ pub enum ScanSensorFaultModelConfig {
     /// Per-point misdetection fault model.
     #[check]
     PointMisdetection(MisdetectionFaultConfig),
-    /// Python-implemented custom fault model.
-    #[check]
-    Python(PythonFaultModelConfig),
     /// Plugin-provided external fault model.
-    #[check]
-    External(ExternalFaultConfig),
+    #[plugin("ScanSensorFaultModel", "scan-sensor-fault-model")]
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for ScanSensorFaultModelConfig {
@@ -154,10 +147,8 @@ pub enum FaultModelTypeScanSensor {
     Misdetection(MisdetectionFault),
     /// Instantiated per-point misdetection fault model.
     PointMisdetection(MisdetectionFault),
-    /// Instantiated Python fault model.
-    Python(PythonFaultModel),
-    /// Instantiated external fault model.
-    External(ExternalFault),
+    /// Instantiated plugin fault model.
+    Plugin(Box<dyn FaultModel>),
 }
 
 impl FaultModelTypeScanSensor {
@@ -169,8 +160,7 @@ impl FaultModelTypeScanSensor {
         context: &Context,
     ) -> crate::errors::SimusaResult<()> {
         match self {
-            Self::Python(f) => f.post_init(node, initial_time, context),
-            Self::External(f) => f.post_init(node, initial_time, context),
+            Self::Plugin(f) => f.post_init(node, initial_time, context),
             Self::AdditiveRobotCentered(_)
             | Self::PointAdditiveRobotCentered(_)
             | Self::PointAdditiveObservationCentered(_)
@@ -205,12 +195,9 @@ pub enum ScanSensorFilterConfig {
     /// Range-based filtering on enumerated variables: excludes observations where numeric values fall outside specified bounds.
     #[check]
     Range(RangeFilterConfig<ScanSensorVariablesFilter>),
-    /// String pattern filtering on observed object unique id (name for nodes, id for landmarks): excludes observations matching configured regexp patterns.
-    #[check]
-    Python(PythonFilterConfig),
     /// Plugin-based custom filtering: delegates exclusion logic to external compiled or scripted plugins.
-    #[check]
-    External(ExternalFilterConfig),
+    #[plugin("ScanSensorFilter", "scan-sensor-filter")]
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl Default for ScanSensorFilterConfig {
@@ -224,10 +211,8 @@ impl Default for ScanSensorFilterConfig {
 pub enum ScanSensorFilterType {
     /// Instantiated range filter for Scan sensor variables.
     Range(RangeFilter<ScanSensorVariablesFilter>),
-    /// Instantiated Python filter for Scan sensor observations.
-    Python(PythonFilter),
-    /// Instantiated external filter for Scan sensor observations.
-    External(ExternalFilter),
+    /// Instantiated plugin filter for Scan sensor observations.
+    Plugin(Box<dyn SensorFilter>),
 }
 
 impl ScanSensorFilterType {
@@ -239,8 +224,7 @@ impl ScanSensorFilterType {
         context: &Context,
     ) -> crate::errors::SimusaResult<()> {
         match self {
-            Self::Python(f) => f.post_init(node, initial_time, context),
-            Self::External(f) => f.post_init(node, initial_time, context),
+            Self::Plugin(f) => f.post_init(node, initial_time, context),
             Self::Range(_) => Ok(()),
         }
     }
@@ -284,9 +268,6 @@ pub struct ScanSensorConfig {
     /// Filter configuration list applied before fault injection.
     #[check]
     pub filters: Vec<ScanSensorFilterConfig>,
-    /// Frame of the sensor with respect to the robot frame. The observations will be given in this frame.
-    #[check]
-    pub frame: FrameConfig,
 }
 
 impl Check for ScanSensorConfig {
@@ -317,7 +298,6 @@ impl Default for ScanSensorConfig {
             }),
             faults: vec![],
             filters: vec![],
-            frame: FrameConfig::default(),
         }
     }
 }
@@ -423,15 +403,6 @@ impl UIComponent for ScanSensorConfig {
                     }
                 });
 
-                self.frame.show_mut(
-                    ui,
-                    ctx,
-                    buffer_stack,
-                    global_config,
-                    current_node_name,
-                    &format!("scan-sensor-frame-{}", unique_id),
-                );
-
                 ScanSensorFilterConfig::show_all_mut(
                     &mut self.filters,
                     ui,
@@ -490,9 +461,6 @@ impl UIComponent for ScanSensorConfig {
                     }
                 }
 
-                self.frame
-                    .show(ui, ctx, &format!("scan-sensor-frame-{}", unique_id));
-
                 ScanSensorFilterConfig::show_all(&self.filters, ui, ctx, unique_id);
 
                 ScanSensorFaultModelConfig::show_all(&self.faults, ui, ctx, unique_id);
@@ -504,12 +472,11 @@ impl UIComponent for ScanSensorConfig {
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ScanSensorRecord {
     last_time: Option<f32>,
-    frame: FrameRecord,
 }
 
 #[cfg(feature = "gui")]
 impl UIComponent for ScanSensorRecord {
-    fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
+    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
         ui.label(format!(
             "Last time: {}",
             match self.last_time {
@@ -517,7 +484,6 @@ impl UIComponent for ScanSensorRecord {
                 None => "None".to_string(),
             }
         ));
-        self.frame.show(ui, ctx, unique_id);
     }
 }
 
@@ -532,8 +498,18 @@ pub struct ScanObservation {
     pub radial_velocities: Vec<f32>,
     /// Fault configurations applied to produce this observation.
     pub applied_faults: Vec<ScanSensorFaultModelConfig>,
-    /// Frame of the observation with respect to the robot frame.
-    pub frame: Frame,
+}
+
+impl ScanObservation {
+    /// Constructs a [`ScanObservation`] from a [`ScanObservationRecord`].
+    pub fn from_record(record: &ScanObservationRecord) -> Self {
+        Self {
+            distances: record.distances.clone(),
+            angles: record.angles.clone(),
+            radial_velocities: record.radial_velocities.clone(),
+            applied_faults: record.applied_faults.clone(),
+        }
+    }
 }
 
 impl Iterator for ScanObservation {
@@ -554,19 +530,19 @@ impl Iterator for ScanObservation {
 }
 
 impl Recordable<ScanObservationRecord> for ScanObservation {
-    fn record(&self, context: &Context) -> ScanObservationRecord {
+    fn record(&self, _context: &Context) -> ScanObservationRecord {
         ScanObservationRecord {
             distances: self.distances.clone(),
             angles: self.angles.clone(),
             radial_velocities: self.radial_velocities.clone(),
             applied_faults: self.applied_faults.clone(),
-            frame: self.frame.record(context),
         }
     }
 }
 
 /// Serializable record representation of [`ScanObservation`].
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[config_derives]
+#[derive(Default)]
 pub struct ScanObservationRecord {
     /// Recorded distance values.
     pub distances: Vec<f32>,
@@ -576,13 +552,11 @@ pub struct ScanObservationRecord {
     pub radial_velocities: Vec<f32>,
     /// Fault configurations applied at observation generation time.
     pub applied_faults: Vec<ScanSensorFaultModelConfig>,
-    /// Frame of the observation with respect to the robot frame.
-    pub frame: FrameRecord,
 }
 
 #[cfg(feature = "gui")]
 impl UIComponent for ScanObservationRecord {
-    fn show(&self, ui: &mut egui::Ui, ctx: &egui::Context, unique_id: &str) {
+    fn show(&self, ui: &mut egui::Ui, _ctx: &egui::Context, _unique_id: &str) {
         ui.vertical(|ui| {
             ui.label(format!("Distances: {:?}", self.distances));
             ui.label(format!("Angles: {:?}", self.angles));
@@ -595,7 +569,6 @@ impl UIComponent for ScanObservationRecord {
                     ui.label(format!("{:?}", fault));
                 }
             }
-            self.frame.show(ui, ctx, unique_id);
         });
     }
 }
@@ -611,7 +584,6 @@ pub struct ScanSensor {
     faults: Vec<FaultModelTypeScanSensor>,
     filters: Vec<ScanSensorFilterType>,
     last_time: Option<f32>,
-    frame: Frame,
 }
 
 impl ScanSensor {
@@ -672,19 +644,17 @@ impl ScanSensor {
                         context,
                     ))
                 }
-                ScanSensorFaultModelConfig::Python(cfg) => FaultModelTypeScanSensor::Python(
-                    PythonFaultModel::from_config(cfg, global_config, initial_time, context)?,
+                ScanSensorFaultModelConfig::Plugin(cfg) => FaultModelTypeScanSensor::Plugin(
+                    plugin_api
+                        .as_ref()
+                        .ok_or_else(|| {
+                            SimusaError::new(
+                                SimusaErrorTypes::PluginAPIError,
+                                "Plugin API is not available.".to_string(),
+                            )
+                        })?
+                        .get_sensor_fault(cfg, global_config, va_factory, initial_time, context),
                 ),
-                ScanSensorFaultModelConfig::External(cfg) => {
-                    FaultModelTypeScanSensor::External(ExternalFault::from_config(
-                        cfg,
-                        plugin_api,
-                        global_config,
-                        va_factory,
-                        initial_time,
-                        context,
-                    )?)
-                }
             });
         }
 
@@ -694,19 +664,17 @@ impl ScanSensor {
                 ScanSensorFilterConfig::Range(cfg) => ScanSensorFilterType::Range(
                     RangeFilter::from_config(cfg, initial_time, context),
                 ),
-                ScanSensorFilterConfig::Python(cfg) => ScanSensorFilterType::Python(
-                    PythonFilter::from_config(cfg, global_config, initial_time, context)?,
+                ScanSensorFilterConfig::Plugin(cfg) => ScanSensorFilterType::Plugin(
+                    plugin_api
+                        .as_ref()
+                        .ok_or_else(|| {
+                            SimusaError::new(
+                                SimusaErrorTypes::PluginAPIError,
+                                "Plugin API is not available.".to_string(),
+                            )
+                        })?
+                        .get_sensor_filter(cfg, global_config, va_factory, initial_time, context),
                 ),
-                ScanSensorFilterConfig::External(cfg) => {
-                    ScanSensorFilterType::External(ExternalFilter::from_config(
-                        cfg,
-                        plugin_api,
-                        global_config,
-                        va_factory,
-                        initial_time,
-                        context,
-                    )?)
-                }
             });
         }
 
@@ -721,7 +689,6 @@ impl ScanSensor {
             faults: fault_models,
             filters,
             last_time: None,
-            frame: Frame::from_config(&config.frame),
         })
     }
 }
@@ -753,6 +720,7 @@ impl Sensor for ScanSensor {
         &mut self,
         node: &mut Node,
         time: f32,
+        frame: &Frame,
         context: &Context,
     ) -> Vec<SensorObservation> {
         if let Some(last_time) = self.last_time
@@ -764,11 +732,11 @@ impl Sensor for ScanSensor {
 
         let state = if let Some(arc_physics) = node.physics() {
             let physics = arc_physics.read().unwrap();
-            physics.state(time, context).clone()
+            physics.state(time, context).unwrap()
         } else {
             State::new() // 0
         };
-        let attached_frame = self.frame.attach_to_state(&state);
+        let attached_frame = frame.attach_to_state(&state);
         let state = attached_frame.state();
         let position = state.pose.fixed_rows::<2>(0).into_owned();
 
@@ -778,7 +746,7 @@ impl Sensor for ScanSensor {
                 &position,
                 Some(self.height),
                 self.detection_distance,
-                Some(format!("{}-{}", node.name(), self.frame.transform())),
+                Some(format!("{}-{}", node.name(), frame.transform())),
                 context,
             )
             .into_iter()
@@ -823,10 +791,7 @@ impl Sensor for ScanSensor {
             }
         }
 
-        let mut observation = ScanObservation {
-            frame: self.frame.clone(),
-            ..Default::default()
-        };
+        let mut observation = ScanObservation::default();
         // Ray casting
         for ray in &self.rays {
             let world_ray_angle = state.pose.z + ray;
@@ -891,8 +856,7 @@ impl Sensor for ScanSensor {
         for filter in &self.filters {
             if let Some(obs) = keep_observation {
                 keep_observation = match filter {
-                    ScanSensorFilterType::Python(f) => f.filter(time, obs, state, None, context),
-                    ScanSensorFilterType::External(f) => f.filter(time, obs, state, None, context),
+                    ScanSensorFilterType::Plugin(f) => f.filter(time, obs, state, None, context),
                     ScanSensorFilterType::Range(f) => {
                         if let SensorObservation::Scan(obs) = obs {
                             let mut obs = obs;
@@ -939,15 +903,7 @@ impl Sensor for ScanSensor {
             let mut observations = vec![filtered_observation];
             for fault_model in self.faults.iter_mut() {
                 match fault_model {
-                    FaultModelTypeScanSensor::Python(f) => f.add_faults(
-                        time,
-                        time,
-                        &mut observations,
-                        SensorObservation::Scan(ScanObservation::default()),
-                        node.environment(),
-                        context,
-                    ),
-                    FaultModelTypeScanSensor::External(f) => f.add_faults(
+                    FaultModelTypeScanSensor::Plugin(f) => f.add_faults(
                         time,
                         time,
                         &mut observations,
@@ -1340,10 +1296,9 @@ impl Sensor for ScanSensor {
 }
 
 impl Recordable<SensorRecord> for ScanSensor {
-    fn record(&self, context: &Context) -> SensorRecord {
+    fn record(&self, _context: &Context) -> SensorRecord {
         SensorRecord::ScanSensor(ScanSensorRecord {
             last_time: self.last_time,
-            frame: self.frame.record(context),
         })
     }
 }

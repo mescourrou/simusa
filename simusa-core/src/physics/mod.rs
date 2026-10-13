@@ -6,16 +6,11 @@
 //! Implementations may include perfect/internal physics, external plugin-backed physics,
 //! or Python-backed physics.
 
-pub mod external_physics;
 pub mod internal_physics;
-pub mod pybinds;
-pub mod python_physics;
-
 pub mod robot_models;
 
 pub mod fault_models;
 
-extern crate confy;
 use std::sync::{Arc, RwLock};
 
 use config_checker::*;
@@ -28,12 +23,8 @@ pub enum PhysicsConfig {
     /// Built-in Rust internal physics implementation.
     #[check]
     Internal(internal_physics::InternalPhysicConfig),
-    /// External plugin-provided physics implementation.
-    #[check]
-    External(external_physics::ExternalPhysicsConfig),
-    /// Python-backed physics implementation.
-    #[check]
-    Python(python_physics::PythonPhysicsConfig),
+    /// Plugin-provided physics implementation.
+    Plugin(crate::utils::GeneralValue),
 }
 
 #[cfg(feature = "gui")]
@@ -63,13 +54,7 @@ impl UIComponent for PhysicsConfig {
                     *self =
                         PhysicsConfig::Internal(internal_physics::InternalPhysicConfig::default())
                 }
-                "External" => {
-                    *self =
-                        PhysicsConfig::External(external_physics::ExternalPhysicsConfig::default())
-                }
-                "Python" => {
-                    *self = PhysicsConfig::Python(python_physics::PythonPhysicsConfig::default())
-                }
+                "Plugin" => *self = PhysicsConfig::Plugin(crate::utils::GeneralValue::default()),
                 _ => panic!("Where did you find this value?"),
             };
         }
@@ -82,21 +67,13 @@ impl UIComponent for PhysicsConfig {
                 current_node_name,
                 unique_id,
             ),
-            PhysicsConfig::External(c) => c.show_mut(
+            PhysicsConfig::Plugin(c) => edit_plugin_config(
                 ui,
-                ctx,
-                buffer_stack,
-                global_config,
-                current_node_name,
+                "Plugin Physics",
+                "plugin-physics",
                 unique_id,
-            ),
-            PhysicsConfig::Python(c) => c.show_mut(
-                ui,
-                ctx,
                 buffer_stack,
-                global_config,
-                current_node_name,
-                unique_id,
+                c,
             ),
         }
     }
@@ -107,8 +84,7 @@ impl UIComponent for PhysicsConfig {
         });
         match self {
             PhysicsConfig::Internal(c) => c.show(ui, ctx, unique_id),
-            PhysicsConfig::External(c) => c.show(ui, ctx, unique_id),
-            PhysicsConfig::Python(c) => c.show(ui, ctx, unique_id),
+            PhysicsConfig::Plugin(c) => show_plugin_config(ui, "Plugin Physics", c),
         }
     }
 }
@@ -118,10 +94,8 @@ impl UIComponent for PhysicsConfig {
 pub enum PhysicsRecord {
     /// Record emitted by internal physics.
     Internal(internal_physics::InternalPhysicsRecord),
-    /// Record emitted by external physics.
-    External(external_physics::ExternalPhysicsRecord),
-    /// Record emitted by Python physics.
-    Python(python_physics::PythonPhysicsRecord),
+    /// Record emitted by plugin physics.
+    Plugin(crate::utils::GeneralValue),
 }
 
 impl PhysicsRecord {
@@ -130,8 +104,7 @@ impl PhysicsRecord {
     /// For external and Python records, this currently returns `[0.0, 0.0, 0.0]`.
     pub fn pose(&self) -> [f32; 3] {
         match self {
-            Self::External(_) => [0., 0., 0.], // TODO: Find a way to get info from external record
-            Self::Python(_) => [0., 0., 0.],   // TODO: Find a way to get info from external record
+            Self::Plugin(_) => [0., 0., 0.], // TODO: Find a way to get info from plugin record
             Self::Internal(p) => p.state.pose,
         }
     }
@@ -146,33 +119,27 @@ impl UIComponent for PhysicsRecord {
                     r.show(ui, ctx, unique_id);
                 });
             }
-            Self::External(r) => {
-                egui::CollapsingHeader::new("ExternalPhysics").show(ui, |ui| {
-                    r.show(ui, ctx, unique_id);
-                });
-            }
-            Self::Python(r) => {
-                egui::CollapsingHeader::new("ExternalPythonPhysics").show(ui, |ui| {
-                    r.show(ui, ctx, unique_id);
-                });
-            }
+            Self::Plugin(r) => show_plugin_config(ui, "Plugin Physics", r),
         });
     }
 }
 
 use crate::{
     context::Context,
-    errors::SimusaResult,
+    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
     node::{Node, node_factory::FromConfigArguments},
     physics::robot_models::Command,
     recordable::Recordable,
-    simulator::SimulatorConfig,
     state_estimators::State,
     utils::SharedRwLock,
 };
 #[cfg(feature = "gui")]
 use crate::{
-    gui::{UIComponent, utils::string_combobox},
+    gui::{
+        UIComponent,
+        utils::{edit_plugin_config, show_plugin_config, string_combobox},
+    },
+    simulator::SimulatorConfig,
     utils::enum_tools::ToVec,
 };
 
@@ -215,7 +182,9 @@ pub trait Physics:
     /// Get the current real state, the groundtruth.
     ///
     /// `context` can be used for logging or diagnostics while retrieving the state.
-    fn state(&self, time: f32, context: &Context) -> State;
+    ///
+    /// Optional: return None if the state is not available at the current time (e.g., if the node is terminated).
+    fn state(&self, time: f32, context: &Context) -> Option<State>;
 
     /// Optional: return the time of the next time step. Needed if using messages
     #[allow(unused_variables)]
@@ -237,23 +206,24 @@ pub fn make_physics_from_config(
     Ok(Arc::new(RwLock::new(match &config {
         PhysicsConfig::Internal(c) => Box::new(internal_physics::InternalPhysics::from_config(
             c,
-            from_config_args.node_name,
-            from_config_args.va_factory,
-            from_config_args.initial_time,
-            from_config_args.context,
-        )) as Box<dyn Physics>,
-        PhysicsConfig::External(c) => Box::new(external_physics::ExternalPhysics::from_config(
-            c,
             from_config_args,
-        )?),
-        PhysicsConfig::Python(c) => Box::new(
-            python_physics::PythonPhysics::from_config(
+        )?) as Box<dyn Physics>,
+        PhysicsConfig::Plugin(c) => from_config_args
+            .plugin_api
+            .as_ref()
+            .ok_or_else(|| {
+                SimusaError::new(
+                    SimusaErrorTypes::PluginAPIError,
+                    "Plugin API not set!".to_string(),
+                )
+            })?
+            .get_physics(
                 c,
                 from_config_args.global_config,
+                from_config_args.va_factory,
+                from_config_args.network,
                 from_config_args.initial_time,
                 from_config_args.context,
-            )
-            .unwrap(),
-        ),
+            ),
     })))
 }

@@ -22,91 +22,33 @@ use pyo3::{exceptions::PyTypeError, prelude::*};
 use simusa_com::pub_sub::{MultiClientTrait, PathKey};
 use simusa_macros::EnumToString;
 
-#[cfg(feature = "gui")]
-use crate::api::async_api::PluginAsyncAPI;
-
-use crate::{
+use simusa::{
     context::Context,
-    controllers::{ControllerError, pybinds::ControllerWrapper},
     debug, error, info,
-    navigators::pybinds::NavigatorWrapper,
-    networking::{
-        network::{Envelope, MessageFlag, Network},
-        pybinds::MessageTypesWrapper,
-    },
+    networking::network::{Envelope, Network},
     node::Node,
-    physics::{
-        pybinds::PhysicsWrapper,
-        robot_models::{Command, holonomic::HolonomicCommand, unicycle::UnicycleCommand},
-    },
+    physics::robot_models::{Command, holonomic::HolonomicCommand, unicycle::UnicycleCommand},
     plugin_api::PluginAPI,
-    pybinds::PythonAPI,
     sensors::{
         Observation, SensorObservation, displacement_sensor::DisplacementObservation,
         gnss_sensor::GNSSObservation, oriented_landmark_sensor::OrientedLandmarkObservation,
         robot_sensor::OrientedRobotObservation, speed_sensor::SpeedObservation,
     },
-    simulator::{AsyncSimulator, Simulator, SimusaBrokerMultiClient},
-    state_estimators::{State, WorldState, pybinds::StateEstimatorWrapper},
+    simulator::{AsyncSimulator, SimusaBrokerMultiClient},
+    state_estimators::{State, WorldState},
     utils::{frame::Frame, occupancy_grid::OccupancyGrid},
     warning,
 };
 
-#[derive(Clone, Debug)]
-#[pyclass(get_all, set_all)]
-#[pyo3(name = "ControllerError")]
-/// Python wrapper around controller tracking error values.
-pub struct ControllerErrorWrapper {
-    /// Lateral error (y axis).
-    pub lateral: f32,
-    /// Longitudinal error (x axis).
-    pub longitudinal: f32,
-    /// Orientation error.
-    pub theta: f32,
-    /// Velocity error.
-    pub velocity: f32,
-}
-
-#[pymethods]
-impl ControllerErrorWrapper {
-    /// Create a zero-initialized controller error.
-    #[new]
-    pub fn new() -> Self {
-        Self {
-            lateral: 0.,
-            longitudinal: 0.,
-            theta: 0.,
-            velocity: 0.,
-        }
-    }
-}
-impl ControllerErrorWrapper {
-    /// Convert from the Rust [`ControllerError`] type.
-    pub fn from_rust(ce: &ControllerError) -> Self {
-        Self {
-            lateral: ce.lateral,
-            theta: ce.theta,
-            velocity: ce.velocity,
-            longitudinal: ce.longitudinal,
-        }
-    }
-
-    /// Convert this wrapper to the Rust [`ControllerError`] type.
-    pub fn to_rust(&self) -> ControllerError {
-        ControllerError {
-            lateral: self.lateral,
-            longitudinal: self.longitudinal,
-            theta: self.theta,
-            velocity: self.velocity,
-        }
-    }
-}
-
-impl Default for ControllerErrorWrapper {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+use crate::{
+    controllers::ControllerWrapper,
+    general::{PythonAPI, impl_from_plain_with_from_ref},
+    messages::MessageFlagWrapper,
+    navigators::NavigatorWrapper,
+    networking::MessageTypeWrapper,
+    physics::PhysicsWrapper,
+    state_estimators::StateEstimatorWrapper,
+};
 
 #[pyclass(get_all, set_all)]
 #[pyo3(name = "Pose")]
@@ -176,9 +118,9 @@ impl StateWrapper {
     }
 }
 
-impl StateWrapper {
+impl From<&State> for StateWrapper {
     /// Convert from the Rust [`State`] type.
-    pub fn from_rust(s: &State) -> Self {
+    fn from(s: &State) -> Self {
         Self {
             pose: Pose {
                 x: s.pose[0],
@@ -192,14 +134,20 @@ impl StateWrapper {
             },
         }
     }
+}
+
+impl_from_plain_with_from_ref!(State, StateWrapper);
+
+impl From<&StateWrapper> for State {
     /// Convert this wrapper to the Rust [`State`] type.
-    pub fn to_rust(&self) -> State {
+    fn from(value: &StateWrapper) -> State {
         State {
-            pose: SVector::from_vec(vec![self.pose.x, self.pose.y, self.pose.theta]),
-            velocity: SVector::from_vec(vec![self.velocity.x, self.velocity.y, self.velocity.z]),
+            pose: SVector::from_vec(vec![value.pose.x, value.pose.y, value.pose.theta]),
+            velocity: SVector::from_vec(vec![value.velocity.x, value.velocity.y, value.velocity.z]),
         }
     }
 }
+impl_from_plain_with_from_ref!(StateWrapper, State);
 
 impl Default for StateWrapper {
     fn default() -> Self {
@@ -236,48 +184,46 @@ impl WorldStateWrapper {
     }
 }
 
-impl WorldStateWrapper {
+impl From<&WorldState> for WorldStateWrapper {
     /// Convert from the Rust [`WorldState`] type.
-    pub fn from_rust(s: &WorldState) -> Self {
+    fn from(s: &WorldState) -> Self {
         Self {
-            ego: s.ego.as_ref().map(StateWrapper::from_rust),
+            ego: s.ego.as_ref().map(StateWrapper::from),
             landmarks: BTreeMap::from_iter(
                 s.landmarks
                     .iter()
-                    .map(|(id, s)| (*id, StateWrapper::from_rust(s))),
+                    .map(|(id, s)| (*id, StateWrapper::from(s))),
             ),
             objects: BTreeMap::from_iter(
                 s.objects
                     .iter()
-                    .map(|(id, s)| (id.clone(), StateWrapper::from_rust(s))),
+                    .map(|(id, s)| (id.clone(), StateWrapper::from(s))),
             ),
-            occupancy_grid: s
-                .occupancy_grid
-                .as_ref()
-                .map(OccupancyGridWrapper::from_rust),
-        }
-    }
-    /// Convert this wrapper to the Rust [`WorldState`] type.
-    pub fn to_rust(&self) -> WorldState {
-        WorldState {
-            ego: self.ego.as_ref().map(StateWrapper::to_rust),
-            landmarks: BTreeMap::from_iter(
-                self.landmarks
-                    .iter()
-                    .map(|(id, s)| (*id, StateWrapper::to_rust(s))),
-            ),
-            objects: BTreeMap::from_iter(
-                self.objects
-                    .iter()
-                    .map(|(id, s)| (id.clone(), StateWrapper::to_rust(s))),
-            ),
-            occupancy_grid: self
-                .occupancy_grid
-                .as_ref()
-                .map(OccupancyGridWrapper::to_rust),
+            occupancy_grid: s.occupancy_grid.as_ref().map(OccupancyGridWrapper::from),
         }
     }
 }
+impl_from_plain_with_from_ref!(WorldState, WorldStateWrapper);
+
+impl From<&WorldStateWrapper> for WorldState {
+    /// Convert this wrapper to the Rust [`WorldState`] type.
+    fn from(value: &WorldStateWrapper) -> WorldState {
+        WorldState {
+            ego: value.ego.as_ref().map(State::from),
+            landmarks: BTreeMap::from_iter(
+                value.landmarks.iter().map(|(id, s)| (*id, State::from(s))),
+            ),
+            objects: BTreeMap::from_iter(
+                value
+                    .objects
+                    .iter()
+                    .map(|(id, s)| (id.clone(), State::from(s))),
+            ),
+            occupancy_grid: value.occupancy_grid.as_ref().map(OccupancyGrid::from),
+        }
+    }
+}
+impl_from_plain_with_from_ref!(WorldStateWrapper, WorldState);
 
 impl Default for WorldStateWrapper {
     fn default() -> Self {
@@ -350,17 +296,21 @@ impl OccupancyGridWrapper {
     }
 }
 
-impl OccupancyGridWrapper {
+impl From<&OccupancyGrid> for OccupancyGridWrapper {
     /// Clone a Rust [`OccupancyGrid`] into its Python wrapper.
-    pub fn from_rust(s: &OccupancyGrid) -> Self {
+    fn from(s: &OccupancyGrid) -> Self {
         Self { grid: s.clone() }
     }
+}
+impl_from_plain_with_from_ref!(OccupancyGrid, OccupancyGridWrapper);
 
+impl From<&OccupancyGridWrapper> for OccupancyGrid {
     /// Clone this wrapper back to a Rust [`OccupancyGrid`].
-    pub fn to_rust(&self) -> OccupancyGrid {
-        self.grid.clone()
+    fn from(value: &OccupancyGridWrapper) -> OccupancyGrid {
+        value.grid.clone()
     }
 }
+impl_from_plain_with_from_ref!(OccupancyGridWrapper, OccupancyGrid);
 
 #[derive(Clone, Debug)]
 #[pyclass(get_all, set_all)]
@@ -379,8 +329,6 @@ pub struct OrientedLandmarkObservationWrapper {
     pub width: f32,
     /// Height of the landmark
     pub height: f32,
-    /// Frame of the sensor
-    pub frame: Pose,
 }
 
 #[pymethods]
@@ -399,18 +347,13 @@ impl OrientedLandmarkObservationWrapper {
             width: 0.,
             height: 1.,
             applied_faults: "[]".to_string(),
-            frame: Pose {
-                x: 0.,
-                y: 0.,
-                theta: 0.,
-            },
         }
     }
 }
 
-impl OrientedLandmarkObservationWrapper {
+impl From<&OrientedLandmarkObservation> for OrientedLandmarkObservationWrapper {
     /// Convert from the Rust [`OrientedLandmarkObservation`] type.
-    pub fn from_rust(s: &OrientedLandmarkObservation) -> Self {
+    fn from(s: &OrientedLandmarkObservation) -> Self {
         Self {
             id: s.id,
             labels: s.labels.clone(),
@@ -422,26 +365,31 @@ impl OrientedLandmarkObservationWrapper {
             applied_faults: serde_json::to_string(&s.applied_faults).unwrap(),
             width: s.width,
             height: s.height,
-            frame: Pose {
-                x: s.frame.transform().translation.x,
-                y: s.frame.transform().translation.y,
-                theta: s.frame.transform().rotation.angle(),
-            },
-        }
-    }
-    /// Convert this wrapper to the Rust [`OrientedLandmarkObservation`] type.
-    pub fn to_rust(&self) -> OrientedLandmarkObservation {
-        OrientedLandmarkObservation {
-            id: self.id,
-            labels: self.labels.clone(),
-            pose: SVector::from_vec(vec![self.pose.x, self.pose.y, self.pose.theta]),
-            applied_faults: serde_json::from_str(&self.applied_faults).unwrap(),
-            width: self.width,
-            height: self.height,
-            frame: Frame::new(self.frame.x, self.frame.y, self.frame.theta),
         }
     }
 }
+impl_from_plain_with_from_ref!(
+    OrientedLandmarkObservation,
+    OrientedLandmarkObservationWrapper
+);
+
+impl From<&OrientedLandmarkObservationWrapper> for OrientedLandmarkObservation {
+    /// Convert this wrapper to the Rust [`OrientedLandmarkObservation`] type.
+    fn from(value: &OrientedLandmarkObservationWrapper) -> OrientedLandmarkObservation {
+        OrientedLandmarkObservation {
+            id: value.id,
+            labels: value.labels.clone(),
+            pose: SVector::from_vec(vec![value.pose.x, value.pose.y, value.pose.theta]),
+            applied_faults: serde_json::from_str(&value.applied_faults).unwrap(),
+            width: value.width,
+            height: value.height,
+        }
+    }
+}
+impl_from_plain_with_from_ref!(
+    OrientedLandmarkObservationWrapper,
+    OrientedLandmarkObservation
+);
 
 impl Default for OrientedLandmarkObservationWrapper {
     fn default() -> Self {
@@ -462,8 +410,6 @@ pub struct SpeedObservationWrapper {
     pub angular_velocity: f32,
     /// Applied faults in JSON format
     pub applied_faults: String,
-    /// Frame of the sensor
-    pub frame: Pose,
 }
 
 #[pymethods]
@@ -476,41 +422,35 @@ impl SpeedObservationWrapper {
             lateral_velocity: 0.,
             angular_velocity: 0.,
             applied_faults: "[]".to_string(),
-            frame: Pose {
-                x: 0.,
-                y: 0.,
-                theta: 0.,
-            },
         }
     }
 }
 
-impl SpeedObservationWrapper {
+impl From<&SpeedObservation> for SpeedObservationWrapper {
     /// Convert from the Rust [`SpeedObservation`] type.
-    pub fn from_rust(s: &SpeedObservation) -> Self {
+    fn from(s: &SpeedObservation) -> Self {
         Self {
             linear_velocity: s.linear_velocity,
             lateral_velocity: s.lateral_velocity,
             angular_velocity: s.angular_velocity,
             applied_faults: serde_json::to_string(&s.applied_faults).unwrap(),
-            frame: Pose {
-                x: s.frame.transform().translation.x,
-                y: s.frame.transform().translation.y,
-                theta: s.frame.transform().rotation.angle(),
-            },
-        }
-    }
-    /// Convert this wrapper to the Rust [`SpeedObservation`] type.
-    pub fn to_rust(&self) -> SpeedObservation {
-        SpeedObservation {
-            linear_velocity: self.linear_velocity,
-            lateral_velocity: self.lateral_velocity,
-            angular_velocity: self.angular_velocity,
-            applied_faults: serde_json::from_str(&self.applied_faults).unwrap(),
-            frame: Frame::new(self.frame.x, self.frame.y, self.frame.theta),
         }
     }
 }
+impl_from_plain_with_from_ref!(SpeedObservation, SpeedObservationWrapper);
+
+impl From<&SpeedObservationWrapper> for SpeedObservation {
+    /// Convert this wrapper to the Rust [`SpeedObservation`] type.
+    fn from(value: &SpeedObservationWrapper) -> SpeedObservation {
+        SpeedObservation {
+            linear_velocity: value.linear_velocity,
+            lateral_velocity: value.lateral_velocity,
+            angular_velocity: value.angular_velocity,
+            applied_faults: serde_json::from_str(&value.applied_faults).unwrap(),
+        }
+    }
+}
+impl_from_plain_with_from_ref!(SpeedObservationWrapper, SpeedObservation);
 
 impl Default for SpeedObservationWrapper {
     fn default() -> Self {
@@ -529,8 +469,6 @@ pub struct GNSSObservationWrapper {
     pub velocity: Vec2,
     /// Applied faults in JSON format
     pub applied_faults: String,
-    /// Frame of the sensor
-    pub frame: Pose,
 }
 
 #[pymethods]
@@ -546,19 +484,13 @@ impl GNSSObservationWrapper {
             },
             velocity: Vec2 { x: 0., y: 0. },
             applied_faults: "[]".to_string(),
-            frame: Pose {
-                x: 0.,
-                y: 0.,
-                theta: 0.,
-            },
         }
     }
 }
 
-impl GNSSObservationWrapper {
+impl From<&GNSSObservation> for GNSSObservationWrapper {
     /// Convert from the Rust [`GNSSObservation`] type.
-    pub fn from_rust(s: &GNSSObservation) -> Self {
-        let frame = s.frame.transform();
+    fn from(s: &GNSSObservation) -> Self {
         Self {
             pose: Vec3 {
                 x: s.pose[0],
@@ -570,23 +502,22 @@ impl GNSSObservationWrapper {
                 y: s.velocity[1],
             },
             applied_faults: serde_json::to_string(&s.applied_faults).unwrap(),
-            frame: Pose {
-                x: frame.translation.x,
-                y: frame.translation.y,
-                theta: frame.rotation.angle(),
-            },
-        }
-    }
-    /// Convert this wrapper to the Rust [`GNSSObservation`] type.
-    pub fn to_rust(&self) -> GNSSObservation {
-        GNSSObservation {
-            pose: Vector3::from_vec(vec![self.pose.x, self.pose.y, self.pose.z]),
-            velocity: Vector2::from_vec(vec![self.velocity.x, self.velocity.y]),
-            applied_faults: serde_json::from_str(&self.applied_faults).unwrap(),
-            frame: Frame::new(self.frame.x, self.frame.y, self.frame.theta),
         }
     }
 }
+impl_from_plain_with_from_ref!(GNSSObservation, GNSSObservationWrapper);
+
+impl From<&GNSSObservationWrapper> for GNSSObservation {
+    /// Convert this wrapper to the Rust [`GNSSObservation`] type.
+    fn from(value: &GNSSObservationWrapper) -> GNSSObservation {
+        GNSSObservation {
+            pose: Vector3::from_vec(vec![value.pose.x, value.pose.y, value.pose.z]),
+            velocity: Vector2::from_vec(vec![value.velocity.x, value.velocity.y]),
+            applied_faults: serde_json::from_str(&value.applied_faults).unwrap(),
+        }
+    }
+}
+impl_from_plain_with_from_ref!(GNSSObservationWrapper, GNSSObservation);
 
 impl Default for GNSSObservationWrapper {
     fn default() -> Self {
@@ -605,8 +536,6 @@ pub struct DisplacementObservationWrapper {
     pub rotation: f32,
     /// Applied faults in JSON format
     pub applied_faults: String,
-    /// Frame of the sensor
-    pub frame: Pose,
 }
 
 #[pymethods]
@@ -618,18 +547,13 @@ impl DisplacementObservationWrapper {
             translation: Vec2 { x: 0., y: 0. },
             rotation: 0.,
             applied_faults: "[]".to_string(),
-            frame: Pose {
-                x: 0.,
-                y: 0.,
-                theta: 0.,
-            },
         }
     }
 }
 
-impl DisplacementObservationWrapper {
+impl From<&DisplacementObservation> for DisplacementObservationWrapper {
     /// Convert from the Rust [`DisplacementObservation`] type.
-    pub fn from_rust(s: &DisplacementObservation) -> Self {
+    fn from(s: &DisplacementObservation) -> Self {
         Self {
             translation: Vec2 {
                 x: s.translation[0],
@@ -637,23 +561,22 @@ impl DisplacementObservationWrapper {
             },
             rotation: s.rotation,
             applied_faults: serde_json::to_string(&s.applied_faults).unwrap(),
-            frame: Pose {
-                x: s.frame.transform().translation.x,
-                y: s.frame.transform().translation.y,
-                theta: s.frame.transform().rotation.angle(),
-            },
-        }
-    }
-    /// Convert this wrapper to the Rust [`DisplacementObservation`] type.
-    pub fn to_rust(&self) -> DisplacementObservation {
-        DisplacementObservation {
-            translation: Vector2::from_vec(vec![self.translation.x, self.translation.y]),
-            rotation: self.rotation,
-            applied_faults: serde_json::from_str(&self.applied_faults).unwrap(),
-            frame: Frame::new(self.frame.x, self.frame.y, self.frame.theta),
         }
     }
 }
+impl_from_plain_with_from_ref!(DisplacementObservation, DisplacementObservationWrapper);
+
+impl From<&DisplacementObservationWrapper> for DisplacementObservation {
+    /// Convert this wrapper to the Rust [`DisplacementObservation`] type.
+    fn from(value: &DisplacementObservationWrapper) -> DisplacementObservation {
+        DisplacementObservation {
+            translation: Vector2::from_vec(vec![value.translation.x, value.translation.y]),
+            rotation: value.rotation,
+            applied_faults: serde_json::from_str(&value.applied_faults).unwrap(),
+        }
+    }
+}
+impl_from_plain_with_from_ref!(DisplacementObservationWrapper, DisplacementObservation);
 
 impl Default for DisplacementObservationWrapper {
     fn default() -> Self {
@@ -674,8 +597,6 @@ pub struct OrientedRobotObservationWrapper {
     pub pose: Pose,
     /// Applied faults in JSON format
     pub applied_faults: String,
-    /// Frame of the sensor
-    pub frame: Pose,
 }
 
 #[pymethods]
@@ -692,18 +613,13 @@ impl OrientedRobotObservationWrapper {
                 theta: 0.,
             },
             applied_faults: "[]".to_string(),
-            frame: Pose {
-                x: 0.,
-                y: 0.,
-                theta: 0.,
-            },
         }
     }
 }
 
-impl OrientedRobotObservationWrapper {
+impl From<&OrientedRobotObservation> for OrientedRobotObservationWrapper {
     /// Convert from the Rust [`OrientedRobotObservation`] type.
-    pub fn from_rust(s: &OrientedRobotObservation) -> Self {
+    fn from(s: &OrientedRobotObservation) -> Self {
         Self {
             name: s.name.clone(),
             labels: s.labels.clone(),
@@ -713,24 +629,23 @@ impl OrientedRobotObservationWrapper {
                 theta: s.pose[2],
             },
             applied_faults: serde_json::to_string(&s.applied_faults).unwrap(),
-            frame: Pose {
-                x: s.frame.transform().translation.x,
-                y: s.frame.transform().translation.y,
-                theta: s.frame.transform().rotation.angle(),
-            },
-        }
-    }
-    /// Convert this wrapper to the Rust [`OrientedRobotObservation`] type.
-    pub fn to_rust(&self) -> OrientedRobotObservation {
-        OrientedRobotObservation {
-            name: self.name.clone(),
-            labels: self.labels.clone(),
-            pose: SVector::from_vec(vec![self.pose.x, self.pose.y, self.pose.theta]),
-            applied_faults: serde_json::from_str(&self.applied_faults).unwrap(),
-            frame: Frame::new(self.frame.x, self.frame.y, self.frame.theta),
         }
     }
 }
+impl_from_plain_with_from_ref!(OrientedRobotObservation, OrientedRobotObservationWrapper);
+
+impl From<&OrientedRobotObservationWrapper> for OrientedRobotObservation {
+    /// Convert this wrapper to the Rust [`OrientedRobotObservation`] type.
+    fn from(value: &OrientedRobotObservationWrapper) -> OrientedRobotObservation {
+        OrientedRobotObservation {
+            name: value.name.clone(),
+            labels: value.labels.clone(),
+            pose: SVector::from_vec(vec![value.pose.x, value.pose.y, value.pose.theta]),
+            applied_faults: serde_json::from_str(&value.applied_faults).unwrap(),
+        }
+    }
+}
+impl_from_plain_with_from_ref!(OrientedRobotObservationWrapper, OrientedRobotObservation);
 
 impl Default for OrientedRobotObservationWrapper {
     fn default() -> Self {
@@ -825,50 +740,57 @@ impl SensorObservationWrapper {
     }
 }
 
-impl SensorObservationWrapper {
+impl From<&SensorObservation> for SensorObservationWrapper {
     /// Convert from the Rust [`SensorObservation`] type.
-    pub fn from_rust(s: &SensorObservation) -> Self {
+    fn from(s: &SensorObservation) -> Self {
         match s {
             SensorObservation::GNSS(o) => {
-                SensorObservationWrapper::GNSS(GNSSObservationWrapper::from_rust(o))
+                SensorObservationWrapper::GNSS(GNSSObservationWrapper::from(o))
             }
             SensorObservation::Speed(o) => {
-                SensorObservationWrapper::Speed(SpeedObservationWrapper::from_rust(o))
+                SensorObservationWrapper::Speed(SpeedObservationWrapper::from(o))
             }
             SensorObservation::OrientedLandmark(o) => SensorObservationWrapper::OrientedLandmark(
-                OrientedLandmarkObservationWrapper::from_rust(o),
+                OrientedLandmarkObservationWrapper::from(o),
             ),
-            SensorObservation::OrientedRobot(o) => SensorObservationWrapper::OrientedRobot(
-                OrientedRobotObservationWrapper::from_rust(o),
-            ),
+            SensorObservation::OrientedRobot(o) => {
+                SensorObservationWrapper::OrientedRobot(OrientedRobotObservationWrapper::from(o))
+            }
             SensorObservation::Displacement(o) => {
-                SensorObservationWrapper::Displacement(DisplacementObservationWrapper::from_rust(o))
+                SensorObservationWrapper::Displacement(DisplacementObservationWrapper::from(o))
             }
             SensorObservation::Scan(_) => {
                 panic!("ScanObservation cannot be converted to SensorObservationWrapper yet");
             }
-            SensorObservation::External(_) => {
-                panic!("ExternalObservation cannot be converted to SensorObservationWrapper yet");
-            }
-        }
-    }
-    /// Convert this wrapper to the Rust [`SensorObservation`] type.
-    pub fn to_rust(&self) -> SensorObservation {
-        match self {
-            SensorObservationWrapper::GNSS(o) => SensorObservation::GNSS(o.to_rust()),
-            SensorObservationWrapper::Speed(o) => SensorObservation::Speed(o.to_rust()),
-            SensorObservationWrapper::OrientedLandmark(o) => {
-                SensorObservation::OrientedLandmark(o.to_rust())
-            }
-            SensorObservationWrapper::OrientedRobot(o) => {
-                SensorObservation::OrientedRobot(o.to_rust())
-            }
-            SensorObservationWrapper::Displacement(o) => {
-                SensorObservation::Displacement(o.to_rust())
+            SensorObservation::Plugin(_) => {
+                panic!("PluginObservation cannot be converted to SensorObservationWrapper yet");
             }
         }
     }
 }
+impl_from_plain_with_from_ref!(SensorObservation, SensorObservationWrapper);
+
+impl From<&SensorObservationWrapper> for SensorObservation {
+    /// Convert this wrapper to the Rust [`SensorObservation`] type.
+    fn from(value: &SensorObservationWrapper) -> SensorObservation {
+        match value {
+            SensorObservationWrapper::GNSS(o) => SensorObservation::GNSS(GNSSObservation::from(o)),
+            SensorObservationWrapper::Speed(o) => {
+                SensorObservation::Speed(SpeedObservation::from(o))
+            }
+            SensorObservationWrapper::OrientedLandmark(o) => {
+                SensorObservation::OrientedLandmark(OrientedLandmarkObservation::from(o))
+            }
+            SensorObservationWrapper::OrientedRobot(o) => {
+                SensorObservation::OrientedRobot(OrientedRobotObservation::from(o))
+            }
+            SensorObservationWrapper::Displacement(o) => {
+                SensorObservation::Displacement(DisplacementObservation::from(o))
+            }
+        }
+    }
+}
+impl_from_plain_with_from_ref!(SensorObservationWrapper, SensorObservation);
 
 impl Default for SensorObservationWrapper {
     fn default() -> Self {
@@ -889,6 +811,8 @@ pub struct ObservationWrapper {
     pub time: f32,
     /// Concrete sensor observation payload.
     pub sensor_observation: SensorObservationWrapper,
+    /// Frame of the sensor
+    pub frame: Pose,
 }
 
 #[pymethods]
@@ -901,30 +825,46 @@ impl ObservationWrapper {
             observer: "someone".to_string(),
             time: 0.,
             sensor_observation: SensorObservationWrapper::new(),
+            frame: Pose {
+                x: 0.,
+                y: 0.,
+                theta: 0.,
+            },
         }
     }
 }
 
-impl ObservationWrapper {
+impl From<&Observation> for ObservationWrapper {
     /// Convert from the Rust [`Observation`] type.
-    pub fn from_rust(s: &Observation) -> Self {
+    fn from(s: &Observation) -> Self {
         Self {
             sensor_name: s.sensor_name.clone(),
             observer: s.observer.clone(),
             time: s.time,
-            sensor_observation: SensorObservationWrapper::from_rust(&s.sensor_observation),
-        }
-    }
-    /// Convert this wrapper to the Rust [`Observation`] type.
-    pub fn to_rust(&self) -> Observation {
-        Observation {
-            sensor_name: self.sensor_name.clone(),
-            observer: self.observer.clone(),
-            time: self.time,
-            sensor_observation: self.sensor_observation.to_rust(),
+            sensor_observation: SensorObservationWrapper::from(&s.sensor_observation),
+            frame: Pose {
+                x: s.frame.transform().translation.x,
+                y: s.frame.transform().translation.y,
+                theta: s.frame.transform().rotation.angle(),
+            },
         }
     }
 }
+impl_from_plain_with_from_ref!(Observation, ObservationWrapper);
+
+impl From<&ObservationWrapper> for Observation {
+    /// Convert this wrapper to the Rust [`Observation`] type.
+    fn from(value: &ObservationWrapper) -> Observation {
+        Observation {
+            sensor_name: value.sensor_name.clone(),
+            observer: value.observer.clone(),
+            time: value.time,
+            sensor_observation: SensorObservation::from(&value.sensor_observation),
+            frame: Frame::new(value.frame.x, value.frame.y, value.frame.theta),
+        }
+    }
+}
+impl_from_plain_with_from_ref!(ObservationWrapper, Observation);
 
 impl Default for ObservationWrapper {
     fn default() -> Self {
@@ -999,31 +939,29 @@ impl Default for CommandWrapper {
     }
 }
 
-impl CommandWrapper {
+impl From<&Command> for CommandWrapper {
     /// Creates a [`CommandWrapper`] from its Rust counterpart [`Command`]
-    pub fn from_rust(s: &Command) -> Self {
+    fn from(s: &Command) -> Self {
         match s {
-            Command::Unicycle(cmd) => {
-                CommandWrapper::Unicycle(UnicycleCommandWrapper::from_rust(cmd))
-            }
+            Command::Unicycle(cmd) => CommandWrapper::Unicycle(UnicycleCommandWrapper::from(cmd)),
             Command::Holonomic(cmd) => {
-                CommandWrapper::Holonomic(HolonomicCommandWrapper::from_rust(cmd))
-            }
-        }
-    }
-
-    /// Converts the Python wrapper back to its Rust counterpart [`Command`]
-    pub fn to_rust(&self) -> Command {
-        match self {
-            CommandWrapper::Unicycle(cmd) => {
-                Command::Unicycle(UnicycleCommandWrapper::to_rust(cmd))
-            }
-            CommandWrapper::Holonomic(cmd) => {
-                Command::Holonomic(HolonomicCommandWrapper::to_rust(cmd))
+                CommandWrapper::Holonomic(HolonomicCommandWrapper::from(cmd))
             }
         }
     }
 }
+impl_from_plain_with_from_ref!(Command, CommandWrapper);
+
+impl From<&CommandWrapper> for Command {
+    /// Converts the Python wrapper back to its Rust counterpart [`Command`]
+    fn from(value: &CommandWrapper) -> Command {
+        match value {
+            CommandWrapper::Unicycle(cmd) => Command::Unicycle(UnicycleCommand::from(cmd)),
+            CommandWrapper::Holonomic(cmd) => Command::Holonomic(HolonomicCommand::from(cmd)),
+        }
+    }
+}
+impl_from_plain_with_from_ref!(CommandWrapper, Command);
 
 /// Wrapper around the [`UnicycleCommand`] to be used in Python.
 #[derive(Clone, Debug)]
@@ -1054,23 +992,27 @@ impl Default for UnicycleCommandWrapper {
     }
 }
 
-impl UnicycleCommandWrapper {
+impl From<&UnicycleCommand> for UnicycleCommandWrapper {
     /// Creates an [`UnicycleCommandWrapper`] from its Rust counterpart [`UnicycleCommand`]
-    pub fn from_rust(s: &UnicycleCommand) -> Self {
+    fn from(s: &UnicycleCommand) -> Self {
         Self {
             left_wheel_speed: s.left_wheel_speed,
             right_wheel_speed: s.right_wheel_speed,
         }
     }
+}
+impl_from_plain_with_from_ref!(UnicycleCommand, UnicycleCommandWrapper);
 
+impl From<&UnicycleCommandWrapper> for UnicycleCommand {
     /// Converts the Python wrapper back to its Rust counterpart [`UnicycleCommand`]
-    pub fn to_rust(&self) -> UnicycleCommand {
+    fn from(value: &UnicycleCommandWrapper) -> UnicycleCommand {
         UnicycleCommand {
-            left_wheel_speed: self.left_wheel_speed,
-            right_wheel_speed: self.right_wheel_speed,
+            left_wheel_speed: value.left_wheel_speed,
+            right_wheel_speed: value.right_wheel_speed,
         }
     }
 }
+impl_from_plain_with_from_ref!(UnicycleCommandWrapper, UnicycleCommand);
 
 /// Wrapper around the [`HolonomicCommand`] to be used in Python.
 #[derive(Clone, Debug)]
@@ -1104,25 +1046,27 @@ impl Default for HolonomicCommandWrapper {
     }
 }
 
-impl HolonomicCommandWrapper {
-    /// Creates an [`HolonomicCommandWrapper`] from its Rust counterpart [`HolonomicCommand`]
-    pub fn from_rust(s: &HolonomicCommand) -> Self {
+impl From<&HolonomicCommand> for HolonomicCommandWrapper {
+    fn from(s: &HolonomicCommand) -> Self {
         Self {
             longitudinal_velocity: s.longitudinal_velocity,
             lateral_velocity: s.lateral_velocity,
             angular_velocity: s.angular_velocity,
         }
     }
+}
+impl_from_plain_with_from_ref!(HolonomicCommand, HolonomicCommandWrapper);
 
-    /// Converts the Python wrapper back to its Rust counterpart [`HolonomicCommand`]
-    pub fn to_rust(&self) -> HolonomicCommand {
-        HolonomicCommand {
-            longitudinal_velocity: self.longitudinal_velocity,
-            lateral_velocity: self.lateral_velocity,
-            angular_velocity: self.angular_velocity,
+impl From<&HolonomicCommandWrapper> for HolonomicCommand {
+    fn from(value: &HolonomicCommandWrapper) -> Self {
+        Self {
+            longitudinal_velocity: value.longitudinal_velocity,
+            lateral_velocity: value.lateral_velocity,
+            angular_velocity: value.angular_velocity,
         }
     }
 }
+impl_from_plain_with_from_ref!(HolonomicCommandWrapper, HolonomicCommand);
 
 /// Wrapper for the [`Envelope`]
 #[derive(Clone, Debug)]
@@ -1131,8 +1075,8 @@ impl HolonomicCommandWrapper {
 pub struct EnvelopeWrapper {
     /// Expeditor
     pub msg_from: String,
-    /// Message sent, see [`MessageTypesWrapper`] for supported messages
-    pub message: MessageTypesWrapper,
+    /// Message sent, see [`MessageTypeWrapper`] for supported messages
+    pub message: MessageTypeWrapper,
     /// Time of the message
     pub timestamp: f32,
 }
@@ -1161,26 +1105,26 @@ impl NodeWrapper {
     ///
     /// # Arguments
     /// * `to` - Channel key to send the message to. It can be a relative key (e.g. "channel1") or an absolute key (e.g. "/my_channels/channel1").
-    /// * `message` - Message to send. See [`MessageTypesWrapper`] for the supported message types in Python.
+    /// * `message` - Message to send. See [`MessageTypeWrapper`] for the supported message types in Python.
     /// * `time` - Time at which the message is sent. It should be the current time of the simulator or in the future.
-    /// * `flags` - Message flags. See [`MessageFlag`] for the supported flags.
+    /// * `flags` - Message flags. See [`MessageFlag`](::simusa::networking::network::MessageFlag) for the supported flags.
     #[pyo3(signature = (to, message, time, flags=Vec::new()))]
     #[warn(clippy::useless_conversion)]
     pub fn send_message(
         &self,
         to: String,
-        message: MessageTypesWrapper,
+        message: MessageTypeWrapper,
         time: f32,
-        flags: Vec<MessageFlag>,
+        flags: Vec<MessageFlagWrapper>,
     ) -> PyResult<()> {
         if let Some(network) = self.network.as_ref().and_then(|n| n.upgrade()) {
-            let msg = message.to_rust();
+            let msg = message.to_rust(&self.context);
             let key = PathKey::from_str(to.as_str()).unwrap();
             let msg = Envelope {
                 from: self.name.clone(),
                 message: msg,
                 timestamp: time,
-                message_flags: flags,
+                message_flags: flags.iter().map(|m| m.to_rust()).collect(),
             };
             network
                 .write()
@@ -1204,7 +1148,7 @@ impl NodeWrapper {
                 .write()
                 .unwrap()
                 .subscribe_to(&keys, None, &self.context);
-            Ok(MultiClientWrapper::from_rust(client))
+            Ok(MultiClientWrapper::from_rust(client, self.context.clone()))
         } else {
             Err(PyErr::new::<PyTypeError, _>("No network on this node"))
         }
@@ -1260,6 +1204,7 @@ impl NodeWrapper {
 #[pyo3(name = "Client")]
 pub struct MultiClientWrapper {
     client: SimusaBrokerMultiClient,
+    context: Context,
 }
 
 #[pymethods]
@@ -1287,23 +1232,23 @@ impl MultiClientWrapper {
     ///
     /// # Arguments
     /// * `to` - Channel key to send the message to. It can be a relative key (e.g. "channel1") or an absolute key (e.g. "/my_channels/channel1").
-    /// * `message` - Message to send. See [`MessageTypesWrapper`] for the supported message types in Python.
+    /// * `message` - Message to send. See [`MessageTypeWrapper`] for the supported message types in Python.
     /// * `time` - Time at which the message is sent. It should be the current time of the simulator or in the future.
-    /// * `flags` - Message flags. See [`MessageFlag`] for the supported flags.
+    /// * `flags` - Message flags. See [`MessageFlag`](::simusa::networking::network::MessageFlag) for the supported flags.
     pub fn send(
         &self,
         to: String,
-        message: MessageTypesWrapper,
+        message: MessageTypeWrapper,
         time: f32,
-        flags: Vec<MessageFlag>,
+        flags: Vec<MessageFlagWrapper>,
     ) -> PyResult<()> {
-        let msg = message.to_rust();
+        let msg = message.to_rust(&self.context);
         let key = PathKey::from_str(to.as_str()).unwrap();
         let msg = Envelope {
             from: self.client.node_id().to_string(),
             message: msg,
             timestamp: time,
-            message_flags: flags,
+            message_flags: flags.iter().map(|m| m.to_rust()).collect(),
         };
         self.client.send(&key, msg, time);
         Ok(())
@@ -1318,7 +1263,7 @@ impl MultiClientWrapper {
                 path.to_string(),
                 EnvelopeWrapper {
                     msg_from: envelope.from,
-                    message: MessageTypesWrapper::from_rust(&envelope.message),
+                    message: MessageTypeWrapper::from_rust(&envelope.message),
                     timestamp: envelope.timestamp,
                 },
             ))
@@ -1349,8 +1294,8 @@ impl MultiClientWrapper {
 
 impl MultiClientWrapper {
     /// Create a new MultiClientWrapper from a SimusaBrokerMultiClient.
-    pub fn from_rust(client: SimusaBrokerMultiClient) -> Self {
-        Self { client }
+    pub fn from_rust(client: SimusaBrokerMultiClient, context: Context) -> Self {
+        Self { client, context }
     }
 }
 
@@ -1390,18 +1335,17 @@ impl PluginAPIWrapper {
     pub fn new() -> Self {
         Self {}
     }
-    /// Return the [`StateEstimator`](crate::state_estimators::StateEstimator) to be used by the
-    /// [`ExternalEstimator`](crate::state_estimators::external_estimator::ExternalEstimator).
+    /// Return the [`StateEstimator`](::simusa::state_estimators::StateEstimator)
     ///
     /// # Arguments
     /// * `config` - Config for the external state estimator. The configuration
-    /// is given using [`serde_json::Value`]. It should be converted by the
+    /// is given using [`::simusa::utils::GeneralValue`]. It should be converted by the
     /// external plugin to the specific configuration.
     /// * `global_config` - Full configuration of the simulator.
     ///
     /// # Return
     ///
-    /// Returns the [`StateEstimator`](crate::state_estimators::StateEstimator) to use.
+    /// Returns the [`StateEstimator`](::simusa::state_estimators::StateEstimator) to use.
     pub fn get_state_estimator(
         &self,
         _config: Py<PyAny>,
@@ -1411,18 +1355,17 @@ impl PluginAPIWrapper {
         panic!("The given PluginAPI does not provide a state estimator");
     }
 
-    /// Return the [`Controller`](crate::controllers::Controller) to be used by the
-    /// [`ExternalController`](crate::controllers::external_controller::ExternalController).
+    /// Return the [`Controller`](::simusa::controllers::Controller).
     ///
     /// # Arguments
     /// * `config` - Config for the external controller. The configuration
-    /// is given using [`serde_json::Value`]. It should be converted by the
+    /// is given using [`::simusa::utils::GeneralValue`]. It should be converted by the
     /// external plugin to the specific configuration.
     /// * `global_config` - Full configuration of the simulator.
     ///
     /// # Return
     ///
-    /// Returns the [`Controller`](crate::controllers::Controller) to use.
+    /// Returns the [`Controller`](::simusa::controllers::Controller) to use.
     pub fn get_controller(
         &self,
         _config: Py<PyAny>,
@@ -1432,18 +1375,17 @@ impl PluginAPIWrapper {
         panic!("The given PluginAPI does not provide a controller");
     }
 
-    /// Return the [`Navigator`](crate::navigators::Navigator) to be used by the
-    /// [`ExternalNavigator`](crate::navigators::external_navigator::ExternalNavigator).
+    /// Return the [`Navigator`](::simusa::navigators::Navigator).
     ///
     /// # Arguments
     /// * `config` - Config for the external navigator. The configuration
-    /// is given using [`serde_json::Value`]. It should be converted by the
+    /// is given using [`::simusa::utils::GeneralValue`]. It should be converted by the
     /// external plugin to the specific configuration.
     /// * `global_config` - Full configuration of the simulator.
     ///
     /// # Return
     ///
-    /// Returns the [`Navigator`](crate::navigators::Navigator) to use.
+    /// Returns the [`Navigator`](::simusa::navigators::Navigator) to use.
     pub fn get_navigator(
         &self,
         _config: Py<PyAny>,
@@ -1453,18 +1395,17 @@ impl PluginAPIWrapper {
         panic!("The given PluginAPI does not provide a navigator");
     }
 
-    /// Return the [`Physics`](crate::physics::Physics) to be used by the
-    /// [`ExternalPhysics`](crate::physics::external_physics::ExternalPhysics).
+    /// Return the [`Physics`](::simusa::physics::Physics).
     ///
     /// # Arguments
     /// * `config` - Config for the external physics. The configuration
-    /// is given using [`serde_json::Value`]. It should be converted by the
+    /// is given using [`::simusa::utils::GeneralValue`]. It should be converted by the
     /// external plugin to the specific configuration.
     /// * `global_config` - Full configuration of the simulator.
     ///
     /// # Return
     ///
-    /// Returns the [`Physics`](crate::physics::Physics) to use.
+    /// Returns the [`Physics`](::simusa::physics::Physics) to use.
     pub fn get_physics(
         &self,
         _config: Py<PyAny>,
@@ -1494,7 +1435,7 @@ impl SimulatorWrapper {
     /// Constructor for the simulator.
     ///
     /// # Arguments
-    /// * `config_path` - Path to the configuration file. The configuration file should be in YAML format and follow the structure defined in the documentation. See the [`SimulatorConfig`](crate::simulator::SimulatorConfig) for more details on the configuration structure.
+    /// * `config_path` - Path to the configuration file. The configuration file should be in YAML format and follow the structure defined in the documentation. See the [`SimulatorConfig`](::simusa::simulator::SimulatorConfig) for more details on the configuration structure.
     /// * `plugin_api` - Optional Python object that implements the [`PluginAPI`] interface. This object will be used to provide custom implementations of the state estimator, controller, navigator and physics if required by the configuration.
     #[staticmethod]
     #[pyo3(signature = (config_path, plugin_api=None))]
@@ -1502,8 +1443,6 @@ impl SimulatorWrapper {
         config_path: String,
         plugin_api: Option<Py<PyAny>>,
     ) -> PyResult<SimulatorWrapper> {
-        Simulator::init_environment();
-
         let python_api = plugin_api.map(|api| Arc::new(PythonAPI::new(api)) as Arc<dyn PluginAPI>);
 
         let simulator =
@@ -1526,98 +1465,4 @@ impl SimulatorWrapper {
         self.simulator.compute_results();
         self.simulator.stop();
     }
-}
-
-/// Run the GUI of the simulator. This function will block until the GUI is closed but
-/// will allow communications between Python thread and GUI to be able to use [`PythonAPI`] in the GUI.
-#[cfg(feature = "gui")]
-#[pyfunction]
-#[pyo3(signature = (default_config_path=None, plugin_api=None, load_results=false))]
-pub fn run_gui(
-    py: Python,
-    default_config_path: Option<String>,
-    plugin_api: Option<Py<PyAny>>,
-    load_results: bool,
-) {
-    use std::{sync::RwLock, thread};
-
-    use crate::gui;
-    let async_plugin_api = plugin_api.as_ref().map(|_| Arc::new(PluginAsyncAPI::new()));
-    let mut python_api = plugin_api.map(PythonAPI::new);
-
-    let api_client = async_plugin_api.as_ref().map(|api| api.get_client());
-
-    let running = Arc::new(RwLock::new(true));
-    let local_running = running.clone();
-
-    let context = Context::default();
-
-    let thread_handle = thread::spawn(move || {
-        while *running.read().unwrap() {
-            if let Some(api_client) = &api_client {
-                let python_api = python_api.as_mut().unwrap();
-                // TODO: Multiple wait can be optimized the same way than AsyncAPI runner (or maybe not as it's Python)
-                api_client.get_state_estimator.try_recv_closure(|request| {
-                    python_api.get_state_estimator(
-                        &request.config,
-                        &request.global_config,
-                        &request.va_factory,
-                        &request.network,
-                        0.,
-                        &context,
-                    )
-                });
-                api_client.get_controller.try_recv_closure(|request| {
-                    python_api.get_controller(
-                        &request.config,
-                        &request.global_config,
-                        &request.va_factory,
-                        &request.network,
-                        0.,
-                        &context,
-                    )
-                });
-                api_client.get_navigator.try_recv_closure(|request| {
-                    python_api.get_navigator(
-                        &request.config,
-                        &request.global_config,
-                        &request.va_factory,
-                        &request.network,
-                        0.,
-                        &context,
-                    )
-                });
-                api_client.get_physics.try_recv_closure(|request| {
-                    python_api.get_physics(
-                        &request.config,
-                        &request.global_config,
-                        &request.va_factory,
-                        &request.network,
-                        0.,
-                        &context,
-                    )
-                });
-                python_api.check_requests(&context);
-            }
-        }
-    });
-
-    // egui needs to be run in the main thread. However, Python get the GIL. So we need to free the GIL so that the thread spawn before can call Python functions.
-    // allow_threads reacquire the GIL when it exits the function. At this point, we are sure that the other thread is finished.
-    py.detach(|| {
-        gui::run_gui(
-            default_config_path,
-            async_plugin_api.map(|api| api as Arc<dyn PluginAPI>),
-            load_results,
-        );
-        *local_running.write().unwrap() = false;
-        thread_handle.join().unwrap();
-    });
-}
-
-#[cfg(not(feature = "gui"))]
-#[pyfunction]
-#[pyo3(signature = (_plugin_api=None))]
-pub fn run_gui(_py: Python, _plugin_api: Option<Py<PyAny>>) {
-    unimplemented!("run_gui not available. Compile python package with 'gui' feature");
 }

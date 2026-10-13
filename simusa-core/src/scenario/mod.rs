@@ -5,7 +5,7 @@
 //! state-based triggers, and executes corresponding actions during simulation.
 
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet},
     str::FromStr,
     sync::{Arc, Mutex},
 };
@@ -20,15 +20,16 @@ use crate::{
     config::NumberConfig,
     constants::TIME_ROUND,
     context::Context,
-    errors::SimusaResult,
+    errors::{SimusaError, SimusaErrorTypes, SimusaResult},
     info, internal,
     logger::InternalLog,
-    networking::{self, message_types::MessageTypes, network::Envelope},
+    networking::{self, message_types::MessageType, network::Envelope},
+    node::node_factory::RecordType,
     scenario::config::{
         AreaEventTriggerConfig, EventConfig, EventRecord, EventTriggerConfig, EventTypeConfig,
         ProximityEventTriggerConfig, ScenarioConfig, SpawnEventConfig, TimeEventTriggerConfig,
     },
-    simulator::{RunningParameters, Simulator, SimulatorConfig, SimusaBroker},
+    simulator::{Record, Simulator, SimulatorConfig, SimusaBroker},
     utils::{SharedRwLock, determinist_random_variable::DeterministRandomVariableFactory},
     warning,
 };
@@ -115,8 +116,7 @@ impl Scenario {
     pub(crate) fn execute_scenario(
         &mut self,
         simulator: &mut Simulator,
-        node_states: &HashMap<String, Option<[f32; 2]>>,
-        running_parameters: &mut RunningParameters,
+        node_states: &BTreeMap<String, Option<[f32; 2]>>,
         context: &Context,
     ) -> SimusaResult<()> {
         let context = context.new_callstack_level("execute_scenario");
@@ -128,7 +128,7 @@ impl Scenario {
             .iter_from_time(self.last_executed_time)
             .take_while(|(t, _)| *t <= time)
         {
-            self.execute_event(
+            if let Some(event_record) = self.execute_event(
                 &event.1,
                 simulator,
                 &[event.0.to_string()],
@@ -136,9 +136,13 @@ impl Scenario {
                     time: NumberConfig::Num(time),
                     occurences: NumberConfig::Num(event.0 as f32),
                 }),
-                running_parameters,
                 &context,
-            )?;
+            )? {
+                simulator.add_record(Record {
+                    time,
+                    node: RecordType::Scenario(Box::new(event_record)),
+                });
+            }
         }
         // Other events
         let other_events = self.other_events.lock().unwrap();
@@ -154,14 +158,18 @@ impl Scenario {
                         &context,
                     );
                     for nodes in triggering_nodes {
-                        self.execute_event(
+                        if let Some(event_record) = self.execute_event(
                             event,
                             simulator,
                             &nodes,
                             &EventTriggerConfig::Proximity(proximity_config.clone()),
-                            running_parameters,
                             &context,
-                        )?;
+                        )? {
+                            simulator.add_record(Record {
+                                time,
+                                node: RecordType::Scenario(Box::new(event_record)),
+                            });
+                        }
                     }
                 }
                 EventTriggerConfig::Area(area_config) => {
@@ -173,14 +181,18 @@ impl Scenario {
                         &context,
                     );
                     for nodes in triggering_nodes {
-                        self.execute_event(
+                        if let Some(event_record) = self.execute_event(
                             event,
                             simulator,
                             &nodes,
                             &EventTriggerConfig::Area(area_config.clone()),
-                            running_parameters,
                             &context,
-                        )?;
+                        )? {
+                            simulator.add_record(Record {
+                                time,
+                                node: RecordType::Scenario(Box::new(event_record)),
+                            });
+                        }
                     }
                 }
                 EventTriggerConfig::Time(_) => unreachable!(),
@@ -205,9 +217,8 @@ impl Scenario {
         simulator: &mut Simulator,
         trigger_variables: &[String],
         trigger: &EventTriggerConfig,
-        running_parameters: &mut RunningParameters,
         context: &Context,
-    ) -> SimusaResult<()> {
+    ) -> SimusaResult<Option<EventRecord>> {
         let context = context.new_callstack_level("execute_event");
         let time = context.get_time().unwrap();
         let mut event_executed = None;
@@ -240,7 +251,7 @@ impl Scenario {
                     tmp_client.unwrap().send(
                         Envelope {
                             from: "scenario".to_string(),
-                            message: MessageTypes::default(),
+                            message: MessageType::default(),
                             message_flags: vec![MessageFlag::Kill],
                             timestamp: time,
                         },
@@ -264,13 +275,9 @@ impl Scenario {
                     trigger
                 );
 
-                if let Err(e) = simulator.spawn_node_from_name(
-                    &model_name,
-                    &node_name,
-                    running_parameters,
-                    time,
-                    &context,
-                ) {
+                if let Err(e) =
+                    simulator.spawn_node_from_name(&model_name, &node_name, time, &context)
+                {
                     warning!(
                         context,
                         "Ignoring error while sending Spawn message for node `{}`: {}",
@@ -287,8 +294,43 @@ impl Scenario {
                     });
                 }
             }
+            EventTypeConfig::SendMessage(msg) => {
+                let channel = Self::replace_variables(&msg.channel, trigger_variables);
+                info!(
+                    context,
+                    "Executing SendMessage event to channel `{}` with message `{}` triggered by {}",
+                    channel,
+                    msg.message,
+                    trigger
+                );
+                let tmp_client = self
+                    .broker
+                    .write()
+                    .unwrap()
+                    .subscribe_to(
+                        &PathKey::from_str(&channel).unwrap(),
+                        "scenario".to_string(),
+                        0.,
+                    )
+                    .ok_or(SimusaError::new(
+                        SimusaErrorTypes::ConfigError,
+                        format!(
+                            "Try to send message to channel `{}` failed: Channel does not exist",
+                            channel
+                        ),
+                    ))?;
+                tmp_client.send(
+                    Envelope {
+                        from: "scenario".to_string(),
+                        message: (*msg.message).clone(),
+                        timestamp: time,
+                        ..Default::default()
+                    },
+                    time,
+                );
+            }
         }
-        if let Some(event_executed) = event_executed {
+        if let Some(event_executed) = &event_executed {
             self.client.send(
                 Envelope {
                     from: "scenario".to_string(),
@@ -299,7 +341,7 @@ impl Scenario {
                 time,
             );
         }
-        Ok(())
+        Ok(event_executed)
     }
 
     /// Returns the next scheduled time-triggered event, if any.
@@ -312,7 +354,7 @@ impl Scenario {
         triggering_nodes_filter: &[Regex],
         area_config: &AreaEventTriggerConfig,
         _simulator: &mut Simulator,
-        node_states: &HashMap<String, Option<[f32; 2]>>,
+        node_states: &BTreeMap<String, Option<[f32; 2]>>,
         context: &Context,
     ) -> Vec<Vec<String>> {
         let context = context.new_callstack_level("area_trigger");
@@ -365,7 +407,7 @@ impl Scenario {
         proximity_config: &ProximityEventTriggerConfig,
         _simulator: &mut Simulator,
         time: f32,
-        node_states: &HashMap<String, Option<[f32; 2]>>,
+        node_states: &BTreeMap<String, Option<[f32; 2]>>,
         context: &Context,
     ) -> Vec<Vec<String>> {
         let context = context.new_callstack_level("proximity_trigger");

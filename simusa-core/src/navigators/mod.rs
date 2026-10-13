@@ -11,12 +11,6 @@ pub mod go_to;
 pub mod trajectory;
 pub mod trajectory_follower;
 
-pub mod external_navigator;
-pub mod python_navigator;
-
-pub mod pybinds;
-
-extern crate confy;
 use std::sync::{Arc, RwLock};
 
 use config_checker::*;
@@ -24,13 +18,19 @@ use serde_derive::{Deserialize, Serialize};
 use simusa_macros::config_derives;
 
 use crate::context::Context;
-use crate::controllers::ControllerError;
-use crate::errors::SimusaResult;
-#[cfg(feature = "gui")]
-use crate::gui::{UIComponent, utils::string_combobox};
+use crate::errors::{SimusaError, SimusaErrorTypes, SimusaResult};
+use crate::interfaces::navigator_controller::{ControllerInputVariable, ControllerInputVariables};
 use crate::node::node_factory::FromConfigArguments;
-use crate::simulator::SimulatorConfig;
 use crate::state_estimators::WorldState;
+#[cfg(feature = "gui")]
+use crate::{
+    gui::{
+        UIComponent,
+        utils::string_combobox,
+        utils::{edit_plugin_config, show_plugin_config},
+    },
+    simulator::SimulatorConfig,
+};
 
 /// Enumerate the configuration of the different strategies.
 ///
@@ -40,12 +40,8 @@ pub enum NavigatorConfig {
     /// Configuration for [`trajectory_follower::TrajectoryFollower`].
     #[check]
     TrajectoryFollower(trajectory_follower::TrajectoryFollowerConfig),
-    /// Configuration for [`external_navigator::ExternalNavigator`].
-    #[check]
-    External(external_navigator::ExternalNavigatorConfig),
-    /// Configuration for [`python_navigator::PythonNavigator`].
-    #[check]
-    Python(python_navigator::PythonNavigatorConfig),
+    /// Configuration for a plugin [`Navigator`].
+    Plugin(crate::utils::GeneralValue),
     /// Configuration for [`go_to::GoTo`].
     #[check]
     GoTo(go_to::GoToConfig),
@@ -79,15 +75,7 @@ impl UIComponent for NavigatorConfig {
                         trajectory_follower::TrajectoryFollowerConfig::default(),
                     )
                 }
-                "External" => {
-                    *self = NavigatorConfig::External(
-                        external_navigator::ExternalNavigatorConfig::default(),
-                    )
-                }
-                "Python" => {
-                    *self =
-                        NavigatorConfig::Python(python_navigator::PythonNavigatorConfig::default())
-                }
+                "Plugin" => *self = NavigatorConfig::Plugin(crate::utils::GeneralValue::default()),
                 "GoTo" => *self = NavigatorConfig::GoTo(go_to::GoToConfig::default()),
                 _ => panic!("Where did you find this value?"),
             };
@@ -101,21 +89,13 @@ impl UIComponent for NavigatorConfig {
                 current_node_name,
                 unique_id,
             ),
-            NavigatorConfig::External(c) => c.show_mut(
+            NavigatorConfig::Plugin(c) => edit_plugin_config(
                 ui,
-                ctx,
-                buffer_stack,
-                global_config,
-                current_node_name,
+                "Plugin Navigator",
+                "plugin-navigator",
                 unique_id,
-            ),
-            NavigatorConfig::Python(c) => c.show_mut(
-                ui,
-                ctx,
                 buffer_stack,
-                global_config,
-                current_node_name,
-                unique_id,
+                c,
             ),
             NavigatorConfig::GoTo(c) => c.show_mut(
                 ui,
@@ -135,8 +115,7 @@ impl UIComponent for NavigatorConfig {
 
         match self {
             NavigatorConfig::TrajectoryFollower(c) => c.show(ui, ctx, unique_id),
-            NavigatorConfig::External(c) => c.show(ui, ctx, unique_id),
-            NavigatorConfig::Python(c) => c.show(ui, ctx, unique_id),
+            NavigatorConfig::Plugin(c) => show_plugin_config(ui, "Plugin Navigator", c),
             NavigatorConfig::GoTo(c) => c.show(ui, ctx, unique_id),
         }
     }
@@ -147,10 +126,8 @@ impl UIComponent for NavigatorConfig {
 pub enum NavigatorRecord {
     /// Runtime record for [`TrajectoryFollower`](trajectory_follower::TrajectoryFollower).
     TrajectoryFollower(trajectory_follower::TrajectoryFollowerRecord),
-    /// Runtime record for [`ExternalNavigator`](external_navigator::ExternalNavigator).
-    External(external_navigator::ExternalNavigatorRecord),
-    /// Runtime record for [`PythonNavigator`](python_navigator::PythonNavigator).
-    Python(python_navigator::PythonNavigatorRecord),
+    /// Runtime record for a Plugin [`Navigator`].
+    Plugin(crate::utils::GeneralValue),
     /// Runtime record for [`GoTo`](go_to::GoTo).
     GoTo(go_to::GoToRecord),
 }
@@ -164,16 +141,7 @@ impl UIComponent for NavigatorRecord {
                     r.show(ui, ctx, unique_id);
                 });
             }
-            Self::External(r) => {
-                egui::CollapsingHeader::new("ExternalNavigator").show(ui, |ui| {
-                    r.show(ui, ctx, unique_id);
-                });
-            }
-            Self::Python(r) => {
-                egui::CollapsingHeader::new("PythonNavigator").show(ui, |ui| {
-                    r.show(ui, ctx, unique_id);
-                });
-            }
+            Self::Plugin(r) => show_plugin_config(ui, "Plugin Navigator", r),
             Self::GoTo(r) => {
                 egui::CollapsingHeader::new("GoTo").show(ui, |ui| {
                     r.show(ui, ctx, unique_id);
@@ -189,28 +157,53 @@ use crate::utils::SharedRwLock;
 #[cfg(feature = "gui")]
 use crate::utils::enum_tools::ToVec;
 
+/// Trait for the output of a [`Navigator`], which can be converted into [`ControllerInputVariables`].
+///
+/// Should not be implemented directly, but rather through the
+/// [`declare_navigator_output!`](crate::interfaces::navigator_controller::declare_navigator_output) macro.
+pub trait NavigatorOutput {
+    /// Returns the list of variables that can be provided by the navigator for the controller.
+    fn available_variables() -> &'static [ControllerInputVariable];
+
+    /// Converts the output of the navigator into [`ControllerInputVariables`] for the controller.
+    fn into_controller_input_variables(
+        self,
+        requested_variables: &[ControllerInputVariable],
+    ) -> ControllerInputVariables;
+}
+
 /// Trait managing the planning, and providing the error to the planned behavior.
 pub trait Navigator:
     std::fmt::Debug + std::marker::Send + std::marker::Sync + Recordable<NavigatorRecord>
 {
+    /// Specifies the variables computed by the navigator. Must implement [`NavigatorOutput`].
+    type OutputType: NavigatorOutput;
+
+    /// Returns the list of variables that can be provided by the navigator for the controller.
+    ///
+    /// Override with caution: the [`Navigator::OutputType`] might not be compatible with the returned variables.
+    fn available_variables(&self) -> &[ControllerInputVariable] {
+        Self::OutputType::available_variables()
+    }
+
     /// Performs optional one-time initialization when the node starts.
     #[allow(unused_variables)]
     fn post_init(&mut self, node: &mut Node, context: &Context) -> SimusaResult<()> {
         Ok(())
     }
 
-    /// Compute the error ([`ControllerError`]) between the given `state` and the planned path.
+    /// Compute the output ([`Navigator::OutputType`]) between the given `state` and the planned path.
     ///
     /// ## Arguments
     /// * `node` - Reference to the node to access modules.
     /// * `state` - Estimated world state used by the navigator.
     /// * `context` - Shared simulation context used for logging and communication metadata.
-    fn compute_error(
+    fn compute_output(
         &mut self,
         node: &mut Node,
         state: WorldState,
         context: &Context,
-    ) -> ControllerError;
+    ) -> SimusaResult<Self::OutputType>;
 
     /// Executes per-step side effects before controller computation.
     fn pre_loop_hook(&mut self, node: &mut Node, time: f32, context: &Context);
@@ -219,6 +212,68 @@ pub trait Navigator:
     #[allow(unused_variables)]
     fn next_time_step(&self, context: &Context) -> Option<f32> {
         None
+    }
+}
+
+/// Trait for abstracting the [`Navigator`] trait with dynamic conversion of [`Navigator::OutputType`], to be used in the [`Node`] struct.
+///
+/// This trait is implemented automatically for any type that implements [`Navigator`].
+/// Should not be implemented directly!
+pub trait AbstractNavigator:
+    std::fmt::Debug + std::marker::Send + std::marker::Sync + Recordable<NavigatorRecord>
+{
+    /// Returns the list of variables ( [`ControllerInputVariable`] ) that can be provided by the navigator for the controller.
+    fn call_available_variables(&self) -> &[ControllerInputVariable];
+
+    /// Performs optional one-time initialization when the node starts.
+    fn call_post_init(&mut self, node: &mut Node, context: &Context) -> SimusaResult<()>;
+
+    /// Compute the output ([`ControllerInputVariables`]) between the given `state` and goal.
+    fn call_compute_output(
+        &mut self,
+        node: &mut Node,
+        state: WorldState,
+        context: &Context,
+        requested_variables: &[ControllerInputVariable],
+    ) -> SimusaResult<ControllerInputVariables>;
+
+    /// Executes the loop hook at the beginning of each simulator time step.
+    fn call_pre_loop_hook(&mut self, node: &mut Node, time: f32, context: &Context);
+
+    /// Optional: return the time of the next time step.
+    fn call_next_time_step(&self, context: &Context) -> Option<f32>;
+}
+
+impl<T> AbstractNavigator for T
+where
+    T: Navigator,
+{
+    fn call_available_variables(&self) -> &[ControllerInputVariable] {
+        self.available_variables()
+    }
+
+    fn call_post_init(&mut self, node: &mut Node, context: &Context) -> SimusaResult<()> {
+        self.post_init(node, context)
+    }
+
+    fn call_compute_output(
+        &mut self,
+        node: &mut Node,
+        state: WorldState,
+        context: &Context,
+        requested_variables: &[ControllerInputVariable],
+    ) -> SimusaResult<ControllerInputVariables> {
+        Ok(self
+            .compute_output(node, state, context)?
+            .into_controller_input_variables(requested_variables))
+    }
+
+    fn call_pre_loop_hook(&mut self, node: &mut Node, time: f32, context: &Context) {
+        self.pre_loop_hook(node, time, context)
+    }
+
+    fn call_next_time_step(&self, context: &Context) -> Option<f32> {
+        self.next_time_step(context)
     }
 }
 
@@ -235,32 +290,37 @@ pub trait Navigator:
 pub fn make_navigator_from_config(
     config: &NavigatorConfig,
     from_config_params: &FromConfigArguments,
-) -> SimusaResult<SharedRwLock<Box<dyn Navigator>>> {
+) -> SimusaResult<SharedRwLock<Box<dyn AbstractNavigator>>> {
     Ok(Arc::new(RwLock::new(match config {
         NavigatorConfig::TrajectoryFollower(c) => {
             Box::new(trajectory_follower::TrajectoryFollower::from_config(
                 c,
                 from_config_params.global_config,
                 from_config_params.initial_time,
-            )) as Box<dyn Navigator>
+            )) as Box<dyn AbstractNavigator>
         }
-        NavigatorConfig::External(c) => Box::new(
-            external_navigator::ExternalNavigator::from_config(c, from_config_params)?,
-        ) as Box<dyn Navigator>,
-        NavigatorConfig::Python(c) => Box::new(
-            python_navigator::PythonNavigator::from_config(
+        NavigatorConfig::Plugin(c) => from_config_params
+            .plugin_api
+            .as_ref()
+            .ok_or_else(|| {
+                SimusaError::new(
+                    SimusaErrorTypes::PluginAPIError,
+                    "Plugin API not set!".to_string(),
+                )
+            })?
+            .get_navigator(
                 c,
                 from_config_params.global_config,
+                from_config_params.va_factory,
+                from_config_params.network,
                 from_config_params.initial_time,
                 from_config_params.context,
-            )
-            .unwrap(),
-        ) as Box<dyn Navigator>,
+            ),
         NavigatorConfig::GoTo(c) => Box::new(go_to::GoTo::from_config(
             c,
             from_config_params.network,
             from_config_params.initial_time,
             from_config_params.context,
-        )) as Box<dyn Navigator>,
+        )) as Box<dyn AbstractNavigator>,
     })))
 }

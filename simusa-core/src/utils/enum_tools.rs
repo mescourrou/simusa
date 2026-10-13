@@ -17,20 +17,28 @@ where
 }
 
 use std::{
-    collections::HashMap,
+    collections::BTreeMap,
     fmt::{Debug, Display},
-    hash::Hash,
     str::FromStr,
 };
 
 /// A trait for enums that represent variables names in the simulator.
 /// This trait provides a method to create a mapping from enum variants to any type `T` (e.g. f32) using a provided mapping function.
 pub trait EnumVariables:
-    Clone + Eq + Debug + ToString + ToVec<&'static str> + ToVec<Self> + Display + FromStr + Hash
+    Clone
+    + Eq
+    + Debug
+    + ToString
+    + ToVec<&'static str>
+    + ToVec<Self>
+    + Display
+    + FromStr
+    + std::cmp::Ord
+    + std::hash::Hash
 {
-    /// Maps each enum variant to a value of type `T` using the provided mapping function, and returns a `HashMap` of the results.
-    fn mapped_values<T>(mut map_fn: impl FnMut(&Self) -> T) -> HashMap<Self, T> {
-        let mut map = HashMap::new();
+    /// Maps each enum variant to a value of type `T` using the provided mapping function, and returns a `BTreeMap` of the results.
+    fn mapped_values<T>(mut map_fn: impl FnMut(&Self) -> T) -> BTreeMap<Self, T> {
+        let mut map = BTreeMap::new();
         for variant in Self::to_vec() {
             let value = map_fn(&variant);
             map.insert(variant, value);
@@ -49,7 +57,7 @@ macro_rules! __enum_variables_emit_subenum {
         $($($documentation:literal)? $variant:ident, $value:literal $(, $add_value:literal)*);+ $(;)?
     ) => {
         $(#[$meta])*
-        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, std::hash::Hash)]
+        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, std::hash::Hash, PartialOrd, Ord)]
         #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
         pub enum $name {
             $(

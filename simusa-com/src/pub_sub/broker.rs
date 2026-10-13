@@ -11,8 +11,9 @@
 
 pub use std::str::FromStr;
 use std::{
-    collections::HashMap,
+    collections::BTreeMap,
     fmt::{Debug, Display},
+    hash::Hash,
 };
 
 use colored::Colorize;
@@ -27,9 +28,9 @@ use crate::pub_sub::{
 /// Core broker interface for channel registration and subscription management.
 pub trait BrokerTrait<KeyType, MessageType, NodeIdType>: Debug + Send + Sync
 where
-    KeyType: std::cmp::Eq + std::hash::Hash + Clone + Default + Send + Sync,
+    KeyType: std::cmp::Eq + Clone + Default + Send + Sync,
     MessageType: Clone + Send + 'static + Default,
-    NodeIdType: std::hash::Hash + Eq + Clone + Send + Sync + 'static,
+    NodeIdType: Eq + Clone + Send + Sync + 'static,
 {
     /// Adds a root-level channel for `key` if it does not already exist.
     fn add_channel(&mut self, key: KeyType);
@@ -91,9 +92,9 @@ where
 pub trait BrokerTraitExtended<KeyType, MessageType, NodeIdType, ConditionArgType>:
     BrokerTrait<KeyType, MessageType, NodeIdType>
 where
-    KeyType: std::cmp::Eq + std::hash::Hash + Clone + Default + Send + Sync,
+    KeyType: std::cmp::Eq + Clone + Default + Send + Sync + std::cmp::Ord,
     MessageType: Clone + Send + 'static + Default,
-    NodeIdType: std::hash::Hash + Eq + Clone + Send + Sync + 'static,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + std::cmp::Ord,
     ConditionArgType: Clone + Send + 'static + Default,
 {
     /// Adds a root-level channel with a per-client delivery condition.
@@ -111,15 +112,15 @@ where
 pub trait BrokerTraitProcessing<KeyType, MessageType, NodeIdType, ConditionArgType>:
     BrokerTrait<KeyType, MessageType, NodeIdType>
 where
-    KeyType: std::cmp::Eq + std::hash::Hash + Clone + Default + Send + Sync,
+    KeyType: std::cmp::Eq + Clone + Default + Send + Sync + std::cmp::Ord,
     MessageType: Clone + Send + 'static + Default,
-    NodeIdType: std::hash::Hash + Eq + Clone + Send + Sync + 'static,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + std::cmp::Ord,
     ConditionArgType: Clone + Send + 'static + Default,
 {
     /// Processes pending messages in all channels.
     fn process_messages(
         &self,
-        client_condition_args: Option<&HashMap<NodeIdType, ConditionArgType>>,
+        client_condition_args: Option<&BTreeMap<NodeIdType, ConditionArgType>>,
     );
 
     /// Retrieves a concrete channel by key.
@@ -133,14 +134,14 @@ where
 /// Generic broker implementation using arbitrary key and node-id types.
 pub struct Broker<KeyType, MessageType, NodeIdType, ConditionArgType>
 where
-    KeyType: std::cmp::Eq + std::hash::Hash + Clone + Default + Send + Sync,
+    KeyType: std::cmp::Eq + Clone + Default + Send + Sync + std::cmp::Ord,
     MessageType: Clone + Send + 'static + Default + Debug,
-    NodeIdType: std::hash::Hash + Eq + Clone + Send + Sync + 'static + Debug,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + Debug,
     ConditionArgType: Clone + Send + 'static + Default + Debug,
 {
-    channels: HashMap<KeyType, Box<dyn ChannelProcessing<NodeIdType, ConditionArgType>>>,
+    channels: BTreeMap<KeyType, Box<dyn ChannelProcessing<NodeIdType, ConditionArgType>>>,
     key_tree: Tree<AutomatedId, KeyType>,
-    key_to_node_id: HashMap<KeyType, AutomatedId>,
+    key_to_node_id: BTreeMap<KeyType, AutomatedId>,
     time_round: f32,
     _phantom: std::marker::PhantomData<MessageType>,
 }
@@ -148,19 +149,19 @@ where
 impl<KeyType, MessageType, NodeIdType, ConditionArgType>
     Broker<KeyType, MessageType, NodeIdType, ConditionArgType>
 where
-    KeyType: std::cmp::Eq + std::hash::Hash + Clone + Default + Send + Sync,
+    KeyType: std::cmp::Eq + Clone + Default + Send + Sync + std::cmp::Ord,
     MessageType: Clone + Send + 'static + Default + Debug,
-    NodeIdType: std::hash::Hash + Eq + Clone + Send + Sync + 'static + Debug,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + Debug + std::cmp::Ord,
     ConditionArgType: Clone + Send + 'static + Default + Debug,
 {
     /// Creates an empty broker with the provided time rounding precision.
     pub fn new(time_round: f32) -> Self {
         let mut key_tree = Tree::new(None);
         let root = key_tree.add_node(Node::new_with_auto_id(Some(KeyType::default())), None);
-        let mut key_to_node_id = HashMap::new();
+        let mut key_to_node_id = BTreeMap::new();
         key_to_node_id.insert(KeyType::default(), root.unwrap());
         Self {
-            channels: HashMap::new(),
+            channels: BTreeMap::new(),
             key_tree,
             key_to_node_id,
             time_round,
@@ -173,9 +174,9 @@ impl<KeyType, MessageType, NodeIdType, ConditionArgType>
     BrokerTrait<KeyType, MessageType, NodeIdType>
     for Broker<KeyType, MessageType, NodeIdType, ConditionArgType>
 where
-    KeyType: std::cmp::Eq + std::hash::Hash + Clone + Default + Send + Sync + Debug + Display,
+    KeyType: std::cmp::Eq + Clone + Default + Send + Sync + Debug + Display + std::cmp::Ord + Hash,
     MessageType: Clone + Send + 'static + Default + Debug + Sync,
-    NodeIdType: std::hash::Hash + Eq + Clone + Send + Sync + 'static + Debug,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + Debug + std::cmp::Ord,
     ConditionArgType: Clone + Send + 'static + Default + Debug,
 {
     fn add_channel(&mut self, key: KeyType) {
@@ -402,9 +403,9 @@ impl<KeyType, MessageType, NodeIdType, ConditionArgType>
     BrokerTraitExtended<KeyType, MessageType, NodeIdType, ConditionArgType>
     for Broker<KeyType, MessageType, NodeIdType, ConditionArgType>
 where
-    KeyType: std::cmp::Eq + std::hash::Hash + Clone + Default + Send + Sync + Debug + Display,
+    KeyType: std::cmp::Eq + Clone + Default + Send + Sync + Debug + Display + std::cmp::Ord + Hash,
     MessageType: Clone + Send + 'static + Default + Debug + Sync,
-    NodeIdType: std::hash::Hash + Eq + Clone + Send + Sync + 'static + Debug,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + Debug + std::cmp::Ord,
     ConditionArgType: Clone + Send + 'static + Default + Debug,
 {
     fn add_channel_conditionnal<F>(&mut self, key: KeyType, condition: F)
@@ -470,14 +471,14 @@ impl<KeyType, MessageType, NodeIdType, ConditionArgType>
     BrokerTraitProcessing<KeyType, MessageType, NodeIdType, ConditionArgType>
     for Broker<KeyType, MessageType, NodeIdType, ConditionArgType>
 where
-    KeyType: std::cmp::Eq + std::hash::Hash + Clone + Default + Send + Sync + Debug + Display,
+    KeyType: std::cmp::Eq + Clone + Default + Send + Sync + Debug + Display + std::cmp::Ord + Hash,
     MessageType: Clone + Send + 'static + Default + Debug + Sync,
-    NodeIdType: std::hash::Hash + Eq + Clone + Send + Sync + 'static + Debug,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + Debug + std::cmp::Ord,
     ConditionArgType: Clone + Send + 'static + Default + Debug,
 {
     fn process_messages(
         &self,
-        client_condition_args: Option<&HashMap<NodeIdType, ConditionArgType>>,
+        client_condition_args: Option<&BTreeMap<NodeIdType, ConditionArgType>>,
     ) {
         #[cfg(feature = "debug_mode")]
         println!(
@@ -502,7 +503,7 @@ where
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 /// Hierarchical key used by [`PathBroker`] channels and metachannels.
 pub struct PathKey {
     path: Vec<String>,
@@ -634,8 +635,8 @@ impl FromStr for PathKey {
 /// Path-oriented broker wrapper around [`Broker`] using [`PathKey`].
 pub struct PathBroker<MessageType, NodeIdType, ConditionArgType>
 where
-    MessageType: Clone + Send + 'static + Default + Debug,
-    NodeIdType: std::hash::Hash + Eq + Clone + Send + Sync + 'static + Debug,
+    MessageType: Clone + Send + 'static + Default + Debug + std::cmp::Ord,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + Debug + std::cmp::Ord,
     ConditionArgType: Clone + Send + 'static + Default + Debug,
 {
     broker: Broker<String, MessageType, NodeIdType, ConditionArgType>,
@@ -644,8 +645,8 @@ where
 impl<MessageType, NodeIdType, ConditionArgType>
     PathBroker<MessageType, NodeIdType, ConditionArgType>
 where
-    MessageType: Clone + Send + 'static + Default + Debug,
-    NodeIdType: std::hash::Hash + Eq + Clone + Send + Sync + 'static + Debug,
+    MessageType: Clone + Send + 'static + Default + Debug + std::cmp::Ord,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + Debug + std::cmp::Ord,
     ConditionArgType: Clone + Send + 'static + Default + Debug,
 {
     /// Creates an empty path broker with the provided time rounding precision.
@@ -672,8 +673,8 @@ where
 impl<MessageType, NodeIdType, ConditionArgType> BrokerTrait<PathKey, MessageType, NodeIdType>
     for PathBroker<MessageType, NodeIdType, ConditionArgType>
 where
-    MessageType: Clone + Send + 'static + Default + Debug + Sync,
-    NodeIdType: std::hash::Hash + Eq + Clone + Send + Sync + 'static + Debug,
+    MessageType: Clone + Send + 'static + Default + Debug + Sync + std::cmp::Ord,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + Debug + std::cmp::Ord,
     ConditionArgType: Clone + Send + 'static + Default + Debug,
 {
     fn add_channel(&mut self, key: PathKey) {
@@ -877,8 +878,8 @@ impl<MessageType, NodeIdType, ConditionArgType>
     BrokerTraitExtended<PathKey, MessageType, NodeIdType, ConditionArgType>
     for PathBroker<MessageType, NodeIdType, ConditionArgType>
 where
-    MessageType: Clone + Send + 'static + Default + Debug + Sync,
-    NodeIdType: std::hash::Hash + Eq + Clone + Send + Sync + 'static + Debug,
+    MessageType: Clone + Send + 'static + Default + Debug + Sync + std::cmp::Ord,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + Debug + std::cmp::Ord,
     ConditionArgType: Clone + Send + 'static + Default + Debug,
 {
     fn add_channel_conditionnal<F>(&mut self, key: PathKey, condition: F)
@@ -912,8 +913,8 @@ impl<MessageType, NodeIdType, ConditionArgType>
     BrokerTraitProcessing<PathKey, MessageType, NodeIdType, ConditionArgType>
     for PathBroker<MessageType, NodeIdType, ConditionArgType>
 where
-    MessageType: Clone + Send + 'static + Default + Debug + Sync,
-    NodeIdType: std::hash::Hash + Eq + Clone + Send + Sync + 'static + Debug,
+    MessageType: Clone + Send + 'static + Default + Debug + Sync + std::cmp::Ord,
+    NodeIdType: Eq + Clone + Send + Sync + 'static + Debug + std::cmp::Ord,
     ConditionArgType: Clone + Send + 'static + Default + Debug,
 {
     fn get_channel(
@@ -925,7 +926,7 @@ where
 
     fn process_messages(
         &self,
-        client_condition_args: Option<&HashMap<NodeIdType, ConditionArgType>>,
+        client_condition_args: Option<&BTreeMap<NodeIdType, ConditionArgType>>,
     ) {
         self.broker.process_messages(client_condition_args);
     }
