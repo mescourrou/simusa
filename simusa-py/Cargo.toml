@@ -19,9 +19,9 @@ gui = ["simusa/gui"] # Enable GUI features
 
 [dependencies]
 # Workspace dependencies (local)
-simusa = { path = "../simusa-core", version = "1.9.1" }
-simusa-com = { path = "../simusa-com", version = "1.9.1" }
-simusa-macros = { path = "../simusa-macros", version = "1.9.1" }
+simusa = { workspace = true }
+simusa-com = { workspace = true }
+simusa-macros = { workspace = true }
 
 # Main dependencies (alphabetical order)
 nalgebra = { version = "0.34.1", features = ["serde-serialize"] }

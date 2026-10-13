@@ -231,7 +231,7 @@ class MessageFlag(Enum):
     # Ask to kill the receiving node
     Kill = 3
 
-class MessageTypes(Enum):
+class MessageType(Enum):
     String: str
     GoTo: GoToMessage
     SensorTrigger: SensorTriggerMessage
@@ -243,25 +243,25 @@ class MessageTypes(Enum):
     def __init__(self):
         self.kind: str
 
-    def from_goto(cmd: GoToMessage) -> MessageTypes:
+    def from_goto(cmd: GoToMessage) -> MessageType:
         raise NotImplementedError()
 
-    def from_sensor_trigger(cmd: SensorTriggerMessage) -> MessageTypes:
+    def from_sensor_trigger(cmd: SensorTriggerMessage) -> MessageType:
         raise NotImplementedError()
 
-    def from_sensor_frame(cmd: SensorFrameMessage) -> MessageTypes:
+    def from_sensor_frame(cmd: SensorFrameMessage) -> MessageType:
         raise NotImplementedError()
 
-    def from_string(cmd: str) -> MessageTypes:
+    def from_string(cmd: str) -> MessageType:
         raise NotImplementedError()
 
-    def from_observations(cmd: List[Observation]) -> MessageTypes:
+    def from_observations(cmd: List[Observation]) -> MessageType:
         raise NotImplementedError()
 
-    def from_event(cmd: str) -> MessageTypes:
+    def from_event(cmd: str) -> MessageType:
         raise NotImplementedError()
 
-    def from_custom(cmd: List[bytes]) -> MessageTypes:
+    def from_custom(cmd: List[bytes]) -> MessageType:
         raise NotImplementedError()
 
     def as_goto(self) -> GoToMessage | None:
@@ -289,19 +289,19 @@ class MessageTypes(Enum):
 class Envelope:
     def __init__(self):
         self.msg_from: str
-        self.message: MessageTypes
+        self.message: MessageType
         self.timestamp: float
 
 class Node:
     def name(self):
         raise NotImplementedError()
     
-    def send_message(self, to: str, message: MessageTypes, time: float, flags: List[MessageFlag]=[]):
+    def send_message(self, to: str, message: MessageType, time: float, flags: List[MessageFlag]=[]):
         """Send a message to the given channel
 
         Args:
             to (str): Channel to send the message to. If relative (does not contain '/'), the root is /simusa/node/{node_name}/
-            message (MessageTypes): Message to send.
+            message (MessageType): Message to send.
             time (float): Timestamp to send
             flags (List[MessageFlag], optional): Flags for the message (eg. Kill). Defaults to [].
         """
@@ -332,7 +332,7 @@ class Client:
     def subscribe_instantaneous(self, key: str) -> None:
         raise NotImplementedError()
 
-    def send(self, to: str, message: MessageTypes, time: float, flags: List[MessageFlag] = []) -> None:
+    def send(self, to: str, message: MessageType, time: float, flags: List[MessageFlag] = []) -> None:
         raise NotImplementedError()
 
     def try_receive(self, time: float) -> Tuple[str, Envelope] | None:

@@ -9,7 +9,7 @@ cargo nextest run --release
 cargo nextest run --release --no-default-features
 cargo nextest run --release --features monothreaded
 
-cd simusa-py && maturin develop
+cd simusa-py && maturin develop --release
 cd $CWD
 
 target/release/simusa-cmd config_example/config.yaml --no-gui

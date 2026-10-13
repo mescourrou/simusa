@@ -1,7 +1,8 @@
 /*!
 Module providing different strategies for the state estimation.
 
-To use an external state estimator (in Rust), use [`external_estimator`]
+To use an plugin state estimator (in Rust), use [`StateEstimatorConfig::Plugin`] in the global configuration,
+implement a struct that implements the [`StateEstimator`] trait,
 and implement a specification for [`crate::plugin_api::PluginAPI`].
 
 ## How to create a new (internal) state estimation strategy
@@ -465,19 +466,21 @@ impl Recordable<WorldStateRecord> for WorldState {
     }
 }
 
-#[cfg(feature = "gui")]
-use crate::gui::{
-    UIComponent,
-    utils::{edit_plugin_config, show_plugin_config, string_combobox, text_singleline_with_apply},
-};
+use crate::context::Context;
+use crate::errors::{SimusaError, SimusaErrorTypes};
 use crate::utils::determinist_random_variable::DeterministRandomVariableFactory;
-#[cfg(feature = "gui")]
-use crate::utils::enum_tools::ToVec;
-use crate::{context::Context, utils::geometry::mod2pi};
+use crate::utils::geometry::mod2pi;
 use crate::{errors::SimusaResult, node::Node};
+#[cfg(feature = "gui")]
 use crate::{
-    errors::{SimusaError, SimusaErrorTypes},
+    gui::{
+        UIComponent,
+        utils::{
+            edit_plugin_config, show_plugin_config, string_combobox, text_singleline_with_apply,
+        },
+    },
     simulator::SimulatorConfig,
+    utils::enum_tools::ToVec,
 };
 use crate::{node::node_factory::FromConfigArguments, utils::occupancy_grid::OccupancyGrid};
 use crate::{
@@ -533,7 +536,9 @@ impl UIComponent for StateEstimatorConfig {
                         perfect_estimator::PerfectEstimatorConfig::default(),
                     )
                 }
-                "Plugin" => *self = StateEstimatorConfig::Plugin(crate::utils::GeneralValue::default()),
+                "Plugin" => {
+                    *self = StateEstimatorConfig::Plugin(crate::utils::GeneralValue::default())
+                }
                 _ => panic!("Where did you find this value?"),
             };
         }

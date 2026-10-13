@@ -4,7 +4,8 @@ log:
   included_nodes: []
   excluded_nodes: []
   log_level:
-    type: Info
+    type: Internal
+    value: [type: "All"]
   outputs:
     - type: File
       value: "simulator.log"

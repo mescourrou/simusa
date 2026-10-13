@@ -65,8 +65,8 @@ mod tests {
         sync::{Arc, Mutex},
     };
 
-    use serde::{Deserialize, Serialize};
     use crate::utils::GeneralValue;
+    use serde::{Deserialize, Serialize};
     use simusa_com::pub_sub::{MultiClientTrait, PathKey};
 
     use crate::{
@@ -152,7 +152,7 @@ mod tests {
             if node.name() == "node2" {
                 while let Some((_path, envelope)) = self.message_client.try_receive(time) {
                     let message: String = envelope.message.clone().into();
-                    println!("Receiving message: {} from {}", &message, envelope.from);
+                    println!("Receiving message: {} from {}", message, envelope.from);
                     *self.last_message.lock().unwrap() = Some(message);
                     *self.last_from.lock().unwrap() = Some(envelope.from.clone());
                 }
@@ -169,12 +169,12 @@ mod tests {
 
     impl Recordable<StateEstimatorRecord> for StateEstimatorTest {
         fn record(&self, _context: &Context) -> StateEstimatorRecord {
-            StateEstimatorRecord::Plugin(
-                GeneralValue(serde_json::to_value(StateEstimatorRecordTest {
+            StateEstimatorRecord::Plugin(GeneralValue(
+                serde_json::to_value(StateEstimatorRecordTest {
                     last_time: self.last_time,
                 })
-                .unwrap()),
-            )
+                .unwrap(),
+            ))
         }
     }
 

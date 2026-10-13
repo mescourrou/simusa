@@ -28,6 +28,7 @@ build_python_linux:
   stage: build
   image: gitlab.laas.fr:4567/mescourrou/simusa:latest
   script:
+    - source /env/bin/activate
     - cd simusa-py
     - maturin build --release --target x86_64-unknown-linux-gnu
   artifacts:
@@ -53,6 +54,7 @@ build_python_windows:
   stage: build
   image: gitlab.laas.fr:4567/mescourrou/simusa:latest
   script:
+    - source /env/bin/activate
     - cd simusa-py
     - maturin build --release --target x86_64-pc-windows-gnu
   artifacts:
@@ -76,7 +78,7 @@ doc:
     - chmod 400 "$SSH_KEY"
     - ssh-add "$SSH_KEY"
   script:
-    - cargo doc --no-deps --document-private-items
+    - cargo doc --no-deps --release
     - scp -i $SSH_KEY -r target/doc/ $DOC_USER@$DOC_HOST:$DOC_PATH/rust
     # - ./generate_config_doc.py
     - cd doc/user_manual && sh ./make_doc.sh
@@ -89,8 +91,14 @@ tests:
   image: gitlab.laas.fr:4567/mescourrou/simusa:latest
   script:
     - source /env/bin/activate
+    - cd simusa-py
     - maturin develop
-    - ./prepare_release.sh
+    - cd -
+    - cargo clippy --all-targets -- -D warnings
+    - cargo clippy -p simusa --no-default-features -- -D warnings
+    - cargo clippy -p simusa --features monothreaded -- -D warnings
+    - RUSTFLAGS="-D warnings" cargo doc --no-deps --release
+    - ./test.sh
 
 run_tools:
   rules:

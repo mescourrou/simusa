@@ -130,7 +130,6 @@ use crate::{
     node::{Node, node_factory::FromConfigArguments},
     physics::robot_models::Command,
     recordable::Recordable,
-    simulator::SimulatorConfig,
     state_estimators::State,
     utils::SharedRwLock,
 };
@@ -140,6 +139,7 @@ use crate::{
         UIComponent,
         utils::{edit_plugin_config, show_plugin_config, string_combobox},
     },
+    simulator::SimulatorConfig,
     utils::enum_tools::ToVec,
 };
 

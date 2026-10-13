@@ -26,8 +26,8 @@ monothreaded = []  # Force single-threaded execution
 
 [dependencies]
 # Workspace dependencies (local)
-simusa-macros = { path = "../simusa-macros", version = "1.9.1" }
-simusa-com = { path = "../simusa-com", version = "1.9.1", default-features =  false }
+simusa-macros = { workspace = true }
+simusa-com = { workspace = true }
 
 # Main dependencies (alphabetical order)
 colored = "3.0.0"

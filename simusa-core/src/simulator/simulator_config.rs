@@ -255,6 +255,7 @@ impl SimulatorConfig {
     }
 
     /// Set the base path of the simulator configuration (only available in the core)
+    #[cfg(feature = "gui")]
     pub(crate) fn set_base_path(&mut self, path: Box<Path>) {
         self.base_path = path;
     }

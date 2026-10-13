@@ -19,14 +19,18 @@ use simusa_macros::config_derives;
 
 use crate::context::Context;
 use crate::errors::{SimusaError, SimusaErrorTypes, SimusaResult};
-#[cfg(feature = "gui")]
-use crate::gui::utils::{edit_plugin_config, show_plugin_config};
-#[cfg(feature = "gui")]
-use crate::gui::{UIComponent, utils::string_combobox};
 use crate::interfaces::navigator_controller::{ControllerInputVariable, ControllerInputVariables};
 use crate::node::node_factory::FromConfigArguments;
-use crate::simulator::SimulatorConfig;
 use crate::state_estimators::WorldState;
+#[cfg(feature = "gui")]
+use crate::{
+    gui::{
+        UIComponent,
+        utils::string_combobox,
+        utils::{edit_plugin_config, show_plugin_config},
+    },
+    simulator::SimulatorConfig,
+};
 
 /// Enumerate the configuration of the different strategies.
 ///
@@ -177,7 +181,7 @@ pub trait Navigator:
 
     /// Returns the list of variables that can be provided by the navigator for the controller.
     ///
-    /// Override with caution: the [`OutputType`] might not be compatible with the returned variables.
+    /// Override with caution: the [`Navigator::OutputType`] might not be compatible with the returned variables.
     fn available_variables(&self) -> &[ControllerInputVariable] {
         Self::OutputType::available_variables()
     }
@@ -188,7 +192,7 @@ pub trait Navigator:
         Ok(())
     }
 
-    /// Compute the output ([`ControllerError`]) between the given `state` and the planned path.
+    /// Compute the output ([`Navigator::OutputType`]) between the given `state` and the planned path.
     ///
     /// ## Arguments
     /// * `node` - Reference to the node to access modules.

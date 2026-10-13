@@ -63,8 +63,7 @@ use crate::{
 /// Trait to link the simulator to the external implementation.
 #[allow(unused_variables)]
 pub trait PluginAPI: Send + Sync {
-    /// Return the [`StateEstimator`] to be used by the
-    /// [`PluginEstimator`](`crate::state_estimators::external_estimator::PluginEstimator`).
+    /// Return the [`StateEstimator`] corresponding to the [`StateEstimatorConfig::Plugin`](crate::state_estimators::StateEstimatorConfig::Plugin) type.
     ///
     /// # Arguments
     /// * `config` - Config for the external state estimator. The configuration
@@ -91,8 +90,7 @@ pub trait PluginAPI: Send + Sync {
         panic!("The given PluginAPI does not provide a state estimator");
     }
 
-    /// Return the [`Controller`] to be used by the
-    /// [`PluginController`](`crate::controllers::external_controller::PluginController`).
+    /// Return the [`Controller`](crate::controllers::Controller) corresponding to the [`ControllerConfig::Plugin`](crate::controllers::ControllerConfig::Plugin).
     ///
     /// # Arguments
     /// * `config` - Config for the external controller. The configuration
@@ -106,7 +104,7 @@ pub trait PluginAPI: Send + Sync {
     ///
     /// # Return
     ///
-    /// Returns the [`Controller`] to use.
+    /// Returns the [`Controller`](crate::controllers::Controller) to use, with the trait [`AbstractController`] automatically implemented.
     fn get_controller(
         &self,
         config: &crate::utils::GeneralValue,
@@ -119,8 +117,7 @@ pub trait PluginAPI: Send + Sync {
         panic!("The given PluginAPI does not provide a controller");
     }
 
-    /// Return the [`Navigator`] to be used by the
-    /// [`PluginNavigator`](`crate::navigators::external_navigator::PluginNavigator`).
+    /// Return the [`Navigator`](crate::navigators::Navigator) corresponding to the [`NavigatorConfig::Plugin`](crate::navigators::NavigatorConfig::Plugin) type.
     ///
     /// # Arguments
     /// * `config` - Config for the external navigator. The configuration
@@ -134,7 +131,8 @@ pub trait PluginAPI: Send + Sync {
     ///
     /// # Return
     ///
-    /// Returns the [`Navigator`] to use.
+    /// Returns the [`Navigator`](crate::navigators::Navigator) to use.
+    /// The trait [`AbstractNavigator`] is automatically implemented.
     fn get_navigator(
         &self,
         config: &crate::utils::GeneralValue,
@@ -147,8 +145,7 @@ pub trait PluginAPI: Send + Sync {
         panic!("The given PluginAPI does not provide a navigator");
     }
 
-    /// Return the [`Physics`] to be used by the
-    /// [`PluginPhysics`](`crate::physics::external_physics::PluginPhysics`).
+    /// Return the [`Physics`] corresponding to the [`PhysicsConfig::Plugin`](crate::physics::PhysicsConfig::Plugin).
     ///
     /// # Arguments
     /// * `config` - Config for the external physics. The configuration
@@ -176,11 +173,10 @@ pub trait PluginAPI: Send + Sync {
     }
 
     /// Allow the plugin to check for requests from the simulator and react to them.
-    /// This is used at the configuration loading step to allow asynchronous plugins to check for requests, especially [`PythonAPI`](crate::pybinds::PythonAPI).
+    /// This is used at the configuration loading step to allow asynchronous plugins to check for requests, especially when using the Python API.
     fn check_requests(&self, context: &Context) {}
 
-    /// Return the [`Sensor`] to be used by the
-    /// [`PluginSensor`](`crate::sensors::external_sensor::PluginSensor`).
+    /// Return the [`Sensor`] corresponding to the [`SensorConfig::Plugin`](crate::sensors::SensorConfig::Plugin) type.
     ///
     /// # Arguments
     /// * `config` - Config for the external sensor. The configuration
@@ -217,8 +213,7 @@ pub trait PluginAPI: Send + Sync {
         Vec::new()
     }
 
-    /// Return the [`SensorFilter`] to be used by the
-    /// [`PluginFilter`](`crate::sensors::sensor_filters::external_filter::PluginFilter`).
+    /// Return the [`SensorFilter`] to be used by the `Plugin` sensor filter.
     ///
     /// # Arguments
     /// * `config` - Config for the external sensor filter. The configuration
@@ -243,8 +238,7 @@ pub trait PluginAPI: Send + Sync {
         panic!("The given PluginAPI does not provide a sensor filter");
     }
 
-    /// Return the [`FaultModel`] to be used by the
-    /// [`PluginFault`](`crate::sensors::fault_models::external_fault::PluginFault`).
+    /// Return the [`FaultModel`] to be used by the `Plugin` options in sensor fault models
     ///
     /// # Arguments
     /// * `config` - Config for the external sensor fault. The configuration

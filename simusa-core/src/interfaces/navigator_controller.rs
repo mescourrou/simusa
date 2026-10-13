@@ -58,11 +58,11 @@ macro_rules! generate_controller_input {
 
 
 /// Enumerates the controller input variables that can be requested from the navigator
-/// by the controller. Each variable corresponds to a specific field in [`ControllerInput`].
+/// by the controller. Each variable corresponds to a specific field in [`ControllerInputVariables`].
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
 pub enum ControllerInputVariable {
     $(
-        /// Variable corresponding to the `$snake_case_name` field in [`ControllerInput`].
+        /// Variable corresponding to the `$snake_case_name` field in [`ControllerInputVariables`].
         #[doc = $docstring]
         $camel_case_name,
     )+

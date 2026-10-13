@@ -33,19 +33,19 @@ class StateEstimator(simusa.StateEstimator):
         node.log_info("Master")
         if abs(5 - time) < 0.001:
             node.log_info("Try to send message")
-            msg = simusa.MessageTypes.GoTo(simusa.GoToMessage([10,10]))
+            msg = simusa.MessageType.GoTo(simusa.GoToMessage([10,10]))
             self.client.send("/simusa/command/robot1", msg, time)
             node.log_info("Message sent")
 
         if abs(20 - time) < 0.001:
             node.log_info("Try to send message")
-            msg = simusa.MessageTypes.GoTo(simusa.GoToMessage([-10,10]))
+            msg = simusa.MessageType.GoTo(simusa.GoToMessage([-10,10]))
             self.client.send("/simusa/command/robot1", msg, time)
             node.log_info("Message sent")
 
         if abs(30 - time) < 0.001:
             node.log_info("Try to send message")
-            msg = simusa.MessageTypes.GoTo(simusa.GoToMessage([-10,-10]))
+            msg = simusa.MessageType.GoTo(simusa.GoToMessage([-10,-10]))
             self.client.send("/simusa/command/robot1", msg, time)
             node.log_info("Message sent")
 

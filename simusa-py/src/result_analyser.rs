@@ -4,7 +4,7 @@ use std::ffi::{CStr, CString};
 use std::io::{BufReader, Read, Write};
 use std::{fs, net::TcpListener};
 
-use simusa::debug;
+use simusa::{debug, error};
 use simusa::logger::{LogLevel, LoggerConfig};
 use simusa::result_analyser::python_analyser::ResultAnalyserFrame;
 use simusa::{
@@ -73,6 +73,11 @@ impl ResultAnalyser {
             "Starting result analyser server at {}:{}", host, port
         );
         let connection = TcpListener::bind(format!("{}:{}", host, port)).map_err(|e| {
+            error!(
+                context,
+                "Impossible to start result analyser server at {}:{}: {}",
+                host, port, e
+            );
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
                 "Impossible to start result analyser server at {}:{}: {}",
                 host, port, e

@@ -28,20 +28,17 @@ use crate::{
     context::Context,
     errors::{SimusaError, SimusaErrorTypes, SimusaResult},
     info, internal,
-    logger::InternalLog,
+    logger::{InternalLog, LogLevel},
     networking::NetworkError,
     plugin_api::PluginAPI,
     result_analyser::ResultAnalyserTrait,
-    simulator::Results,
+    simulator::{Results, SimulatorConfig},
 };
 
 #[cfg(feature = "gui")]
-use crate::{
-    gui::{
-        UIComponent,
-        utils::{json_config, path_finder},
-    },
-    simulator::SimulatorConfig,
+use crate::gui::{
+    UIComponent,
+    utils::{json_config, path_finder},
 };
 
 /// Configuration of the Python Result Analyser.
@@ -180,7 +177,14 @@ impl PythonResultAnalyser {
 
     fn send_request(&self, frame: ResultAnalyserFrame, context: &Context) -> SimusaResult<()> {
         let mut connection = None;
-        for _ in 0..10 {
+        internal!(
+            context,
+            InternalLog::ExternalNetwork,
+            "Try to establish a connection to the result analyser server at port {}",
+            self.config.port
+        );
+        let max_tries: u8 = 10;
+        for i in 0..max_tries {
             if let Ok(conn) = TcpStream::connect(SocketAddr::new(
                 IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 self.config.port,
@@ -189,6 +193,12 @@ impl PythonResultAnalyser {
                 break;
             }
             std::thread::sleep(Duration::from_millis(500));
+            internal!(
+                context,
+                InternalLog::ExternalNetwork,
+                "Retry to establish a connection ({}/{max_tries} tries)",
+                i+1
+            );
         }
         let connection = connection.ok_or_else(|| {
             SimusaError::new(
@@ -196,6 +206,11 @@ impl PythonResultAnalyser {
                 "Impossible to connect to result analyser server".into(),
             )
         })?;
+        internal!(
+            context,
+            InternalLog::ExternalNetwork,
+            "plop2"
+        );
         let mut reader = BufReader::new(connection.try_clone().unwrap());
         let mut writer = BufWriter::new(connection);
         internal!(
@@ -282,8 +297,17 @@ except ImportError as e:
     else:
         raise e
 
-simusa._internal.ResultAnalyser().run_server('localhost', {2}, '{3}')
-            ", VERSION, python_distrib, self.config.port, context.get_loglevel()))
+simusa._internal.ResultAnalyser().run_server('127.0.0.1', {2}, '{3}')
+            ", VERSION, python_distrib, self.config.port, {
+                let l = context.get_loglevel();
+                // Convert Internal log level to Debug for Python server,
+                // as it does not support Internal log level.
+                if let LogLevel::Internal(_) = l {
+                    LogLevel::Debug
+                } else {
+                    l
+                }
+            }))
             .envs(std::env::vars())
             .spawn()
             .map_err(|e| {
@@ -300,6 +324,13 @@ simusa._internal.ResultAnalyser().run_server('localhost', {2}, '{3}')
         };
 
         let res = self.send_request(frame, context);
+        if let Err(err) = &res {
+            self.command.as_mut().unwrap().kill().map_err(|e| {
+                err.clone().chain(format!("Impossible to stop result analyser server: {}", e))
+            })?;
+            self.command = None;
+            return Err(err.clone());
+        }
 
         if let Some(mut err) = self.command.as_mut().unwrap().stderr.take() {
             let mut buf = String::new();

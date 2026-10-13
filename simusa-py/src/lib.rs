@@ -6,7 +6,7 @@ use crate::{
     controllers::{ControllerWrapper, PythonControllerInputWrapper},
     messages::{GoToMessageWrapper, MessageFlagWrapper, SensorTriggerMessageWrapper},
     navigators::NavigatorWrapper,
-    networking::MessageTypesWrapper,
+    networking::MessageTypeWrapper,
     physics::PhysicsWrapper,
     result_analyser::ResultAnalyser,
     state_estimators::StateEstimatorWrapper,
@@ -160,7 +160,7 @@ pub fn simusa(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<NodeWrapper>()?;
     m.add_class::<MultiClientWrapper>()?;
     m.add_class::<MessageFlagWrapper>()?;
-    m.add_class::<MessageTypesWrapper>()?;
+    m.add_class::<MessageTypeWrapper>()?;
     m.add_class::<GoToMessageWrapper>()?;
     m.add_class::<SensorTriggerMessageWrapper>()?;
     m.add_function(wrap_pyfunction!(run_gui, m)?)?;

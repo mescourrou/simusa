@@ -45,7 +45,7 @@ use crate::{
     general::{PythonAPI, impl_from_plain_with_from_ref},
     messages::MessageFlagWrapper,
     navigators::NavigatorWrapper,
-    networking::MessageTypesWrapper,
+    networking::MessageTypeWrapper,
     physics::PhysicsWrapper,
     state_estimators::StateEstimatorWrapper,
 };
@@ -1075,8 +1075,8 @@ impl_from_plain_with_from_ref!(HolonomicCommandWrapper, HolonomicCommand);
 pub struct EnvelopeWrapper {
     /// Expeditor
     pub msg_from: String,
-    /// Message sent, see [`MessageTypesWrapper`] for supported messages
-    pub message: MessageTypesWrapper,
+    /// Message sent, see [`MessageTypeWrapper`] for supported messages
+    pub message: MessageTypeWrapper,
     /// Time of the message
     pub timestamp: f32,
 }
@@ -1105,15 +1105,15 @@ impl NodeWrapper {
     ///
     /// # Arguments
     /// * `to` - Channel key to send the message to. It can be a relative key (e.g. "channel1") or an absolute key (e.g. "/my_channels/channel1").
-    /// * `message` - Message to send. See [`MessageTypesWrapper`] for the supported message types in Python.
+    /// * `message` - Message to send. See [`MessageTypeWrapper`] for the supported message types in Python.
     /// * `time` - Time at which the message is sent. It should be the current time of the simulator or in the future.
-    /// * `flags` - Message flags. See [`MessageFlag`] for the supported flags.
+    /// * `flags` - Message flags. See [`MessageFlag`](::simusa::networking::network::MessageFlag) for the supported flags.
     #[pyo3(signature = (to, message, time, flags=Vec::new()))]
     #[warn(clippy::useless_conversion)]
     pub fn send_message(
         &self,
         to: String,
-        message: MessageTypesWrapper,
+        message: MessageTypeWrapper,
         time: f32,
         flags: Vec<MessageFlagWrapper>,
     ) -> PyResult<()> {
@@ -1232,13 +1232,13 @@ impl MultiClientWrapper {
     ///
     /// # Arguments
     /// * `to` - Channel key to send the message to. It can be a relative key (e.g. "channel1") or an absolute key (e.g. "/my_channels/channel1").
-    /// * `message` - Message to send. See [`MessageTypesWrapper`] for the supported message types in Python.
+    /// * `message` - Message to send. See [`MessageTypeWrapper`] for the supported message types in Python.
     /// * `time` - Time at which the message is sent. It should be the current time of the simulator or in the future.
-    /// * `flags` - Message flags. See [`MessageFlag`] for the supported flags.
+    /// * `flags` - Message flags. See [`MessageFlag`](::simusa::networking::network::MessageFlag) for the supported flags.
     pub fn send(
         &self,
         to: String,
-        message: MessageTypesWrapper,
+        message: MessageTypeWrapper,
         time: f32,
         flags: Vec<MessageFlagWrapper>,
     ) -> PyResult<()> {
@@ -1263,7 +1263,7 @@ impl MultiClientWrapper {
                 path.to_string(),
                 EnvelopeWrapper {
                     msg_from: envelope.from,
-                    message: MessageTypesWrapper::from_rust(&envelope.message),
+                    message: MessageTypeWrapper::from_rust(&envelope.message),
                     timestamp: envelope.timestamp,
                 },
             ))
@@ -1335,18 +1335,17 @@ impl PluginAPIWrapper {
     pub fn new() -> Self {
         Self {}
     }
-    /// Return the [`StateEstimator`](crate::state_estimators::StateEstimator) to be used by the
-    /// [`PluginEstimator`](crate::state_estimators::external_estimator::PluginEstimator).
+    /// Return the [`StateEstimator`](::simusa::state_estimators::StateEstimator)
     ///
     /// # Arguments
     /// * `config` - Config for the external state estimator. The configuration
-    /// is given using [`crate::utils::GeneralValue`]. It should be converted by the
+    /// is given using [`::simusa::utils::GeneralValue`]. It should be converted by the
     /// external plugin to the specific configuration.
     /// * `global_config` - Full configuration of the simulator.
     ///
     /// # Return
     ///
-    /// Returns the [`StateEstimator`](crate::state_estimators::StateEstimator) to use.
+    /// Returns the [`StateEstimator`](::simusa::state_estimators::StateEstimator) to use.
     pub fn get_state_estimator(
         &self,
         _config: Py<PyAny>,
@@ -1356,18 +1355,17 @@ impl PluginAPIWrapper {
         panic!("The given PluginAPI does not provide a state estimator");
     }
 
-    /// Return the [`Controller`](crate::controllers::Controller) to be used by the
-    /// [`PluginController`](crate::controllers::external_controller::PluginController).
+    /// Return the [`Controller`](::simusa::controllers::Controller).
     ///
     /// # Arguments
     /// * `config` - Config for the external controller. The configuration
-    /// is given using [`crate::utils::GeneralValue`]. It should be converted by the
+    /// is given using [`::simusa::utils::GeneralValue`]. It should be converted by the
     /// external plugin to the specific configuration.
     /// * `global_config` - Full configuration of the simulator.
     ///
     /// # Return
     ///
-    /// Returns the [`Controller`](crate::controllers::Controller) to use.
+    /// Returns the [`Controller`](::simusa::controllers::Controller) to use.
     pub fn get_controller(
         &self,
         _config: Py<PyAny>,
@@ -1377,18 +1375,17 @@ impl PluginAPIWrapper {
         panic!("The given PluginAPI does not provide a controller");
     }
 
-    /// Return the [`Navigator`](crate::navigators::Navigator) to be used by the
-    /// [`PluginNavigator`](crate::navigators::external_navigator::PluginNavigator).
+    /// Return the [`Navigator`](::simusa::navigators::Navigator).
     ///
     /// # Arguments
     /// * `config` - Config for the external navigator. The configuration
-    /// is given using [`crate::utils::GeneralValue`]. It should be converted by the
+    /// is given using [`::simusa::utils::GeneralValue`]. It should be converted by the
     /// external plugin to the specific configuration.
     /// * `global_config` - Full configuration of the simulator.
     ///
     /// # Return
     ///
-    /// Returns the [`Navigator`](crate::navigators::Navigator) to use.
+    /// Returns the [`Navigator`](::simusa::navigators::Navigator) to use.
     pub fn get_navigator(
         &self,
         _config: Py<PyAny>,
@@ -1398,18 +1395,17 @@ impl PluginAPIWrapper {
         panic!("The given PluginAPI does not provide a navigator");
     }
 
-    /// Return the [`Physics`](crate::physics::Physics) to be used by the
-    /// [`PluginPhysics`](crate::physics::external_physics::PluginPhysics).
+    /// Return the [`Physics`](::simusa::physics::Physics).
     ///
     /// # Arguments
     /// * `config` - Config for the external physics. The configuration
-    /// is given using [`crate::utils::GeneralValue`]. It should be converted by the
+    /// is given using [`::simusa::utils::GeneralValue`]. It should be converted by the
     /// external plugin to the specific configuration.
     /// * `global_config` - Full configuration of the simulator.
     ///
     /// # Return
     ///
-    /// Returns the [`Physics`](crate::physics::Physics) to use.
+    /// Returns the [`Physics`](::simusa::physics::Physics) to use.
     pub fn get_physics(
         &self,
         _config: Py<PyAny>,
@@ -1439,7 +1435,7 @@ impl SimulatorWrapper {
     /// Constructor for the simulator.
     ///
     /// # Arguments
-    /// * `config_path` - Path to the configuration file. The configuration file should be in YAML format and follow the structure defined in the documentation. See the [`SimulatorConfig`](crate::simulator::SimulatorConfig) for more details on the configuration structure.
+    /// * `config_path` - Path to the configuration file. The configuration file should be in YAML format and follow the structure defined in the documentation. See the [`SimulatorConfig`](::simusa::simulator::SimulatorConfig) for more details on the configuration structure.
     /// * `plugin_api` - Optional Python object that implements the [`PluginAPI`] interface. This object will be used to provide custom implementations of the state estimator, controller, navigator and physics if required by the configuration.
     #[staticmethod]
     #[pyo3(signature = (config_path, plugin_api=None))]

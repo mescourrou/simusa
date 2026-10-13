@@ -73,7 +73,6 @@ use crate::{
         maths::round_precision,
     },
 };
-use core::f32;
 use std::{cmp::Ordering, collections::BTreeMap, fs::OpenOptions, io::SeekFrom, path::Path};
 
 use serde_json;
@@ -1252,7 +1251,7 @@ impl Simulator {
             crate::logger::InternalLog::NodeRunning,
             "Collecting results"
         );
-        let mut new_records = self.new_records.drain(..).collect::<Vec<_>>();
+        let mut new_records = std::mem::take(&mut self.new_records);
         if let Some(async_api) = &self.async_api {
             while let Ok(record) = async_api.records.lock().unwrap().try_recv() {
                 new_records.push(record)

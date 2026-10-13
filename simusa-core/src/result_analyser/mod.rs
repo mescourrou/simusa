@@ -72,7 +72,9 @@ impl UIComponent for ResultAnalyserConfig {
                 "Python" => {
                     *self = ResultAnalyserConfig::Python(PythonResultAnalyserConfig::default())
                 }
-                "Plugin" => *self = ResultAnalyserConfig::Plugin(crate::utils::GeneralValue::default()),
+                "Plugin" => {
+                    *self = ResultAnalyserConfig::Plugin(crate::utils::GeneralValue::default())
+                }
                 _ => panic!("Where did you find this value?"),
             };
         }

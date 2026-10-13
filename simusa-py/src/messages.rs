@@ -68,7 +68,7 @@ impl SensorFrameMessageWrapper {
 #[derive(Clone, Debug)]
 #[pyclass(get_all, set_all)]
 #[pyo3(name = "GoToMessage")]
-/// Runtime message used to update the target point of a [`GoTo`] navigator.
+/// Runtime message used to update the target point of a [`GoTo`](::simusa::navigators::go_to::GoTo) navigator.
 pub struct GoToMessageWrapper {
     /// Target point in world coordinates `[x, y]`.
     ///

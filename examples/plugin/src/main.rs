@@ -102,7 +102,11 @@ impl Controller for MyWonderfulController {
 
 impl Recordable<ControllerRecord> for MyWonderfulController {
     fn record(&self, _context: &Context) -> ControllerRecord {
-        ControllerRecord::Plugin(serde_json::to_value(MyWonderfulControllerRecord {}).unwrap().into())
+        ControllerRecord::Plugin(
+            serde_json::to_value(MyWonderfulControllerRecord {})
+                .unwrap()
+                .into(),
+        )
     }
 }
 
@@ -192,7 +196,11 @@ impl Navigator for MyWonderfulNavigator {
 
 impl Recordable<NavigatorRecord> for MyWonderfulNavigator {
     fn record(&self, _context: &Context) -> NavigatorRecord {
-        NavigatorRecord::Plugin(serde_json::to_value(MyWonderfulNavigatorRecord {}).unwrap().into())
+        NavigatorRecord::Plugin(
+            serde_json::to_value(MyWonderfulNavigatorRecord {})
+                .unwrap()
+                .into(),
+        )
     }
 }
 
@@ -240,7 +248,8 @@ impl Recordable<PhysicsRecord> for MyWonderfulPhysics {
             serde_json::to_value(MyWonderfulPhysicsRecord {
                 state: self.state.record(context),
             })
-            .unwrap().into(),
+            .unwrap()
+            .into(),
         )
     }
 }
@@ -307,7 +316,8 @@ impl Recordable<StateEstimatorRecord> for MyWonderfulStateEstimator {
             serde_json::to_value(MyWonderfulStateEstimatorRecord {
                 last_prediction: self.last_prediction,
             })
-            .unwrap().into(),
+            .unwrap()
+            .into(),
         )
     }
 }
@@ -369,7 +379,9 @@ impl Sensor for MyWonderfulSensor {
         self.last_time = time;
         // Return a custom observation here, but you can return an existing one as well (e.g. SpeedObservation)
         vec![SensorObservation::Plugin(
-            serde_json::to_value(self.last_observation.as_ref().unwrap()).unwrap().into(),
+            serde_json::to_value(self.last_observation.as_ref().unwrap())
+                .unwrap()
+                .into(),
         )]
     }
 
@@ -380,7 +392,11 @@ impl Sensor for MyWonderfulSensor {
 
 impl Recordable<SensorRecord> for MyWonderfulSensor {
     fn record(&self, _context: &Context) -> SensorRecord {
-        SensorRecord::Plugin(serde_json::to_value(self.last_observation.clone()).unwrap().into())
+        SensorRecord::Plugin(
+            serde_json::to_value(self.last_observation.clone())
+                .unwrap()
+                .into(),
+        )
     }
 }
 

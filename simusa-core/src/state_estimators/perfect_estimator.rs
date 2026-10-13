@@ -8,7 +8,7 @@ use super::{State, WorldState, WorldStateRecord};
 use crate::{
     constants::TIME_ROUND,
     context::Context,
-    error, info,
+    error,
     node::NodeState,
     physics::robot_models::Command,
     utils::{
@@ -238,7 +238,6 @@ impl StateEstimator for PerfectEstimator {
             );
             return;
         }
-        info!(context, "Doing prediction step");
         if let Some(ego) = &mut self.world_state.ego {
             let arc_physic = node
                 .physics()

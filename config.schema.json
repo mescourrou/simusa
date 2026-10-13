@@ -96,7 +96,7 @@
     "version": {
       "description": "Version of the simulator used by the configuration. Produces a warning the the major version (second number)\nis different from the current one.",
       "type": "string",
-      "default": "1.9.1"
+      "default": "1.10.0"
     }
   },
   "additionalProperties": false,
@@ -348,6 +348,7 @@
               "const": "Plugin"
             }
           },
+          "$ref": "#/$defs/GeneralValue",
           "required": [
             "type"
           ]
@@ -502,6 +503,7 @@
               "const": "Plugin"
             }
           },
+          "$ref": "#/$defs/GeneralValue",
           "required": [
             "type"
           ]
@@ -564,6 +566,7 @@
               "const": "Plugin"
             }
           },
+          "$ref": "#/$defs/GeneralValue",
           "required": [
             "type"
           ]
@@ -1022,6 +1025,7 @@
               "const": "Plugin"
             }
           },
+          "$ref": "#/$defs/GeneralValue",
           "required": [
             "type"
           ]
@@ -1084,6 +1088,7 @@
               "const": "Plugin"
             }
           },
+          "$ref": "#/$defs/GeneralValue",
           "required": [
             "type"
           ]
@@ -1219,6 +1224,9 @@
           "const": "self_velocity"
         }
       ]
+    },
+    "GeneralValue": {
+      "description": "Wrapper around [`serde_json::Value`] that can be used in the configuration system for custom user-defined values.\n\nThe wrapper exists to implement specific traits."
     },
     "InternalLog": {
       "description": "Internal debug categories used when [`LogLevel::Internal`] is selected.",
@@ -1434,6 +1442,7 @@
           ]
         },
         {
+          "description": "External network logs (e.g., communication with other language servers).",
           "type": "object",
           "properties": {
             "type": {
@@ -1768,7 +1777,7 @@
           ]
         },
         {
-          "description": "Observations payload used by [`Observation`].",
+          "description": "Observations payload received by [`SensorManager`](crate::sensors::sensor_manager::SensorManager).",
           "type": "object",
           "properties": {
             "type": {
@@ -1935,6 +1944,7 @@
               "const": "Plugin"
             }
           },
+          "$ref": "#/$defs/GeneralValue",
           "required": [
             "type"
           ]
@@ -2589,6 +2599,7 @@
               "const": "Plugin"
             }
           },
+          "$ref": "#/$defs/GeneralValue",
           "required": [
             "type"
           ]
@@ -2721,6 +2732,7 @@
               "const": "Plugin"
             }
           },
+          "$ref": "#/$defs/GeneralValue",
           "required": [
             "type"
           ]
@@ -2955,6 +2967,7 @@
               "const": "Plugin"
             }
           },
+          "$ref": "#/$defs/GeneralValue",
           "required": [
             "type"
           ]
@@ -3034,6 +3047,7 @@
               "const": "Plugin"
             }
           },
+          "$ref": "#/$defs/GeneralValue",
           "required": [
             "type"
           ]
@@ -3387,12 +3401,15 @@
       ]
     },
     "ResultAnalyserConfig": {
+      "description": "Result analyser choices",
       "oneOf": [
         {
+          "description": "Python result analyser that starts a Python server to call a custom Python script.",
           "type": "object",
           "properties": {
             "additionnal_params": {
               "description": "Arbitrary parameters forwarded to the analysis script (additional_params in the script entry point).\nThis can be used to forward any custom configuration to the analysis script without having to add it to the simulator configuration.",
+              "$ref": "#/$defs/GeneralValue",
               "default": null
             },
             "function_name": {
@@ -3401,6 +3418,7 @@
               "default": "analyse_results"
             },
             "port": {
+              "description": "Port used to communicate with the Python analysis server.",
               "type": "integer",
               "format": "uint16",
               "default": 54600,
@@ -3428,6 +3446,7 @@
           ]
         },
         {
+          "description": "Plugin result analyser that is defined through the PluginAPI.",
           "type": "object",
           "properties": {
             "type": {
@@ -3435,6 +3454,7 @@
               "const": "Plugin"
             }
           },
+          "$ref": "#/$defs/GeneralValue",
           "required": [
             "type"
           ]
@@ -3881,6 +3901,7 @@
               "const": "Plugin"
             }
           },
+          "$ref": "#/$defs/GeneralValue",
           "required": [
             "type"
           ]
@@ -4013,6 +4034,7 @@
               "const": "Plugin"
             }
           },
+          "$ref": "#/$defs/GeneralValue",
           "required": [
             "type"
           ]
@@ -4447,6 +4469,7 @@
               "const": "Plugin"
             }
           },
+          "$ref": "#/$defs/GeneralValue",
           "required": [
             "type"
           ]
@@ -4509,6 +4532,7 @@
               "const": "Plugin"
             }
           },
+          "$ref": "#/$defs/GeneralValue",
           "required": [
             "type"
           ]
@@ -4681,13 +4705,16 @@
       "additionalProperties": false
     },
     "SendMessageEventConfig": {
+      "description": "Configuration to send a message to a channel as an Event action.",
       "type": "object",
       "properties": {
         "channel": {
+          "description": "Name of the channel to send the message to (if relative, it is relative to the root: prefer absolute paths).",
           "type": "string",
           "default": ""
         },
         "message": {
+          "description": "Message to send (can be any type that implements [`MessageType`]).",
           "$ref": "#/$defs/MessageType"
         }
       },
@@ -5046,6 +5073,7 @@
               "const": "Plugin"
             }
           },
+          "$ref": "#/$defs/GeneralValue",
           "required": [
             "type"
           ]
@@ -5358,6 +5386,7 @@
               "const": "Plugin"
             }
           },
+          "$ref": "#/$defs/GeneralValue",
           "required": [
             "type"
           ]
@@ -5541,6 +5570,7 @@
               "const": "Plugin"
             }
           },
+          "$ref": "#/$defs/GeneralValue",
           "required": [
             "type"
           ]
@@ -5603,6 +5633,7 @@
               "const": "Plugin"
             }
           },
+          "$ref": "#/$defs/GeneralValue",
           "required": [
             "type"
           ]
@@ -5767,6 +5798,7 @@
               "const": "Plugin"
             }
           },
+          "$ref": "#/$defs/GeneralValue",
           "required": [
             "type"
           ]

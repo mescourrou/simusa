@@ -183,8 +183,8 @@ pub fn edit_plugin_config(
             ui.label("Config (JSON):");
             json_config(
                 ui,
-                &format!("{}-key-{}", &unique_key, &unique_id),
-                &format!("{}-error-key-{}", &unique_key, &unique_id),
+                &format!("{}-key-{}", unique_key, unique_id),
+                &format!("{}-error-key-{}", unique_key, unique_id),
                 buffer_stack,
                 config,
             );
@@ -193,7 +193,11 @@ pub fn edit_plugin_config(
 }
 
 /// Show the config of a plugin as a JSON text.
-pub fn show_plugin_config(ui: &mut egui::Ui, plugin_name: &str, config: &crate::utils::GeneralValue) {
+pub fn show_plugin_config(
+    ui: &mut egui::Ui,
+    plugin_name: &str,
+    config: &crate::utils::GeneralValue,
+) {
     egui::CollapsingHeader::new(plugin_name).show(ui, |ui| {
         ui.vertical(|ui| {
             ui.label("Config (JSON):");

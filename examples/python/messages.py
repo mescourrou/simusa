@@ -41,11 +41,11 @@ class StateEstimator(simusa.StateEstimator):
         self.last_time = time
         if node.name() == "robot1":
             if abs(time - 30) < 0.001:
-                node.send_message("/simusa/nodes/robot2/test", simusa.MessageTypes.String("Bye Bye"), time, [simusa.MessageFlag.Kill])
+                node.send_message("/simusa/nodes/robot2/test", simusa.MessageType.String("Bye Bye"), time, [simusa.MessageFlag.Kill])
             elif time < 30:
-                node.send_message("/simusa/nodes/robot2/test", simusa.MessageTypes.from_goto(simusa.GoToMessage((0, 0))), time)
+                node.send_message("/simusa/nodes/robot2/test", simusa.MessageType.from_goto(simusa.GoToMessage((0, 0))), time)
         else:
-            node.send_message("/simusa/nodes/robot1/test", simusa.MessageTypes.String("Hello from robot2"), time)
+            node.send_message("/simusa/nodes/robot1/test", simusa.MessageType.String("Hello from robot2"), time)
         node.log_info(f"{node.name()}: Prediction {self._state}")
 
     def correction_step(self, node: simusa.Node, observations: List[simusa.Observation], t: float):
@@ -67,9 +67,9 @@ class StateEstimator(simusa.StateEstimator):
         msg = self.client.try_receive(time)
         while msg is not None:
             match msg[1].message:
-                case simusa.MessageTypes.String(s):
+                case simusa.MessageType.String(s):
                     v = f"String({s})"
-                case simusa.MessageTypes.GoTo(g):
+                case simusa.MessageType.GoTo(g):
                     v = f"GoTo({g})"
 
             messages.append((msg[0], msg[1].msg_from, v, msg[1].timestamp))

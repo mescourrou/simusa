@@ -15,7 +15,6 @@ use serde::{Deserialize, Serialize};
 use simusa_com::pub_sub::{MultiClientTrait, PathKey};
 use simusa_macros::EnumToString;
 
-use core::f32;
 use std::collections::BTreeMap;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -85,14 +84,13 @@ pub struct NodeMetaData {
 /// Structure managing one node.
 ///
 /// It is composed of modules to manage different aspects:
-/// * `navigator` is of [`Navigator`] trait, and defines the error to be sent
-///   to the [`Controller`] to follow the required trajectory.
-/// * `controller` is of [`Controller`] trait, it defines the command to be sent
+/// * `navigator` is of [`AbstractNavigator`] trait, and computes the input of the Controller ([`ControllerInputVariables`]) such as errors.
+/// * `controller` is of [`AbstractController`] trait, it defines the command to be sent
 ///   to the [`Physics`] module.
 /// * `physics` is of [`Physics`] trait. It simulates the node behaviour, its real
 ///   state. It contains a ground truth to evaluate the [`StateEstimator`].
 /// * `state_estimator` is of [`StateEstimator`] trait. It estimates the node
-///   state, and send it to the [`Navigator`].
+///   state, and send it to the [`AbstractNavigator`].
 ///
 /// * `sensor_manager`, of type [`SensorManager`], manages the [`Sensor`](crate::sensors::Sensor)s. The
 ///   observations of the sensors are sent to the [`StateEstimator`].
@@ -102,9 +100,9 @@ pub struct NodeMetaData {
 ///   the landmark map.
 #[derive(Debug)]
 pub struct Node {
-    /// [`Navigator`] module, implementing the navigation strategy.
+    /// [`AbstractNavigator`] module, implementing the navigation strategy.
     pub(self) navigator: Option<SharedRwLock<Box<dyn AbstractNavigator>>>,
-    /// [`Controller`] module, implementing the control strategy.
+    /// [`AbstractController`] module, implementing the control strategy.
     pub(self) controller: Option<SharedRwLock<Box<dyn AbstractController>>>,
     /// [`Physics`] module, implementing the physics strategy.
     pub(self) physics: Option<SharedRwLock<Box<dyn Physics>>>,
@@ -759,7 +757,7 @@ impl Node {
         self.node_meta_data.write().unwrap().state = NodeState::Terminated;
         self.node_server
             .as_ref()
-            .unwrap()
+            .expect("Node server is not available")
             .state_update
             .as_ref()
             .unwrap()
@@ -770,7 +768,7 @@ impl Node {
                     self.node_meta_data.read().unwrap().state.clone(),
                 ),
             ))
-            .unwrap();
+            .expect("Failed to send state update");
     }
 }
 

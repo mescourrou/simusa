@@ -12,7 +12,6 @@
 //!
 
 extern crate confy;
-use core::f32;
 use serde_derive::{Deserialize, Serialize};
 use simusa_com::pub_sub::{MultiClientTrait, PathKey};
 use simusa_macros::config_derives;
@@ -23,16 +22,12 @@ use std::sync::{Arc, RwLock};
 use crate::constants::TIME_ROUND;
 use crate::context::Context;
 use crate::errors::{SimusaError, SimusaErrorTypes, SimusaResult};
-#[cfg(feature = "gui")]
-use crate::gui::{
-    UIComponent,
-    utils::{string_checkbox, text_singleline_with_apply},
-};
 use crate::logger::InternalLog;
 use crate::networking::message_types::MessageType;
 use crate::networking::network::Envelope;
 use crate::node::Node;
 use crate::node::node_factory::FromConfigArguments;
+use crate::recordable::Recordable;
 use crate::sensors::displacement_sensor::DisplacementSensor;
 use crate::sensors::scan_sensor::ScanSensor;
 use crate::simulator::SimusaBrokerMultiClient;
@@ -40,7 +35,14 @@ use crate::state_estimators::State;
 use crate::utils::SharedRwLock;
 use crate::utils::frame::{Frame, FrameConfig};
 use crate::{error, internal, networking, warning};
-use crate::{recordable::Recordable, simulator::SimulatorConfig};
+#[cfg(feature = "gui")]
+use crate::{
+    gui::{
+        UIComponent,
+        utils::{string_checkbox, text_singleline_with_apply},
+    },
+    simulator::SimulatorConfig,
+};
 
 use super::gnss_sensor::GNSSSensor;
 use super::oriented_landmark_sensor::OrientedLandmarkSensor;

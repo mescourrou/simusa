@@ -681,12 +681,12 @@ package networking {
 
     class Envelope {
         from: String
-        message: MessageTypes
+        message: MessageType
         timestamp: f32
         message_flags: [MessageFlag]
     }
 
-    enum MessageTypes {
+    enum MessageType {
         {field} String(String)
         {field} GoTo(GoToMessage)
         {field} SensorTrigger(SensorTriggerMessage)
@@ -695,7 +695,7 @@ package networking {
         {field} Custom([u8])
     }
 
-    Envelope -- MessageTypes
+    Envelope -- MessageType
 
     enum MessageFlag {
         God

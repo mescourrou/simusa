@@ -23,11 +23,10 @@ use crate::{
         UIComponent,
         utils::{edit_plugin_config, show_plugin_config, string_combobox},
     },
+    simulator::SimulatorConfig,
     utils::enum_tools::ToVec,
 };
 use std::sync::{Arc, RwLock};
-
-use crate::simulator::SimulatorConfig;
 
 use config_checker::*;
 use serde_derive::{Deserialize, Serialize};
@@ -145,7 +144,7 @@ pub trait Controller:
 
     /// Returns the list of variables requested by the controller from the navigator.
     ///
-    /// Override with caution: the [`InputType`] might not be compatible with the requested variables.
+    /// Override with caution: the [`Controller::InputType`] might not be compatible with the requested variables.
     fn required_variables(&self) -> &[ControllerInputVariable] {
         Self::InputType::required_variables()
     }
@@ -186,7 +185,7 @@ pub trait Controller:
 
 /// Trait for abstracting the [`Controller`] trait with dynamic conversion from
 /// [`Navigator::OutputType`](crate::navigators::Navigator::OutputType) to
-/// [`Controller::InputType`](crate::controllers::Controller::InputType), to be
+/// [`Controller::InputType`], to be
 /// used in the [`Node`] struct.
 ///
 /// This trait is implemented automatically for any type that implements [`Controller`].

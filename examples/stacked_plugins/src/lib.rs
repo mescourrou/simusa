@@ -6,8 +6,8 @@ use simusa::plugin_api::PluginAPI;
 use simusa::recordable::Recordable;
 use simusa::simulator::{AsyncSimulator, SimulatorConfig};
 use simusa::state_estimators::{StateEstimator, WorldState};
-use simusa::utils::{GeneralValue, SharedRwLock};
 use simusa::utils::determinist_random_variable::DeterministRandomVariableFactory;
+use simusa::utils::{GeneralValue, SharedRwLock};
 use simusa::{declare_navigator_output, info};
 use simusa_py::general::PythonAPI;
 use std::sync::Arc;
@@ -98,7 +98,11 @@ impl Navigator for MyWonderfulNavigator {
 
 impl Recordable<NavigatorRecord> for MyWonderfulNavigator {
     fn record(&self, _context: &Context) -> NavigatorRecord {
-        NavigatorRecord::Plugin(serde_json::to_value(MyWonderfulNavigatorRecord {}).unwrap().into())
+        NavigatorRecord::Plugin(
+            serde_json::to_value(MyWonderfulNavigatorRecord {})
+                .unwrap()
+                .into(),
+        )
     }
 }
 
