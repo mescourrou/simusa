@@ -21,7 +21,7 @@ default-members = [
 resolver = "2"
 
 [workspace.package]
-version = "1.10.0"
+version = "1.10.1"
 edition = "2024"
 authors = ["Maxime Escourrou <maxime.escourrou@laas.fr>"]
 license = "MIT"
@@ -30,9 +30,9 @@ repository = "https://gitlab.laas.fr/mescourrou/simusa.git"
 readme = "README.md"
 
 [workspace.dependencies]
-simusa = { path = "simusa-core", version = "1.10.0" }
-simusa-com = { path = "simusa-com", version = "1.10.0" }
-simusa-macros = { path = "simusa-macros", version = "1.10.0" }
+simusa = { path = "simusa-core", version = "1.10.1" }
+simusa-com = { path = "simusa-com", version = "1.10.1" }
+simusa-macros = { path = "simusa-macros", version = "1.10.1" }
 
 [profile.release]
 opt-level = 2 # fast and small wasm

@@ -4,7 +4,6 @@ use std::ffi::{CStr, CString};
 use std::io::{BufReader, Read, Write};
 use std::{fs, net::TcpListener};
 
-use simusa::{debug, error};
 use simusa::logger::{LogLevel, LoggerConfig};
 use simusa::result_analyser::python_analyser::ResultAnalyserFrame;
 use simusa::{
@@ -15,6 +14,7 @@ use simusa::{
     simulator::Results,
     warning,
 };
+use simusa::{debug, error};
 
 const CONVERT_TO_DICT: &CStr = cr#"
 import json
@@ -75,8 +75,7 @@ impl ResultAnalyser {
         let connection = TcpListener::bind(format!("{}:{}", host, port)).map_err(|e| {
             error!(
                 context,
-                "Impossible to start result analyser server at {}:{}: {}",
-                host, port, e
+                "Impossible to start result analyser server at {}:{}: {}", host, port, e
             );
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
                 "Impossible to start result analyser server at {}:{}: {}",

@@ -96,7 +96,7 @@
     "version": {
       "description": "Version of the simulator used by the configuration. Produces a warning the the major version (second number)\nis different from the current one.",
       "type": "string",
-      "default": "1.10.0"
+      "default": "1.10.1"
     }
   },
   "additionalProperties": false,
@@ -3424,6 +3424,11 @@
               "default": 54600,
               "maximum": 65535,
               "minimum": 0
+            },
+            "python_command": {
+              "description": "Command used to call Python (default: `python3` for Unix and Mac, `python` for Windows).",
+              "type": "string",
+              "default": "python3"
             },
             "script_path": {
               "description": "Path to the Python analysis script (path from config location).\n\nIf the file does not exist, a default script (named `analyse_results.py`) is created in the same directory as the config file.",

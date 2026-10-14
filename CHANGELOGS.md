@@ -1,5 +1,8 @@
 # Changelogs
 
+## v1.10.1
+[feature] Allow to change python command for Python Result Analyser
+
 ## v1.10.0
 Features:
 - [breaking] Rename External options to Plugin

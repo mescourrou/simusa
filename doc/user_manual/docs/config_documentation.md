@@ -44,6 +44,7 @@ List of parameters:
 			`function_name`: String
 			`additionnal_params`: GeneralValue
 			`port`: Unsigned Integer
+			`python_command`: String
 		- `type`: Plugin => GeneralValue
 `base_path`: String
 `max_time`: Float

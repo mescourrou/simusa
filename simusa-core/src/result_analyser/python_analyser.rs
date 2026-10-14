@@ -61,6 +61,8 @@ pub struct PythonResultAnalyserConfig {
     pub additionnal_params: crate::utils::GeneralValue,
     /// Port used to communicate with the Python analysis server.
     pub port: u16,
+    /// Command used to call Python (default: `python3` for Unix and Mac, `python` for Windows).
+    pub python_command: String,
 }
 
 impl Default for PythonResultAnalyserConfig {
@@ -71,6 +73,11 @@ impl Default for PythonResultAnalyserConfig {
             function_name: "analyse_results".to_string(),
             additionnal_params: crate::utils::GeneralValue::default(),
             port: 54600,
+            python_command: if cfg!(target_os = "windows") {
+                "python".to_string()
+            } else {
+                "python3".to_string()
+            },
         }
     }
 }
@@ -102,6 +109,14 @@ impl UIComponent for PythonResultAnalyserConfig {
                 ui.label("Show figures:");
                 ui.checkbox(&mut self.show_figures, "");
             });
+            ui.horizontal(|ui| {
+                ui.label("Port:");
+                ui.add(egui::DragValue::new(&mut self.port).range(1024..=65535));
+            });
+            ui.horizontal(|ui| {
+                ui.label("Python command:");
+                ui.text_edit_singleline(&mut self.python_command);
+            });
 
             ui.vertical(|ui| {
                 ui.label("Additional params (JSON format, null for nothing):");
@@ -127,6 +142,14 @@ impl UIComponent for PythonResultAnalyserConfig {
                 } else {
                     ui.label("No");
                 }
+            });
+            ui.horizontal(|ui| {
+                ui.label("Port: ");
+                ui.label(self.port.to_string());
+            });
+            ui.horizontal(|ui| {
+                ui.label("Python command: ");
+                ui.label(self.python_command.clone());
             });
             ui.vertical(|ui| {
                 ui.label("Additional params: ");
@@ -197,7 +220,7 @@ impl PythonResultAnalyser {
                 context,
                 InternalLog::ExternalNetwork,
                 "Retry to establish a connection ({}/{max_tries} tries)",
-                i+1
+                i + 1
             );
         }
         let connection = connection.ok_or_else(|| {
@@ -206,11 +229,7 @@ impl PythonResultAnalyser {
                 "Impossible to connect to result analyser server".into(),
             )
         })?;
-        internal!(
-            context,
-            InternalLog::ExternalNetwork,
-            "plop2"
-        );
+        internal!(context, InternalLog::ExternalNetwork, "plop2");
         let mut reader = BufReader::new(connection.try_clone().unwrap());
         let mut writer = BufWriter::new(connection);
         internal!(
@@ -282,7 +301,8 @@ impl ResultAnalyserTrait for PythonResultAnalyser {
         #[cfg(target_os = "macos")]
         let python_distrib = "manylinux_2_39_x86_64";
 
-        self.command = Some(std::process::Command::new("python3")
+        let python_command = &self.config.python_command;
+        self.command = Some(std::process::Command::new(python_command)
             .arg("-c")
             .arg(format!("
 try:
@@ -326,7 +346,8 @@ simusa._internal.ResultAnalyser().run_server('127.0.0.1', {2}, '{3}')
         let res = self.send_request(frame, context);
         if let Err(err) = &res {
             self.command.as_mut().unwrap().kill().map_err(|e| {
-                err.clone().chain(format!("Impossible to stop result analyser server: {}", e))
+                err.clone()
+                    .chain(format!("Impossible to stop result analyser server: {}", e))
             })?;
             self.command = None;
             return Err(err.clone());
