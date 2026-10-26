@@ -262,7 +262,12 @@ pub struct NodeConfig {
     /// Name of the robot. Will be used in the `model_name` field as well.
     pub name: String,
     /// If `true`, node starts in running state when created.
+    #[deprecated(note = "Use `spawn_count` instead, with `0` for no autospawn and `>0` for autospawn")]
     pub autospawn: bool,
+    /// Number of initial node spawned at the beginning of the simulation.
+    /// If `0`, node is not spawned at the beginning, but can be spawned later with a
+    /// [`SpawnEventConfig`](crate::scenario::config::SpawnEventConfig).
+    pub spawn_count: usize,
     /// Free-form labels attached to the node metadata.
     pub labels: Vec<String>,
     /// Configuration of the type-specific behaviour
@@ -272,9 +277,11 @@ pub struct NodeConfig {
 
 impl Default for NodeConfig {
     fn default() -> Self {
+        #[allow(deprecated)]
         NodeConfig {
             name: String::from("NoName"),
             autospawn: true,
+            spawn_count: 1,
             labels: Vec::new(),
             node_type: NodeTypeConfig::default(),
         }
@@ -327,8 +334,8 @@ impl UIComponent for NodeConfig {
             });
 
             ui.horizontal(|ui| {
-                ui.label("Autospawn:");
-                ui.checkbox(&mut self.autospawn, "");
+                ui.label("Spawn count:");
+                ui.add(egui::DragValue::new(&mut self.spawn_count).range(0..=usize::MAX));
             });
 
             self.node_type.show_mut(
@@ -358,7 +365,7 @@ impl UIComponent for NodeConfig {
             });
 
             ui.horizontal(|ui| {
-                ui.label(format!("Autospawn: {}", self.autospawn));
+                ui.label(format!("Spawn count: {}", self.spawn_count));
             });
         });
     }
@@ -862,10 +869,6 @@ pub struct MakeNodeParams<'a> {
     pub va_factory: &'a Arc<DeterministRandomVariableFactory>,
     /// Optional time-analysis factory used to create node profilers.
     pub time_analysis_factory: Option<&'a mut TimeAnalysisFactory>,
-    /// If `true`, forces record transmission even without results configuration.
-    pub force_send_results: bool,
-    /// Optional override name for the created node.
-    pub new_name: Option<&'a str>,
     /// Shared simulation message broker.
     pub broker: &'a SharedRwLock<SimusaBroker>,
     /// Initial simulation time.
@@ -885,7 +888,6 @@ struct NodeBuilder {
     meta_data_list: Option<SharedRoLock<BTreeMap<String, SharedRoLock<NodeMetaData>>>>,
     node_message_client: SimusaBrokerMultiClient,
     environment: Arc<Environment>,
-    send_record: bool,
 }
 
 impl NodeBuilder {
@@ -961,8 +963,8 @@ impl NodeBuilder {
         Ok(client)
     }
 
-    pub fn from_config(config: &NodeConfig, params: &mut MakeNodeParams) -> SimusaResult<Node> {
-        let node_name = config.name.clone();
+    pub fn from_config(config: &NodeConfig, params: &mut MakeNodeParams, new_name: Option<&str>) -> SimusaResult<Node> {
+        let node_name = new_name.map(str::to_string).unwrap_or(config.name.clone());
         let node_type = config.node_type.as_node_type();
         let client = Self::make_global_channels(&node_name, params.broker, &params.context)?;
         let proto_node = Self {
@@ -975,20 +977,15 @@ impl NodeBuilder {
             node_meta_data: Arc::new(RwLock::new(NodeMetaData {
                 name: node_name.clone(),
                 node_type,
-                model_name: node_name.clone(),
+                model_name: config.name.clone(),
                 labels: config.labels.clone(),
-                state: if config.autospawn {
-                    NodeState::Running
-                } else {
-                    NodeState::Created
-                },
+                state: NodeState::Running,
                 physics: None,
             })),
             meta_data_list: None,
             node_message_client: client,
             environment: params.environment.clone(),
             node_name,
-            send_record: params.force_send_results || params.global_config.results.is_some(),
         };
         match &config.node_type {
             NodeTypeConfig::Robot(robot_config) => proto_node.make_robot(robot_config, params),
@@ -998,7 +995,7 @@ impl NodeBuilder {
         }
     }
 
-    fn make_robot(self, config: &RobotConfig, params: &mut MakeNodeParams) -> SimusaResult<Node> {
+    fn make_robot(self, config: &RobotConfig, params: &MakeNodeParams) -> SimusaResult<Node> {
         // Make global channels
         let network = Arc::new(RwLock::new(Network::from_config(
             self.node_name.clone(),
@@ -1057,7 +1054,6 @@ impl NodeBuilder {
             node_server: self.node_server,
             other_node_names: self.other_node_names,
             time_analysis: self.time_analysis,
-            send_records: self.send_record,
             meta_data_list: self.meta_data_list,
             node_message_client: self.node_message_client,
             environment: self.environment,
@@ -1089,7 +1085,7 @@ impl NodeBuilder {
     fn make_computation_unit(
         self,
         config: &ComputationUnitConfig,
-        params: &mut MakeNodeParams,
+        params: &MakeNodeParams,
     ) -> SimusaResult<Node> {
         let network = Arc::new(RwLock::new(Network::from_config(
             self.node_name.clone(),
@@ -1128,7 +1124,6 @@ impl NodeBuilder {
             node_server: self.node_server,
             other_node_names: self.other_node_names,
             time_analysis: self.time_analysis,
-            send_records: self.send_record,
             meta_data_list: self.meta_data_list,
             node_message_client: self.node_message_client,
             environment: self.environment,
@@ -1163,18 +1158,36 @@ pub struct NodeFactory {}
 
 impl NodeFactory {
     /// Builds a node from its configuration.
-    pub fn make_node(config: &NodeConfig, params: &mut MakeNodeParams) -> SimusaResult<Node> {
-        NodeBuilder::from_config(config, params)
+    pub fn make_nodes(config: &NodeConfig, params: &mut MakeNodeParams) -> SimusaResult<Vec<Node>> {
+        let mut config = config.clone();
+        // Deprecated autospawn field is still supported for backward compatibility.
+        // If autospawn is false (which is not the default value), we set spawn_count to 0,
+        // which is the new way to disable autospawn.
+        #[allow(deprecated)]
+        if !config.autospawn {
+            config.spawn_count = 0;
+        }
+        let mut nodes = Vec::new();
+        for i in 0..config.spawn_count {
+            let new_name = if config.spawn_count == 1 {
+                None
+            } else {
+                Some(format!("{}-{}", config.name, i))
+            };
+            nodes.push(NodeBuilder::from_config(&config, params, new_name.as_deref())?);
+        }
+        Ok(nodes)
     }
 
     /// Builds a node by searching its name in global robot and computation-unit configs.
     pub(crate) fn make_node_from_name(
         name: &str,
         params: &mut MakeNodeParams,
+        new_name: Option<&str>,
     ) -> SimusaResult<Node> {
         for node_config in params.global_config.nodes.iter() {
             if node_config.name == name {
-                return NodeBuilder::from_config(node_config, params);
+                return NodeBuilder::from_config(node_config, params, new_name);
             }
         }
 

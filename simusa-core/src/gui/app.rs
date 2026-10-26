@@ -299,7 +299,6 @@ impl SimusaApp {
                         .load_config
                         .async_call(AsyncApiLoadConfigRequest {
                             config: cfg,
-                            force_send_results: true,
                         });
                 }
                 Err(e) => {
@@ -369,7 +368,6 @@ impl SimusaApp {
                         .load_config
                         .async_call(AsyncApiLoadConfigRequest {
                             config: cfg,
-                            force_send_results: true,
                         });
                 }
                 Err(e) => {
@@ -549,7 +547,6 @@ impl eframe::App for SimusaApp {
                                 .load_config
                                 .async_call(AsyncApiLoadConfigRequest {
                                     config: cfg,
-                                    force_send_results: true,
                                 });
                             self.p.current_max_time = 0.;
                         }

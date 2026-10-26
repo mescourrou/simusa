@@ -67,7 +67,6 @@ impl AsyncSimulator {
         );
         sim.api.load_config.async_call(AsyncApiLoadConfigRequest {
             config,
-            force_send_results: false,
         });
 
         if let Some(unwrapped_async_api) = &sim.async_plugin_api {

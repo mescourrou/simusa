@@ -177,7 +177,6 @@ pub struct Simulator {
     determinist_va_factory: Arc<DeterministRandomVariableFactory>,
     max_threads: usize,
 
-    async_api: Option<Arc<SimulatorAsyncApi>>,
     async_api_server: Option<SimulatorAsyncApiServer>,
 
     node_apis: BTreeMap<String, NodeClient>,
@@ -186,7 +185,6 @@ pub struct Simulator {
     records: Vec<Record>,
     new_records: Vec<Record>,
     time_analysis_factory: Option<TimeAnalysisFactory>,
-    force_send_results: bool,
     scenario: SharedMutex<Scenario>,
     plugin_api: Option<Arc<dyn PluginAPI>>,
     environment: Arc<Environment>,
@@ -212,7 +210,6 @@ impl Simulator {
             config: SimulatorConfig::default(),
             network_manager,
             determinist_va_factory: va_factory.clone(),
-            async_api: None,
             async_api_server: None,
             node_apis: BTreeMap::new(),
             result_saving_data: Some(ResultSavingData::default()),
@@ -221,7 +218,6 @@ impl Simulator {
             time_analysis_factory: Some(
                 TimeAnalysisFactory::init_from_config(&TimeAnalysisConfig::default(), &SimulatorConfig::default()).unwrap(),
             ),
-            force_send_results: false,
             scenario: Arc::new(Mutex::new(Scenario::from_config(
                 &ScenarioConfig::default(),
                 &SimulatorConfig::default(),
@@ -289,9 +285,9 @@ impl Simulator {
             None => None,
         };
 
-        if config.results.is_some() && self.async_api.is_none() {
-            self.async_api = Some(self.get_async_api());
-        }
+        // if config.results.is_some() && self.async_api.is_none() {
+        //     self.async_api = Some(self.get_async_api());
+        // }
 
         self.result_saving_data = self.config.results.as_ref().map(|cfg| ResultSavingData {
             save_mode: cfg.save_mode.clone(),
@@ -322,15 +318,12 @@ impl Simulator {
 
         // Create nodes
         for node_config in &config.nodes {
-            if node_config.autospawn {
-                self.add_node(
-                    node_config,
-                    &config,
-                    self.force_send_results,
-                    0.,
-                    &self.context.clone(),
-                )?;
-            }
+            self.add_node(
+                node_config,
+                &config,
+                0.,
+                &self.context.clone(),
+            )?;
         }
 
         self.scenario = Arc::new(Mutex::new(Scenario::from_config(
@@ -368,18 +361,9 @@ impl Simulator {
         config_path: &Path,
         plugin_api: Option<Arc<dyn PluginAPI>>,
     ) -> SimusaResult<()> {
-        self.load_config_path_full(config_path, plugin_api, false)
-    }
-
-    pub(crate) fn load_config_path_full(
-        &mut self,
-        config_path: &Path,
-        plugin_api: Option<Arc<dyn PluginAPI>>,
-        force_send_results: bool,
-    ) -> SimusaResult<()> {
         println!("Load configuration from {:?}", config_path);
-        let config = SimulatorConfig::load_from_path(config_path)?;
-        self.load_config_full(&config, plugin_api, force_send_results)
+        let config = SimulatorConfig::load_from_path(config_path)?;        
+        self.load_config(&config, plugin_api)
     }
 
     /// Load a simulator configuration into an existing simulator instance.
@@ -387,15 +371,6 @@ impl Simulator {
         &mut self,
         config: &SimulatorConfig,
         plugin_api: Option<Arc<dyn PluginAPI>>,
-    ) -> SimusaResult<()> {
-        self.load_config_full(config, plugin_api, false)
-    }
-
-    pub(crate) fn load_config_full(
-        &mut self,
-        config: &SimulatorConfig,
-        plugin_api: Option<Arc<dyn PluginAPI>>,
-        force_send_results: bool,
     ) -> SimusaResult<()> {
         println!("Checking configuration...");
         self.init_log(&config.log)?;
@@ -438,7 +413,6 @@ impl Simulator {
         } else {
             self.config.random_seed = Some(self.determinist_va_factory.global_seed());
         }
-        self.force_send_results = force_send_results;
 
         self.reset(plugin_api)
     }
@@ -468,34 +442,30 @@ impl Simulator {
         &mut self,
         node_config: &NodeConfig,
         global_config: &SimulatorConfig,
-        force_send_results: bool,
         initial_time: f32,
         context: &Context,
     ) -> SimusaResult<()> {
         let context: Context =
             context.new_callstack_level(&format!("add_node({})", node_config.name));
-        let new_node = NodeFactory::make_node(
+        let new_nodes = NodeFactory::make_nodes(
             node_config,
             &mut MakeNodeParams {
                 plugin_api: &self.plugin_api,
                 global_config,
                 va_factory: &self.determinist_va_factory,
                 time_analysis_factory: self.time_analysis_factory.as_mut(),
-                force_send_results,
-                new_name: None,
                 broker: &self.network_manager.broker(),
                 initial_time,
                 environment: self.environment.clone(),
                 context,
             },
         )?;
-        let meta_data = new_node.meta_data();
-        let name = meta_data.read().unwrap().name.clone();
-        self.environment.insert_meta_data(name, meta_data);
-        if new_node.state() != NodeState::Running {
-            return Ok(());
+        for new_node in &new_nodes {
+            let meta_data = new_node.meta_data();
+            let name = meta_data.read().unwrap().name.clone();
+            self.environment.insert_meta_data(name, meta_data);
         }
-        self.nodes.push(new_node);
+        self.nodes.extend(new_nodes);
         Ok(())
     }
 
@@ -545,6 +515,28 @@ impl Simulator {
             match data.save_mode {
                 ResultSaveMode::AtTheEnd => {}
                 _ => self.prepare_save_results()?,
+            }
+        }
+
+        // If very first run, add the initial records at time 0.
+        if self.last_sim_time < 0. {
+            let mut records = Vec::new();
+            for node in self.nodes.iter() {
+                records.push(Record {
+                    node: node.record(&context),
+                    time: 0.,
+                });
+            }
+            for record in records {
+                self.add_record(record);
+            }
+            if let Err(e) = self.process_records(Some(0.), &context) {
+                error!(
+                    context,
+                    "Error in processing records at beginning of simulation: {}",
+                    e.detailed_error()
+                );
+                return Err(e);
             }
         }
 
@@ -734,6 +726,22 @@ impl Simulator {
                     "End of time step"
                 );
 
+                let mut records = Vec::new();
+                for node in self
+                    .nodes
+                    .iter_mut()
+                    .filter(|n| n.state() != NodeState::Terminated)
+                {
+                    let record = Record{
+                        node: node.record(&node_contexts[&node.name()]),
+                        time,
+                    };
+                    
+                    records.push(record);
+                }
+                for record in records {
+                    self.add_record(record);
+                }
                 let node_states = self.node_positions();
                 if let Err(e) = self.end_of_time_step_procedure(&node_states, &context) {
                     error = Some(e);
@@ -745,15 +753,6 @@ impl Simulator {
                     .iter_mut()
                     .filter(|n| n.state() != NodeState::Terminated)
                 {
-                    if node.send_records()
-                        && let Some(async_api_server) = &self.async_api_server
-                    {
-                        async_api_server.send_record(&Record {
-                            time,
-                            node: node.record(&node_contexts[&node.name()]),
-                        });
-                    }
-
                     if node.process_messages() {
                         node.handle_messages(time, &node_contexts[&node.name()]);
                     }
@@ -1003,7 +1002,21 @@ impl Simulator {
                         crate::logger::InternalLog::NodeSyncDetailed,
                         "End of time step"
                     );
-
+                    let mut records = Vec::new();
+                    for node in self
+                        .nodes
+                        .iter_mut()
+                        .filter(|n| n.state() != NodeState::Terminated)
+                    {
+                        let record = Record {
+                            node: node.record(&node_contexts[&node.name()]),
+                            time,
+                        };
+                        records.push(record);
+                    }
+                    for record in records {
+                        self.add_record(record);
+                    }
                     let node_states = self.node_positions();
                     if let Err(e) = self.end_of_time_step_procedure(&node_states, &context) {
                         error = Some(e);
@@ -1023,15 +1036,6 @@ impl Simulator {
                         .iter_mut()
                         .filter(|n| n.state() != NodeState::Terminated)
                     {
-                        if node.send_records()
-                            && let Some(async_api_server) = &self.async_api_server
-                        {
-                            async_api_server.send_record(&Record {
-                                time,
-                                node: node.record(&node_contexts[&node.name()]),
-                            });
-                        }
-
                         if node.process_messages() {
                             node.handle_messages(time, &node_contexts[&node.name()]);
                         }
@@ -1072,14 +1076,13 @@ impl Simulator {
                 global_config: &self.config,
                 va_factory: &self.determinist_va_factory,
                 time_analysis_factory: self.time_analysis_factory.as_mut(),
-                force_send_results: self.force_send_results,
-                new_name: Some(new_node_name),
                 initial_time: time,
                 broker: &self.network_manager.broker(),
                 environment: self.environment.clone(),
                 context: context
                     .new_callstack_level(&format!("spawn_node_from_name({})", node_name)),
             },
+            Some(new_node_name),
         )?;
         let meta_data = node.meta_data();
         let name = meta_data.read().unwrap().name.clone();
@@ -1182,6 +1185,12 @@ impl Simulator {
     /// Save the results to the file given during the configuration.
     ///
     /// If the configuration of the [`Simulator`] do not contain a result path, no results are saved.
+    /// 
+    /// # Arguments
+    /// * `time` - The current time of the simulation. If `None`, it means that the simulation is finished
+    ///   and the results should be saved at the end.
+    /// * `context` - The context of the simulation, used for logging and error reporting.
+    /// 
     fn process_records(&mut self, time: Option<f32>, context: &Context) -> SimusaResult<()> {
         let context = context.new_callstack_level("process_records");
         if self.config.results.is_none() {
@@ -1246,18 +1255,6 @@ impl Simulator {
             taf.save_results(&context);
         }
 
-        internal!(
-            context,
-            crate::logger::InternalLog::NodeRunning,
-            "Collecting results"
-        );
-        let mut new_records = std::mem::take(&mut self.new_records);
-        if let Some(async_api) = &self.async_api {
-            while let Ok(record) = async_api.records.lock().unwrap().try_recv() {
-                new_records.push(record)
-            }
-        }
-
         let result_config = self.config.results.clone().unwrap();
         let filename = result_config.result_path;
         if let Some(filename) = filename {
@@ -1282,7 +1279,7 @@ impl Simulator {
                 Ok(f) => f,
             };
 
-            for record in &new_records {
+            for record in &self.new_records {
                 if result_saving_data.first_row {
                     result_saving_data.first_row = false;
                 } else {
@@ -1303,7 +1300,7 @@ impl Simulator {
                 recording_file.write_all(b"\n]}").unwrap();
             }
         }
-        self.records.extend(new_records);
+        self.records.extend(self.new_records.drain(..));
         Ok(())
     }
 
@@ -1463,6 +1460,9 @@ impl Simulator {
 
     /// Add a new record to the simulator's records, which will be saved to the results file if configured.
     pub fn add_record(&mut self, record: Record) {
+        if let Some(async_api_server) = &self.async_api_server {
+            async_api_server.send_record(&record);
+        }
         self.new_records.push(record);
     }
 

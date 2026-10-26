@@ -49,8 +49,6 @@ use crate::{internal, networking};
 /// TODO: Use Rust type system to enforce correct mode usage instead of runtime checks.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, EnumToString)]
 pub enum NodeState {
-    /// Node has been created but is not running yet.
-    Created,
     /// Node is active and can execute simulation steps.
     Running,
     /// Node is marked for termination and will stop at the next safe point.
@@ -119,7 +117,6 @@ pub struct Node {
 
     pub(self) other_node_names: Vec<String>,
     pub(self) time_analysis: Option<SharedMutex<TimeAnalysisNode>>,
-    pub(self) send_records: bool,
 
     pub(self) node_meta_data: SharedRwLock<NodeMetaData>,
     pub(self) meta_data_list: Option<SharedRoLock<BTreeMap<String, SharedRoLock<NodeMetaData>>>>,
@@ -656,11 +653,6 @@ impl Node {
 
     pub(crate) fn set_state(&mut self, state: NodeState) {
         self.node_meta_data.write().unwrap().state = state;
-    }
-
-    /// Return whether this node is configured to emit records.
-    pub fn send_records(&self) -> bool {
-        self.send_records
     }
 
     /// Get the names of other known nodes in the simulation.
