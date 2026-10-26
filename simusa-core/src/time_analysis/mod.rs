@@ -23,8 +23,7 @@ use std::collections::BTreeMap;
 use std::time;
 
 use crate::{
-    context::Context, errors::SimusaResult, info,
-    time_analysis::time_analysis_config::AnalysisUnit, utils::SharedMutex,
+    context::Context, errors::SimusaResult, info, simulator::SimulatorConfig, time_analysis::time_analysis_config::AnalysisUnit, utils::SharedMutex,
 };
 
 /// Node for the time analysis. It represents a block of code to analyse,
@@ -95,9 +94,16 @@ pub struct TimeAnalysisFactory {
 
 impl TimeAnalysisFactory {
     /// Creates a new time analysis factory from the given config.
-    pub fn init_from_config(config: &TimeAnalysisConfig) -> SimusaResult<Self> {
+    pub fn init_from_config(config: &TimeAnalysisConfig, global_config: &SimulatorConfig) -> SimusaResult<Self> {
+        let mut config = config.clone();
+        config.output_path = global_config
+            .get_base_path()
+            .join(&config.output_path)
+            .to_str()
+            .unwrap()
+            .to_string();
         let s = Self {
-            config: config.clone(),
+            config,
             exporter: match config.exporter {
                 ProfileExporterConfig::TraceEventExporter => Box::new(TraceEventExporter {}),
             },

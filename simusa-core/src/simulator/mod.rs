@@ -219,7 +219,7 @@ impl Simulator {
             records: Vec::new(),
             new_records: Vec::new(),
             time_analysis_factory: Some(
-                TimeAnalysisFactory::init_from_config(&TimeAnalysisConfig::default()).unwrap(),
+                TimeAnalysisFactory::init_from_config(&TimeAnalysisConfig::default(), &SimulatorConfig::default()).unwrap(),
             ),
             force_send_results: false,
             scenario: Arc::new(Mutex::new(Scenario::from_config(
@@ -285,7 +285,7 @@ impl Simulator {
         self.result_analyser = None;
 
         self.time_analysis_factory = match &config.time_analysis {
-            Some(time_analysis) => Some(TimeAnalysisFactory::init_from_config(time_analysis)?),
+            Some(time_analysis) => Some(TimeAnalysisFactory::init_from_config(time_analysis, &config)?),
             None => None,
         };
 
