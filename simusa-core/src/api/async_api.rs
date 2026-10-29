@@ -215,10 +215,7 @@ impl AsyncApiRunner {
                             "Loading config: {}",
                             request.config.get_base_path().to_str().unwrap()
                         );
-                        simulator.load_config(
-                            &request.config,
-                            plugin_api_threaded.clone(),
-                        )?;
+                        simulator.load_config(&request.config, plugin_api_threaded.clone())?;
                         println!("End loading");
                         Ok(simulator.config())
                     });

@@ -216,7 +216,11 @@ impl Simulator {
             records: Vec::new(),
             new_records: Vec::new(),
             time_analysis_factory: Some(
-                TimeAnalysisFactory::init_from_config(&TimeAnalysisConfig::default(), &SimulatorConfig::default()).unwrap(),
+                TimeAnalysisFactory::init_from_config(
+                    &TimeAnalysisConfig::default(),
+                    &SimulatorConfig::default(),
+                )
+                .unwrap(),
             ),
             scenario: Arc::new(Mutex::new(Scenario::from_config(
                 &ScenarioConfig::default(),
@@ -281,7 +285,10 @@ impl Simulator {
         self.result_analyser = None;
 
         self.time_analysis_factory = match &config.time_analysis {
-            Some(time_analysis) => Some(TimeAnalysisFactory::init_from_config(time_analysis, &config)?),
+            Some(time_analysis) => Some(TimeAnalysisFactory::init_from_config(
+                time_analysis,
+                &config,
+            )?),
             None => None,
         };
 
@@ -318,12 +325,7 @@ impl Simulator {
 
         // Create nodes
         for node_config in &config.nodes {
-            self.add_node(
-                node_config,
-                &config,
-                0.,
-                &self.context.clone(),
-            )?;
+            self.add_node(node_config, &config, 0., &self.context.clone())?;
         }
 
         self.scenario = Arc::new(Mutex::new(Scenario::from_config(
@@ -362,7 +364,7 @@ impl Simulator {
         plugin_api: Option<Arc<dyn PluginAPI>>,
     ) -> SimusaResult<()> {
         println!("Load configuration from {:?}", config_path);
-        let config = SimulatorConfig::load_from_path(config_path)?;        
+        let config = SimulatorConfig::load_from_path(config_path)?;
         self.load_config(&config, plugin_api)
     }
 
@@ -732,11 +734,11 @@ impl Simulator {
                     .iter_mut()
                     .filter(|n| n.state() != NodeState::Terminated)
                 {
-                    let record = Record{
+                    let record = Record {
                         node: node.record(&node_contexts[&node.name()]),
                         time,
                     };
-                    
+
                     records.push(record);
                 }
                 for record in records {
@@ -1185,12 +1187,12 @@ impl Simulator {
     /// Save the results to the file given during the configuration.
     ///
     /// If the configuration of the [`Simulator`] do not contain a result path, no results are saved.
-    /// 
+    ///
     /// # Arguments
     /// * `time` - The current time of the simulation. If `None`, it means that the simulation is finished
     ///   and the results should be saved at the end.
     /// * `context` - The context of the simulation, used for logging and error reporting.
-    /// 
+    ///
     fn process_records(&mut self, time: Option<f32>, context: &Context) -> SimusaResult<()> {
         let context = context.new_callstack_level("process_records");
         if self.config.results.is_none() {
@@ -1300,7 +1302,7 @@ impl Simulator {
                 recording_file.write_all(b"\n]}").unwrap();
             }
         }
-        self.records.extend(self.new_records.drain(..));
+        self.records.append(&mut self.new_records);
         Ok(())
     }
 

@@ -65,9 +65,9 @@ impl AsyncSimulator {
                 .clone()
                 .map(|api| api as Arc<dyn PluginAPI>),
         );
-        sim.api.load_config.async_call(AsyncApiLoadConfigRequest {
-            config,
-        });
+        sim.api
+            .load_config
+            .async_call(AsyncApiLoadConfigRequest { config });
 
         if let Some(unwrapped_async_api) = &sim.async_plugin_api {
             let api_client = &unwrapped_async_api.get_client();

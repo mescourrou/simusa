@@ -96,7 +96,7 @@
     "version": {
       "description": "Version of the simulator used by the configuration. Produces a warning the the major version (second number)\nis different from the current one.",
       "type": "string",
-      "default": "1.10.1"
+      "default": "1.10.2"
     }
   },
   "additionalProperties": false,
@@ -2023,7 +2023,8 @@
         "autospawn": {
           "description": "If `true`, node starts in running state when created.",
           "type": "boolean",
-          "default": true
+          "default": true,
+          "deprecated": true
         },
         "labels": {
           "description": "Free-form labels attached to the node metadata.",
@@ -2037,6 +2038,13 @@
           "description": "Name of the robot. Will be used in the `model_name` field as well.",
           "type": "string",
           "default": "NoName"
+        },
+        "spawn_count": {
+          "description": "Number of initial node spawned at the beginning of the simulation.\nIf `0`, node is not spawned at the beginning, but can be spawned later with a\n[`SpawnEventConfig`](crate::scenario::config::SpawnEventConfig).",
+          "type": "integer",
+          "format": "uint",
+          "default": 1,
+          "minimum": 0
         }
       },
       "oneOf": [

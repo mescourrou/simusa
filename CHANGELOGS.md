@@ -1,5 +1,10 @@
 # Changelogs
 
+## v1.10.2
+Features:
+- Add `spawn_count` option in Node config to spawn multiple nodes at the beginning. `autospawn` is now deprecated.
+- Allow loading config from yaml Value or string
+
 ## v1.10.1
 [feature] Allow to change python command for Python Result Analyser
 

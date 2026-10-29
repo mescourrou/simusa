@@ -262,7 +262,9 @@ pub struct NodeConfig {
     /// Name of the robot. Will be used in the `model_name` field as well.
     pub name: String,
     /// If `true`, node starts in running state when created.
-    #[deprecated(note = "Use `spawn_count` instead, with `0` for no autospawn and `>0` for autospawn")]
+    #[deprecated(
+        note = "Use `spawn_count` instead, with `0` for no autospawn and `>0` for autospawn"
+    )]
     pub autospawn: bool,
     /// Number of initial node spawned at the beginning of the simulation.
     /// If `0`, node is not spawned at the beginning, but can be spawned later with a
@@ -963,7 +965,11 @@ impl NodeBuilder {
         Ok(client)
     }
 
-    pub fn from_config(config: &NodeConfig, params: &mut MakeNodeParams, new_name: Option<&str>) -> SimusaResult<Node> {
+    pub fn from_config(
+        config: &NodeConfig,
+        params: &mut MakeNodeParams,
+        new_name: Option<&str>,
+    ) -> SimusaResult<Node> {
         let node_name = new_name.map(str::to_string).unwrap_or(config.name.clone());
         let node_type = config.node_type.as_node_type();
         let client = Self::make_global_channels(&node_name, params.broker, &params.context)?;
@@ -1174,7 +1180,11 @@ impl NodeFactory {
             } else {
                 Some(format!("{}-{}", config.name, i))
             };
-            nodes.push(NodeBuilder::from_config(&config, params, new_name.as_deref())?);
+            nodes.push(NodeBuilder::from_config(
+                &config,
+                params,
+                new_name.as_deref(),
+            )?);
         }
         Ok(nodes)
     }

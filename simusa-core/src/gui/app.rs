@@ -297,9 +297,7 @@ impl SimusaApp {
                         .lock()
                         .unwrap()
                         .load_config
-                        .async_call(AsyncApiLoadConfigRequest {
-                            config: cfg,
-                        });
+                        .async_call(AsyncApiLoadConfigRequest { config: cfg });
                 }
                 Err(e) => {
                     error!(
@@ -366,9 +364,7 @@ impl SimusaApp {
                         .lock()
                         .unwrap()
                         .load_config
-                        .async_call(AsyncApiLoadConfigRequest {
-                            config: cfg,
-                        });
+                        .async_call(AsyncApiLoadConfigRequest { config: cfg });
                 }
                 Err(e) => {
                     error!(

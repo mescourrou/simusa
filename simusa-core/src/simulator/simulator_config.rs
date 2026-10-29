@@ -206,15 +206,14 @@ impl SimulatorConfig {
             serde_yaml_ng::to_writer(file, &default_config).unwrap();
         }
         // Transformer allows to use !include tags in the YAML file to include other files.
-        let config: serde_yaml_ng::Value =
-            match yaml_include::Transformer::new(path.into(), true) {
-                Ok(loader) => loader.parse(),
-                Err(error) => {
-                    let what = format!("Error while loading the config file : {}", error);
-                    println!("ERROR: {what}");
-                    return Err(SimusaError::new(SimusaErrorTypes::ConfigError, what));
-                }
-            };
+        let config: serde_yaml_ng::Value = match yaml_include::Transformer::new(path.into(), true) {
+            Ok(loader) => loader.parse(),
+            Err(error) => {
+                let what = format!("Error while loading the config file : {}", error);
+                println!("ERROR: {what}");
+                return Err(SimusaError::new(SimusaErrorTypes::ConfigError, what));
+            }
+        };
         let mut config = Self::load_from_value(config)?;
 
         config.set_base_path(Box::from(path.parent().unwrap()));
