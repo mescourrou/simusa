@@ -205,21 +205,42 @@ impl SimulatorConfig {
             let file = std::fs::File::create(path).unwrap();
             serde_yaml_ng::to_writer(file, &default_config).unwrap();
         }
-        let mut config: serde_yaml_ng::Value =
-            match yaml_include::Transformer::new(path.into(), true) {
-                Ok(loader) => loader.parse(),
-                Err(error) => {
-                    let what = format!("Error while loading the config file : {}", error);
-                    println!("ERROR: {what}");
-                    return Err(SimusaError::new(SimusaErrorTypes::ConfigError, what));
-                }
-            };
+        // Transformer allows to use !include tags in the YAML file to include other files.
+        let config: serde_yaml_ng::Value = match yaml_include::Transformer::new(path.into(), true) {
+            Ok(loader) => loader.parse(),
+            Err(error) => {
+                let what = format!("Error while loading the config file : {}", error);
+                println!("ERROR: {what}");
+                return Err(SimusaError::new(SimusaErrorTypes::ConfigError, what));
+            }
+        };
+        let mut config = Self::load_from_value(config)?;
+
+        config.set_base_path(Box::from(path.parent().unwrap()));
+
+        Ok(config)
+    }
+
+    /// Load a simulator configuration from a YAML string.
+    pub fn load_from_yaml_str(yaml_str: &str) -> SimusaResult<Self> {
+        let config: serde_yaml_ng::Value = serde_yaml_ng::from_str(yaml_str).map_err(|e| {
+            SimusaError::new(
+                SimusaErrorTypes::ConfigError,
+                format!("Error from SerdeYAML while loading SimulatorConfig: {}", e),
+            )
+        })?;
+        Self::load_from_value(config)
+    }
+
+    /// Load a simulator configuration from a YAML value.
+    pub fn load_from_value(value: serde_yaml_ng::Value) -> SimusaResult<Self> {
+        let mut config = value;
         config.apply_merge().map_err(|e| {
             let what = format!("Error from SerdeYAML while merging YAML tags: {}", e);
             println!("ERROR: {what}");
             SimusaError::new(SimusaErrorTypes::ConfigError, what)
         })?;
-        let mut config: SimulatorConfig = match serde_yaml_ng::from_value(config) {
+        let config: SimulatorConfig = match serde_yaml_ng::from_value(config) {
             Ok(c) => c,
             Err(e) => {
                 let what = format!(
@@ -234,18 +255,6 @@ impl SimulatorConfig {
                 return Err(SimusaError::new(SimusaErrorTypes::ConfigError, what));
             }
         };
-
-        config.base_path = Box::from(path.parent().unwrap());
-        if let Some(time_analysis) = &mut config.time_analysis {
-            time_analysis.output_path = config
-                .base_path
-                .as_ref()
-                .join(&time_analysis.output_path)
-                .to_str()
-                .unwrap()
-                .to_string();
-        }
-
         Ok(config)
     }
 
@@ -254,9 +263,10 @@ impl SimulatorConfig {
         self.base_path.as_ref()
     }
 
-    /// Set the base path of the simulator configuration (only available in the core)
-    #[cfg(feature = "gui")]
-    pub(crate) fn set_base_path(&mut self, path: Box<Path>) {
+    /// Set the base path of the simulator configuration. By default, it is set to the parent
+    /// directory of the configuration file or the current directory if the configuration is
+    /// loaded with another method.
+    pub fn set_base_path(&mut self, path: Box<Path>) {
         self.base_path = path;
     }
 

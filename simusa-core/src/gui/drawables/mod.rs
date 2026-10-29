@@ -200,17 +200,17 @@ impl DrawableManager {
         );
 
         // Insert robots
-        for node in &config.nodes {
-            if node.autospawn
-                && let NodeTypeConfig::Robot(robot) = &node.node_type
-            {
-                self.add_drawable(
-                    Box::new(robot::Robot::init(robot, config, node.name.clone())),
-                    context,
-                );
-                self.drawn_robots.push(node.name.clone());
-            }
-        }
+        // for node in &config.nodes {
+        //     if node.autospawn
+        //         && let NodeTypeConfig::Robot(robot) = &node.node_type
+        //     {
+        //         self.add_drawable(
+        //             Box::new(robot::Robot::init(robot, config, node.name.clone())),
+        //             context,
+        //         );
+        //         self.drawn_robots.push(node.name.clone());
+        //     }
+        // }
         if let Some(plugin_api) = plugin_api {
             for drawable in plugin_api.get_drawables(config) {
                 self.add_drawable(drawable, context);

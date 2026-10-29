@@ -86,8 +86,8 @@ doc:
     - scp -i $SSH_KEY -r site/ $DOC_USER@$DOC_HOST:$DOC_PATH/user
 
 tests:
-  only:
-    - /^release/.*$/
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   stage: test
   image: gitlab.laas.fr:4567/mescourrou/simusa:latest
   script:

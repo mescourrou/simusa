@@ -59,6 +59,7 @@ List of parameters:
 `nodes`: [NodeConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/node/node_factory/struct.NodeConfig.html), List
 	`name`: String
 	`autospawn`: Boolean
+	`spawn_count`: usize
 	`labels`: String, List
 	`node_type`: [NodeTypeConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/node/node_factory/enum.NodeTypeConfig.html), Enum
 		- `type`: Robot => [RobotConfig](https://homepages.laas.fr/mescourrou/Recherche/Logiciels/multi-robot-simulator/rust/simusa/node/node_factory/struct.RobotConfig.html)

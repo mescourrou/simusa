@@ -215,11 +215,7 @@ impl AsyncApiRunner {
                             "Loading config: {}",
                             request.config.get_base_path().to_str().unwrap()
                         );
-                        simulator.load_config_full(
-                            &request.config,
-                            plugin_api_threaded.clone(),
-                            request.force_send_results,
-                        )?;
+                        simulator.load_config(&request.config, plugin_api_threaded.clone())?;
                         println!("End loading");
                         Ok(simulator.config())
                     });
@@ -490,8 +486,6 @@ pub type PluginAsyncAPIGetPhysicsRequest = PluginAsyncAPIGetStateEstimatorReques
 pub struct AsyncApiLoadConfigRequest {
     /// Configuration to load in the simulator.
     pub config: SimulatorConfig,
-    /// If true, the simulator will send results to the API even if results are disabled in the configuration. Needed for GUI.
-    pub force_send_results: bool,
 }
 
 /// Request to call [`Simulator::run`] with the given parameters.
