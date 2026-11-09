@@ -678,7 +678,7 @@ impl Sensor for RobotSensor {
                             }
                             RobotSensorFilterType::Id(f) => {
                                 if let SensorObservation::OrientedRobot(obs) = obs {
-                                    if f.match_exclusion(std::slice::from_ref(&obs.name)) {
+                                    if f.is_accepted(std::slice::from_ref(&obs.name)) {
                                         Some(SensorObservation::OrientedRobot(obs))
                                     } else {
                                         None
@@ -689,7 +689,7 @@ impl Sensor for RobotSensor {
                             }
                             RobotSensorFilterType::Label(f) => {
                                 if let SensorObservation::OrientedRobot(obs) = obs {
-                                    if f.match_exclusion(&obs.labels) {
+                                    if f.is_accepted(&obs.labels) {
                                         Some(SensorObservation::OrientedRobot(obs))
                                     } else {
                                         None
@@ -700,29 +700,25 @@ impl Sensor for RobotSensor {
                             }
                             RobotSensorFilterType::Range(f) => {
                                 if let SensorObservation::OrientedRobot(obs) = obs {
-                                    if f.match_exclusion(
-                                        &RobotSensorVariablesFilter::mapped_values(|variant| {
-                                            match variant {
-                                                RobotSensorVariablesFilter::X => obs.pose.x,
-                                                RobotSensorVariablesFilter::Y => obs.pose.y,
-                                                RobotSensorVariablesFilter::Orientation => {
-                                                    obs.pose.z
-                                                }
-                                                RobotSensorVariablesFilter::R => {
-                                                    obs.pose.fixed_rows::<2>(0).norm()
-                                                }
-                                                RobotSensorVariablesFilter::Theta => {
-                                                    obs.pose.y.atan2(obs.pose.x)
-                                                }
-                                                RobotSensorVariablesFilter::SelfVelocity => {
-                                                    state.velocity.fixed_rows::<2>(0).norm()
-                                                }
-                                                RobotSensorVariablesFilter::TargetVelocity => {
-                                                    other_state.velocity.fixed_rows::<2>(0).norm()
-                                                }
+                                    if f.is_accepted(&RobotSensorVariablesFilter::mapped_values(
+                                        |variant| match variant {
+                                            RobotSensorVariablesFilter::X => obs.pose.x,
+                                            RobotSensorVariablesFilter::Y => obs.pose.y,
+                                            RobotSensorVariablesFilter::Orientation => obs.pose.z,
+                                            RobotSensorVariablesFilter::R => {
+                                                obs.pose.fixed_rows::<2>(0).norm()
                                             }
-                                        }),
-                                    ) {
+                                            RobotSensorVariablesFilter::Theta => {
+                                                obs.pose.y.atan2(obs.pose.x)
+                                            }
+                                            RobotSensorVariablesFilter::SelfVelocity => {
+                                                state.velocity.fixed_rows::<2>(0).norm()
+                                            }
+                                            RobotSensorVariablesFilter::TargetVelocity => {
+                                                other_state.velocity.fixed_rows::<2>(0).norm()
+                                            }
+                                        },
+                                    )) {
                                         Some(SensorObservation::OrientedRobot(obs))
                                     } else {
                                         None

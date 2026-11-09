@@ -698,7 +698,7 @@ impl Sensor for OrientedLandmarkSensor {
                         }
                         OrientedLandmarkSensorFilterType::Range(f) => {
                             if let SensorObservation::OrientedLandmark(obs) = obs {
-                                if f.match_exclusion(
+                                if f.is_accepted(
                                     &OrientedLandmarkSensorVariablesFilter::mapped_values(
                                         |variant| match variant {
                                             OrientedLandmarkSensorVariablesFilter::X => obs.pose.x,
@@ -724,9 +724,9 @@ impl Sensor for OrientedLandmarkSensor {
                                         },
                                     ),
                                 ) {
-                                    None
-                                } else {
                                     Some(SensorObservation::OrientedLandmark(obs))
+                                } else {
+                                    None
                                 }
                             } else {
                                 unreachable!()
@@ -734,10 +734,10 @@ impl Sensor for OrientedLandmarkSensor {
                         }
                         OrientedLandmarkSensorFilterType::Id(f) => {
                             if let SensorObservation::OrientedLandmark(obs) = obs {
-                                if f.match_exclusion(&[obs.id.to_string()]) {
-                                    None
-                                } else {
+                                if f.is_accepted(&[obs.id.to_string()]) {
                                     Some(SensorObservation::OrientedLandmark(obs))
+                                } else {
+                                    None
                                 }
                             } else {
                                 unreachable!()
@@ -745,10 +745,10 @@ impl Sensor for OrientedLandmarkSensor {
                         }
                         OrientedLandmarkSensorFilterType::Label(f) => {
                             if let SensorObservation::OrientedLandmark(obs) = obs {
-                                if f.match_exclusion(&obs.labels) {
-                                    None
-                                } else {
+                                if f.is_accepted(&obs.labels) {
                                     Some(SensorObservation::OrientedLandmark(obs))
+                                } else {
+                                    None
                                 }
                             } else {
                                 unreachable!()

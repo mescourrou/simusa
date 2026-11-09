@@ -868,7 +868,7 @@ impl Sensor for ScanSensor {
                                 .map(|(r, (theta, v))| (r, theta, v))
                                 .enumerate()
                             {
-                                if f.match_exclusion(&ScanSensorVariablesFilter::mapped_values(
+                                if !f.is_accepted(&ScanSensorVariablesFilter::mapped_values(
                                     |variant| match variant {
                                         ScanSensorVariablesFilter::R => *r,
                                         ScanSensorVariablesFilter::Theta => *theta,

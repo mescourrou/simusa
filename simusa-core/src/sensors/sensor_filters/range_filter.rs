@@ -166,11 +166,17 @@ impl<SV: EnumVariables> RangeFilter<SV> {
         }
     }
 
-    /// Return whether the provided variable map passes the exclusion filter.
+    /// See [`is_accepted`](Self::is_accepted) for the new method to use.
+    #[deprecated(since = "0.10.3", note = "Use `is_accepted` instead")]
+    pub fn match_exclusion(&self, variable_map: &BTreeMap<SV, f32>) -> bool {
+        self.is_accepted(variable_map)
+    }
+
+    /// Return whether the provided variable map should be kept.
     ///
     /// The method evaluates every configured variable and returns `true` when the
     /// input should be kept according to the configured range policy.
-    pub fn match_exclusion(&self, variable_map: &BTreeMap<SV, f32>) -> bool {
+    pub fn is_accepted(&self, variable_map: &BTreeMap<SV, f32>) -> bool {
         let mut keep = true;
         for (i, var) in self.config.variables.iter().enumerate() {
             if let Some(value) = variable_map.get(var) {

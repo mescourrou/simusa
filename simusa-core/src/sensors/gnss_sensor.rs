@@ -504,8 +504,8 @@ impl Sensor for GNSSSensor {
                     GNSSSensorFilterType::Plugin(f) => f.filter(time, obs, state, None, context),
                     GNSSSensorFilterType::Range(f) => {
                         if let SensorObservation::GNSS(obs) = obs {
-                            if f.match_exclusion(&GNSSSensorVariablesFilter::mapped_values(
-                                |variant| match variant {
+                            if f.is_accepted(&GNSSSensorVariablesFilter::mapped_values(|variant| {
+                                match variant {
                                     GNSSSensorVariablesFilter::X => obs.pose.x,
                                     GNSSSensorVariablesFilter::Y => obs.pose.y,
                                     GNSSSensorVariablesFilter::Orientation => obs.pose.z,
@@ -520,11 +520,11 @@ impl Sensor for GNSSSensor {
                                     GNSSSensorVariablesFilter::SelfVelocity => {
                                         state.velocity.fixed_rows::<2>(0).norm()
                                     }
-                                },
-                            )) {
-                                None
-                            } else {
+                                }
+                            })) {
                                 Some(SensorObservation::GNSS(obs))
+                            } else {
+                                None
                             }
                         } else {
                             unreachable!()

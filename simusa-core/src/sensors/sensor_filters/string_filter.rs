@@ -163,37 +163,47 @@ impl StringFilter {
         }
     }
 
-    /// Return whether the given strings should be excluded by the filter.
+    /// See [`is_accepted`](Self::is_accepted) for the new method to use.
+    #[deprecated(since = "0.10.3", note = "Use `!is_accepted` instead (negated)")]
+    pub fn match_exclusion(&self, strings: &[String]) -> bool {
+        !self.is_accepted(strings)
+    }
+
+    /// Return whether the given strings should be kept by the filter.
     ///
     /// The method checks the input strings against both accepted and rejected
     /// regexp sets, then applies the configured priority rule.
-    pub fn match_exclusion(&self, strings: &[String]) -> bool {
+    pub fn is_accepted(&self, strings: &[String]) -> bool {
+        // If priority_accept is true, accepted matches override rejected matches.
         if self.priority_accept {
-            if !self.accepted.is_empty()
+            if !self.accepted.is_empty() // If there are accepted patterns, check if any string matches an accepted pattern
                 && strings
                     .iter()
                     .any(|label| self.accepted.iter().any(|re| re.is_match(label)))
             {
-                return false;
-            } else if strings
+                return true;
+            } else if strings // If no accepted patterns match, check if any string matches a rejected pattern
                 .iter()
                 .any(|label| self.rejected.iter().any(|re| re.is_match(label)))
             {
-                return true;
+                return false;
             }
-        } else if strings
+        } else if strings // If priority_accept is false, rejected matches override accepted matches.
             .iter()
             .any(|label| self.rejected.iter().any(|re| re.is_match(label)))
         {
-            return true;
-        } else if !self.accepted.is_empty()
+            return false;
+        } else if !self.accepted.is_empty() // If rejected patterns do not match, check if any string matches an accepted pattern
             && strings
                 .iter()
                 .any(|label| self.accepted.iter().any(|re| re.is_match(label)))
         {
-            return false;
+            return true;
         }
-        !self.accepted.is_empty()
+        // We reach this point if no accepted or rejected patterns matched.
+        // If there are accepted patterns (which did not match), we reject the strings;
+        // otherwise, we accept them (there are no accepted patterns and rejected pattern did not match).
+        self.accepted.is_empty()
     }
 }
 
@@ -209,10 +219,10 @@ mod tests {
             priority_accept: true,
         };
         let filter = StringFilter::from_config(&config, 0.0, &Context::default());
-        assert!(filter.match_exclusion(&["robot_1".to_string(), "robot_bad".to_string()]));
-        assert!(!filter.match_exclusion(&["robot_good".to_string(), "robot_bad".to_string()]));
-        assert!(!filter.match_exclusion(&["robot_bad".to_string(), "robot_good".to_string()]));
-        assert!(filter.match_exclusion(&["landmark_1".to_string()]));
+        assert!(!filter.is_accepted(&["robot_1".to_string(), "robot_bad".to_string()]));
+        assert!(filter.is_accepted(&["robot_good".to_string(), "robot_bad".to_string()]));
+        assert!(filter.is_accepted(&["robot_bad".to_string(), "robot_good".to_string()]));
+        assert!(!filter.is_accepted(&["landmark_1".to_string()]));
     }
 
     #[test]
@@ -223,10 +233,10 @@ mod tests {
             priority_accept: false,
         };
         let filter = StringFilter::from_config(&config, 0.0, &Context::default());
-        assert!(!filter.match_exclusion(&["robot_1".to_string()]));
-        assert!(filter.match_exclusion(&["robot_1".to_string(), "robot_bad".to_string()]));
-        assert!(filter.match_exclusion(&["robot_bad".to_string(), "robot_1".to_string()]));
-        assert!(filter.match_exclusion(&["landmark_1".to_string()]));
+        assert!(filter.is_accepted(&["robot_1".to_string()]));
+        assert!(!filter.is_accepted(&["robot_1".to_string(), "robot_bad".to_string()]));
+        assert!(!filter.is_accepted(&["robot_bad".to_string(), "robot_1".to_string()]));
+        assert!(!filter.is_accepted(&["landmark_1".to_string()]));
     }
 
     #[test]
@@ -237,8 +247,8 @@ mod tests {
             priority_accept: true,
         };
         let filter = StringFilter::from_config(&config, 0.0, &Context::default());
-        assert!(filter.match_exclusion(&["robot_1".to_string()]));
-        assert!(filter.match_exclusion(&["robot_bad".to_string()]));
-        assert!(!filter.match_exclusion(&["landmark_1".to_string()]));
+        assert!(!filter.is_accepted(&["robot_1".to_string()]));
+        assert!(!filter.is_accepted(&["robot_bad".to_string()]));
+        assert!(filter.is_accepted(&["landmark_1".to_string()]));
     }
 }
