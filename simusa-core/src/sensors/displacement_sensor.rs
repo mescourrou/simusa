@@ -567,7 +567,7 @@ impl Sensor for DisplacementSensor {
                     }
                     DisplacementSensorFilterType::Range(f) => {
                         if let SensorObservation::Displacement(obs) = o {
-                            if f.match_exclusion(&DisplacementSensorVariablesFilter::mapped_values(
+                            if f.is_accepted(&DisplacementSensorVariablesFilter::mapped_values(
                                 |variant| match variant {
                                     DisplacementSensorVariablesFilter::X => obs.translation.x,
                                     DisplacementSensorVariablesFilter::Y => obs.translation.y,
@@ -581,9 +581,9 @@ impl Sensor for DisplacementSensor {
                                     }
                                 },
                             )) {
-                                None
-                            } else {
                                 Some(SensorObservation::Displacement(obs))
+                            } else {
+                                None
                             }
                         } else {
                             unreachable!()

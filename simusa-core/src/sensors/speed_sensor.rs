@@ -495,7 +495,7 @@ impl Sensor for SpeedSensor {
                     SpeedSensorFilterType::Plugin(f) => f.filter(time, obs, state, None, context),
                     SpeedSensorFilterType::Range(f) => {
                         if let SensorObservation::Speed(obs) = obs {
-                            if f.match_exclusion(&SpeedSensorVariablesFilter::mapped_values(
+                            if f.is_accepted(&SpeedSensorVariablesFilter::mapped_values(
                                 |variant| match variant {
                                     SpeedSensorVariablesFilter::W => obs.angular_velocity,
                                     SpeedSensorVariablesFilter::V => obs.linear_velocity,
@@ -504,9 +504,9 @@ impl Sensor for SpeedSensor {
                                     }
                                 },
                             )) {
-                                None
-                            } else {
                                 Some(SensorObservation::Speed(obs))
+                            } else {
+                                None
                             }
                         } else {
                             unreachable!()

@@ -1,5 +1,12 @@
 # Changelogs
 
+## v1.10.3
+Fix: fix usage of `match_exclusion` for StringFilter and RangeFilter. Replaced by `is_accepted` for more clarity.
+
+Deprecated:
+- `StringFilter::match_exclusion` is deprecated and should be replaced by `!is_accepted`.
+- `RangeFilter::match_exclusion` is deprecated and should be replaced by `is_accepted`.
+
 ## v1.10.2
 Features:
 - Add `spawn_count` option in Node config to spawn multiple nodes at the beginning. `autospawn` is now deprecated.
